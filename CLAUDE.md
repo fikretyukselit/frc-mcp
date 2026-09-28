@@ -110,6 +110,10 @@ For full detail, see:
 
 ## 4. Repository layout (target)
 
+Packages that exist today (M0): `cmd/frc-mcp`, `internal/{index,retrieve,router,render,vec,netguard,textutil,
+testfixture,mcpserver,mcpserver/surface,ingest/sanitize}`, `testdata/fixture`. Everything else below is planned; see
+`CONTRIBUTING.md` §2 for the status table.
+
 ```
 cmd/frc-mcp/            main; subcommand wiring only (no logic)
 internal/

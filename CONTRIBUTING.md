@@ -1,0 +1,70 @@
+# Contributing to frc-mcp
+
+Thanks for helping FRC teams get correct robot code from their AI tools. This page explains how to get started.
+The authoritative project context lives in [`CLAUDE.md`](CLAUDE.md). It is written for humans as well as coding
+agents, and it lists what must stay true.
+
+## 1. Read first (about 20 minutes)
+
+| Read | For |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) §1–§5 | Mission, system shape, pinned stack, **invariants** (never break these) |
+| [`docs/architecture.md`](docs/architecture.md) | Components, decision models, shard schema |
+| [`docs/mcp-surface.md`](docs/mcp-surface.md) | The tool contract (inputs, outputs, errors) |
+| [`docs/security.md`](docs/security.md) | Trust tiers, fencing, egress allowlist: required reading for anything touching ingestion or output |
+| [`docs/adr/`](docs/adr/) | Why things are the way they are. Change a decision only through a new ADR. |
+| [`docs/reviews/`](docs/reviews/) | Decision logs (English summaries of the Turkish research in `docs/research/`) |
+
+## 2. What exists today vs. what is planned
+
+The docs describe the **target** design. The code implements milestone **M0**:
+
+| Area | Status |
+|---|---|
+| Shard format, FTS5 + symbol tables (`internal/index`) | ✅ implemented |
+| Retrieval engine, router, abstention (`internal/retrieve`, `internal/router`) | ✅ implemented (confidence coefficients are placeholders until the M1 eval) |
+| Render contract (`internal/render`) | ✅ implemented, golden-tested |
+| Vector layer (`internal/vec`) | ✅ implemented; not yet wired to an embedder (M1) |
+| Egress guard, sanitizer (`internal/netguard`, `internal/ingest/sanitize`) | ✅ implemented |
+| Tools `frc_search`, `frc_fetch`, `frc_api` | ✅ implemented |
+| `frc_context`, `frc_vendordep`, `frc_verify_code`, `frc_migrate`, `frc_whats_new`, `frc_hardware` | ⏳ M1–M4 |
+| Real ingestion adapters, `data/`, `eval/`, shard sync/signing | ⏳ M1–M3 |
+
+The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
+
+## 3. Setup
+
+```sh
+# Go 1.27+ (go.mod pins toolchain go1.27.1; GOTOOLCHAIN=auto fetches it)
+make test       # all tests, CGO disabled (as shipped)
+make race       # race detector
+make lint       # go vet, gofmt, golangci-lint v2
+make fixture    # build bin/frc-mcp and the fixture shard
+make doctor     # measure latency on your machine
+make serve      # run the MCP server over stdio on the fixture
+```
+
+For an interactive check, point any MCP client (or a pinned, patched MCP Inspector) at
+`bin/frc-mcp serve --index .shards`.
+
+## 4. Rules for changes
+
+- **Invariants** (`CLAUDE.md` §5) are enforced by tests. If a test guards one, fix your change, not the test.
+- **Contracts:** if you change a tool schema, the chunk/shard schema or the render output, update
+  `docs/mcp-surface.md` / `docs/architecture.md`, then run `make golden` and review the diff in the same PR.
+- **Performance:** a PR touching `internal/retrieve`, `internal/index`, `internal/vec` or `internal/embed` must
+  include `benchstat` output (`make bench` before and after). Budgets are in `CLAUDE.md` §6; measured numbers are in
+  `docs/benchmarks.md`.
+- **No cgo** in the default build. Prefer the standard library, and justify every new module in the PR.
+- **Upstream facts** (URLs, API names, versions) must be verified against the live source or marked
+  `verified: false`. Never guess them.
+- **Security:** never add a tool argument that takes arbitrary URLs or file paths without going through
+  `internal/netguard` or the project-root scoping rules in `docs/security.md` §2.3.
+- **Style:** Conventional Commits, small PRs, code and docs in English, `log/slog` to stderr only (stdout is the
+  stdio transport).
+
+## 5. Good first contributions
+
+- Add adversarial cases to the router tests (`internal/router/router_test.go`) or the sanitizer corpus.
+- Write qrels for the M1 eval set: real student questions mapped to the doc section that answers them.
+- Verify a `⚠`-marked endpoint in `docs/sources.md` and record the evidence.
