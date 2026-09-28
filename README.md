@@ -69,4 +69,11 @@ with `CGO_ENABLED=0`.
 - [ADRs](docs/adr/)
 - [Reviews](docs/reviews/)
 
+## License
+
+The frc-mcp source code is released under the [MIT License](LICENSE). Content served from index shards (WPILib and vendor
+documentation, API references, forum posts) keeps its **upstream license**. Every result carries it in
+`citation.license`, and full-page redistribution follows the per-source rules in [`docs/security.md`](docs/security.md)
+and [`docs/sources.md`](docs/sources.md).
+
 Maintained by the [Fikret Yüksel Foundation](https://github.com/fikretyukselit).

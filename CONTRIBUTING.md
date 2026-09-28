@@ -63,7 +63,11 @@ For an interactive check, point any MCP client (or a pinned, patched MCP Inspect
 - **Style:** Conventional Commits, small PRs, code and docs in English, `log/slog` to stderr only (stdout is the
   stdio transport).
 
-## 5. Good first contributions
+## 5. License
+
+By contributing, you agree that your contributions are licensed under the project's [MIT License](LICENSE).
+
+## 6. Good first contributions
 
 - Add adversarial cases to the router tests (`internal/router/router_test.go`) or the sanitizer corpus.
 - Write qrels for the M1 eval set: real student questions mapped to the doc section that answers them.
