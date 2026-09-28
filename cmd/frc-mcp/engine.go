@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/fikretyukselit/frc-mcp/internal/dist"
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
@@ -21,6 +22,9 @@ func openEngine(ctx context.Context, log *slog.Logger, dir, season string, dense
 		return nil, nil
 	}
 	opt := retrieve.Options{DefaultSeason: season, DisableDense: !dense}
+	if m, err := dist.ReadLocal(dir); err == nil && m != nil {
+		opt.Expires = m.ExpiresAt
+	}
 	if dense {
 		md := index.ModelDir(dir, index.DefaultEmbedModel)
 		if _, err := os.Stat(md); err == nil {

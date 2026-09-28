@@ -46,7 +46,8 @@ type Project struct {
 }
 
 var (
-	gradleRIO = regexp.MustCompile(`id\s*\(?\s*["'](edu\.wpi\.first|org\.wpilib)\.GradleRIO["']\s*\)?\s*version\s*["']([^"']+)["']`)
+	gradleRIO = regexp.MustCompile(`id\s*\(?\s*["'](edu\.wpi\.first|org\.wpilib)\.GradleRIO["']\s*\)?(?:\s*version\s*["']([^"']+)["'])?`)
+	propVer   = regexp.MustCompile(`(?m)^\s*(?:wpilibVersion|gradleRioVersion|gradlerioVersion)\s*=\s*([0-9][\w.\-]*)\s*$`)
 	robotpy   = regexp.MustCompile(`(?m)^\s*robotpy_version\s*=\s*["']([^"']+)["']`)
 	seasonOf  = regexp.MustCompile(`^(20[2-3][0-9])`)
 )
@@ -76,10 +77,32 @@ func Detect(root string) (*Project, error) {
 	for _, f := range []string{"build.gradle", "build.gradle.kts"} {
 		if b, ok := read(f); ok {
 			found = true
-			if m := gradleRIO.FindSubmatch(b); m != nil {
+			m := gradleRIO.FindSubmatch(b)
+			switch {
+			case m != nil && len(m[2]) > 0:
 				p.WPILib = string(m[2])
-			} else {
-				p.Warnings = append(p.Warnings, f+": GradleRIO plugin version not found")
+			case m != nil:
+				// Version declared elsewhere: gradle.properties (common in
+				// larger codebases) or settings.gradle pluginManagement.
+				if pb, ok := read("gradle.properties"); ok {
+					if pm := propVer.FindSubmatch(pb); pm != nil {
+						p.WPILib = string(pm[1])
+					}
+				}
+				if p.WPILib == "" {
+					for _, sf := range []string{"settings.gradle", "settings.gradle.kts"} {
+						if sb, ok := read(sf); ok {
+							if sm := gradleRIO.FindSubmatch(sb); sm != nil && len(sm[2]) > 0 {
+								p.WPILib = string(sm[2])
+							}
+						}
+					}
+				}
+				if p.WPILib == "" {
+					p.Warnings = append(p.Warnings, f+": GradleRIO version not found (checked build file, gradle.properties, settings.gradle)")
+				}
+			default:
+				p.Warnings = append(p.Warnings, f+": GradleRIO plugin not found")
 			}
 			switch {
 			case exists(abs, "src/main/cpp") || exists(abs, "src/main/include"):
@@ -152,6 +175,36 @@ func Detect(root string) (*Project, error) {
 		}
 	}
 	return p, nil
+}
+
+// ReadSource reads a source file for verification: relative to root, must
+// stay inside it after symlink resolution, must be .java, size-capped.
+func ReadSource(root, rel string, maxBytes int64) ([]byte, error) {
+	if !strings.HasSuffix(rel, ".java") {
+		return nil, errors.New("only .java files can be verified")
+	}
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	if abs, err = filepath.EvalSymlinks(abs); err != nil {
+		return nil, err
+	}
+	if filepath.IsAbs(rel) {
+		r, err := filepath.Rel(abs, rel)
+		if err != nil {
+			return nil, errors.New("path escapes project root")
+		}
+		rel = r
+	}
+	b, err := readScoped(abs, filepath.ToSlash(rel))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(b)) > maxBytes {
+		return nil, fmt.Errorf("file is larger than %d bytes", maxBytes)
+	}
+	return b, nil
 }
 
 // readScoped reads root/rel if it resolves (after symlinks) inside root and

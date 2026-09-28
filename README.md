@@ -12,7 +12,8 @@ knowledge, pinned to the versions your robot project actually uses. It covers:
 > - retrieval quality of Recall@10 0.976 and nDCG@10 0.857, with **0 wrong-season results**;
 > - search p95 of about 5 ms.
 >
-> Vendor libraries arrive in M3. See [`CLAUDE.md`](CLAUDE.md) §9 for the roadmap.
+> M2 adds the vendordep catalog, a Java code verifier (0 false errors on 128k lines of real 2026 team code) and a
+> signed index sync. Vendor docs and APIs arrive in M3. See [`CLAUDE.md`](CLAUDE.md) §9 for the roadmap.
 
 ## Why
 
@@ -36,7 +37,7 @@ Client config (use a pinned path or version, never `@latest`):
 { "mcpServers": { "frc": { "command": "/path/to/frc-mcp", "args": ["serve", "--index", "/path/to/shards"] } } }
 ```
 
-## Tools (M1)
+## Tools (M2)
 
 | Tool | Purpose |
 |---|---|
@@ -45,8 +46,12 @@ Client config (use a pinned path or version, never `@latest`):
 | `frc_fetch` | Returns a full section by id (search → fetch), paged by token budget |
 | `frc_api` | Exact lookup across 35k API symbols: signatures, deprecated/removed status, and replacements, including the generated `edu.wpi.first` → `org.wpilib` map |
 
-The v0.2 surface grows to 9 tools: `frc_verify_code`, `frc_migrate`, `frc_vendordep`, `frc_whats_new` and
-`frc_hardware` are added. See [MCP surface](docs/mcp-surface.md).
+| `frc_vendordep` | Resolves a vendor library from the official WPILib catalog (newest version, install command, frcYear), or checks a whole installed set: outdated, wrong year, conflicts |
+| `frc_verify_code` | Checks Java robot code against the pinned season's API: wrong-season imports and calls come with the exact fix; deprecated APIs are flagged |
+
+Also new: `frc-mcp verify DIR` checks a whole robot project from the command line, and `frc-mcp sync` installs or
+updates the signed index. Next come `frc_migrate`, `frc_whats_new` and `frc_hardware`; see
+[MCP surface](docs/mcp-surface.md).
 
 ## Performance (Apple M2, real WPILib index)
 

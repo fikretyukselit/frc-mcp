@@ -30,6 +30,13 @@ expected changes/day in the off-season (scaled by the season multiplier). **Pri*
   Utility Mode; `commandbased/commands-v2/`; the FIRST Driver Station replacing the NI DS; Systemcore pages; and a
   `yearly-overview/removed-features` page.
 
+- **Vendordep catalog** (`wpilibsuite/vendor-json-repo`):
+  - Folder listings come from the GitHub contents API: 107 files for 2026 and 8 for `2027_alpha7`. Individual JSONs
+    come from `raw.githubusercontent.com` (ETag, `max-age=300`).
+  - The `*_metadata.json` files hold only uuid, name and description; version data lives in the per-year folders.
+  - Catalog quirks we keep verbatim: `PathplannerLib-2025.1.2.json` in the 2026 folder contains version 2026.1.2.
+    Phoenix 6 for 2027 is already `26.70.0-alpha-2`, newer than the research's alpha-1.
+
 ## 1. WPILib core
 
 | Source | Endpoint(s) | Detect | Floor | Prior | Pri |

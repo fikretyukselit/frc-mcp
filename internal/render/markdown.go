@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -216,12 +217,108 @@ func ContextMarkdown(o ContextOut) string {
 	for _, w := range o.Warnings {
 		fmt.Fprintf(&b, "\n⚠ %s\n", w)
 	}
+	if len(o.Upgrades) > 0 {
+		b.WriteString("\nVendordep updates (WPILib catalog):\n")
+		for _, u := range o.Upgrades {
+			fmt.Fprintf(&b, "- %s: %s → %s (%s)", u.Name, u.Installed, u.Latest, u.Status)
+			if u.Fix != "" {
+				fmt.Fprintf(&b, " — `%s`", u.Fix)
+			}
+			b.WriteString("\n")
+		}
+	}
 	if len(o.Files) > 0 {
 		fmt.Fprintf(&b, "\nRead: %s\n", strings.Join(o.Files, ", "))
 	}
 	if o.Pin != "" {
 		fmt.Fprintf(&b, "\nPin handle: `%s`\n", o.Pin)
 	}
+	footer(&b, o.Envelope)
+	return b.String()
+}
+
+// VendordepMarkdown renders frc_vendordep.
+func VendordepMarkdown(o VendordepOut) string {
+	var b strings.Builder
+	envelope(&b, "frc_vendordep", o.Envelope)
+	if l := o.Library; l != nil {
+		fmt.Fprintf(&b, "\n**%s** — newest %s version: **%s** (frcYear %s, file `%s`)\n", l.Name, o.Season, l.Latest, orDash(l.FRCYear), l.FileName)
+		if l.Install != "" {
+			fmt.Fprintf(&b, "\nInstall / update:\n```\n%s\n```\n", l.Install)
+		} else {
+			b.WriteString("\nInstall with the WPILib Dependency Manager (VS Code: WPILib: Manage Vendor Libraries).\n")
+		}
+		fmt.Fprintf(&b, "\nAll %s versions: %s\n", o.Season, strings.Join(l.Versions, ", "))
+		for _, c := range l.ConflictsWith {
+			fmt.Fprintf(&b, "⚠ conflicts: %s\n", c)
+		}
+		b.WriteString("\n")
+		source(&b, l.Citation, "")
+	}
+	if len(o.Findings) > 0 {
+		b.WriteString("\n| Library | Installed | Newest | Status | Fix |\n|---|---|---|---|---|\n")
+		for _, f := range o.Findings {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", f.Name, orDash(f.Installed), orDash(f.Latest), f.Status, codeOrDash(f.Fix))
+		}
+		b.WriteString("\n")
+		for _, f := range o.Findings {
+			if f.Status != "ok" {
+				fmt.Fprintf(&b, "- %s\n", f.Message)
+			}
+		}
+	}
+	if len(o.Candidates) > 0 {
+		fmt.Fprintf(&b, "\nCatalog libraries: %s\n", strings.Join(o.Candidates, ", "))
+	}
+	footer(&b, o.Envelope)
+	return b.String()
+}
+
+func codeOrDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return "`" + s + "`"
+}
+
+// VerifyMarkdown renders frc_verify_code.
+func VerifyMarkdown(o VerifyOut) string {
+	var b strings.Builder
+	envelope(&b, "frc_verify_code", o.Envelope)
+	target := "code"
+	if o.File != "" {
+		target = o.File
+	}
+	fmt.Fprintf(&b, "\n%s: %d API references checked · %d error(s) · %d warning(s)\n", target, o.Checked, o.Errors, o.Warnings)
+	for _, f := range o.Findings {
+		if f.Severity == "info" {
+			continue
+		}
+		fmt.Fprintf(&b, "\n- **%s** line %d:%d `%s` — %s", f.Severity, f.Line, f.Col, f.Symbol, f.Message)
+		if f.Fix != "" {
+			fmt.Fprintf(&b, "\n  fix: %s", f.Fix)
+		}
+		b.WriteString("\n")
+	}
+	info := 0
+	for _, f := range o.Findings {
+		if f.Severity == "info" {
+			info++
+		}
+	}
+	if info > 0 {
+		fmt.Fprintf(&b, "\n%d unresolved reference(s) (info; see structured findings)\n", info)
+	}
+	keys := make([]string, 0, len(o.Coverage))
+	for k := range o.Coverage {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	b.WriteString("\nCoverage:")
+	for _, k := range keys {
+		fmt.Fprintf(&b, " %s=%s;", k, o.Coverage[k])
+	}
+	b.WriteString("\n")
 	footer(&b, o.Envelope)
 	return b.String()
 }

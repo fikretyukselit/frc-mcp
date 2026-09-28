@@ -180,7 +180,11 @@ func API(matches, others []index.Symbol, rc Context, season string) APIOut {
 		out.Status, out.Confidence = retrieve.StatusOK, 1
 		for _, m := range out.Matches {
 			if m.RemovedIn != "" || m.DeprecatedIn != "" {
-				out.Next = append(out.Next, fmt.Sprintf("%s is deprecated/removed; prefer %s", m.FQN, orDash(m.Replacement)))
+				repl := m.Replacement
+				if repl == "" {
+					repl = "the documented replacement"
+				}
+				out.Next = append(out.Next, fmt.Sprintf("%s is deprecated/removed; prefer %s", m.FQN, repl))
 				break
 			}
 		}
@@ -275,7 +279,7 @@ func round4(f float64) float64 { return float64(int(f*10000+0.5)) / 10000 }
 
 func orDash(s string) string {
 	if s == "" {
-		return "the documented replacement"
+		return "—"
 	}
 	return s
 }

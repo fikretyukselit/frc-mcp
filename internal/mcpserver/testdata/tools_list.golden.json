@@ -490,6 +490,40 @@
           "description": "true when results were cut to fit the token budget",
           "type": "boolean"
         },
+        "upgrades": {
+          "description": "installed vendordeps that are outdated or for the wrong year, per the WPILib catalog",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "fix": {
+                "type": "string"
+              },
+              "installed": {
+                "type": "string"
+              },
+              "latest": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "installed",
+              "latest",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
         "vendordeps": {
           "items": {
             "additionalProperties": false,
@@ -501,6 +535,9 @@
                 "type": "string"
               },
               "name": {
+                "type": "string"
+              },
+              "uuid": {
                 "type": "string"
               },
               "version": {
@@ -1183,5 +1220,477 @@
       "type": "object"
     },
     "title": "Search FRC docs"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Resolve FRC vendordeps"
+    },
+    "description": "Resolve a vendor library (vendordep) from the official WPILib vendordep catalog, or check a whole set of installed vendordeps for one FRC season: newest version, install/update command, frcYear compatibility and declared conflicts. Answers are exact catalog facts, never guesses.\n\nUse when: adding a vendor library (REVLib, Phoenix 6, PhotonLib, PathPlannerLib, ChoreoLib, AdvantageKit, YAGSL, …), fixing \"vendordep for the wrong year\" or version errors, or checking whether a project's vendordeps are current. Pass a frc_context pin to check the project's own vendordeps.\nDon't use when: you need a vendor's API or docs — use frc_search / frc_api.\n\nExamples:\n{\"name\": \"rev\"}\n{\"name\": \"phoenix6\", \"frc_season\": \"2027\"}\n{\"vendordeps\": [\"REVLib@2026.0.0\", \"PathplannerLib@2025.2.7\"], \"frc_season\": \"2026\"}\n{\"pin\": \"pin1.…\"}",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "frc_season": {
+          "description": "FRC season, e.g. 2026 (default: pin, then the current stable season)",
+          "pattern": "^20[2-3][0-9]$",
+          "type": "string"
+        },
+        "name": {
+          "description": "library name or alias (rev, phoenix6, photon, pathplanner, choreo, advantagekit, yagsl, …)",
+          "type": "string"
+        },
+        "pin": {
+          "description": "pin handle from frc_context; set mode checks the project's own vendordeps",
+          "type": "string"
+        },
+        "vendordeps": {
+          "description": "set mode: installed vendordeps as raw JSON documents or name@version",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "name": "frc_vendordep",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "description": "catalog names when the query was ambiguous or unknown",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "confidence": {
+          "description": "0..1 confidence in the top result",
+          "type": "number"
+        },
+        "degraded": {
+          "description": "retrievers that were unavailable for this call",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "findings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "fix": {
+                "type": "string"
+              },
+              "installed": {
+                "type": "string"
+              },
+              "latest": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "description": "ok | outdated | wrong_year | newer_than_catalog | unknown | conflict",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "installed",
+              "status",
+              "message"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "frc_season": {
+          "description": "effective FRC season the results are pinned to",
+          "type": "string"
+        },
+        "freshness": {
+          "description": "shard (served from the local index) | live",
+          "type": "string"
+        },
+        "index_age": {
+          "description": "age of the newest loaded index shard",
+          "type": "string"
+        },
+        "index_stale": {
+          "description": "true when the index manifest is past its expiry",
+          "type": "boolean"
+        },
+        "language": {
+          "description": "effective language filter",
+          "type": "string"
+        },
+        "library": {
+          "additionalProperties": false,
+          "properties": {
+            "citation": {
+              "additionalProperties": false,
+              "properties": {
+                "library": {
+                  "description": "library id, e.g. wpilib, phoenix6, revlib",
+                  "type": "string"
+                },
+                "license": {
+                  "description": "license of the upstream content",
+                  "type": "string"
+                },
+                "retrieved_at": {
+                  "description": "RFC 3339 time the content was fetched",
+                  "type": "string"
+                },
+                "source_url": {
+                  "description": "canonical URL of the upstream source",
+                  "type": "string"
+                },
+                "suspect": {
+                  "description": "true when the content was flagged as a possible prompt injection",
+                  "type": "boolean"
+                },
+                "trust": {
+                  "description": "official | vendor | community; community text is untrusted data",
+                  "type": "string"
+                },
+                "upstream_rev": {
+                  "description": "upstream commit SHA, ETag or release tag the content was built from",
+                  "type": "string"
+                },
+                "version": {
+                  "description": "library version (or range) the content applies to",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source_url",
+                "library",
+                "version",
+                "upstream_rev",
+                "retrieved_at",
+                "license",
+                "trust"
+              ],
+              "type": "object"
+            },
+            "conflicts_with": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "file_name": {
+              "type": "string"
+            },
+            "frc_year": {
+              "type": "string"
+            },
+            "install": {
+              "description": "command that installs or updates the vendordep",
+              "type": "string"
+            },
+            "json_url": {
+              "description": "online vendordep URL from the WPILib catalog",
+              "type": "string"
+            },
+            "latest_version": {
+              "type": "string"
+            },
+            "maven_urls": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "uuid": {
+              "type": "string"
+            },
+            "versions": {
+              "description": "all catalog versions for the season, ascending",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "uuid",
+            "latest_version",
+            "versions",
+            "frc_year",
+            "file_name",
+            "citation"
+          ],
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "next": {
+          "description": "suggested next tool calls",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "next_cursor": {
+          "description": "pass back as cursor to get the next page",
+          "type": "string"
+        },
+        "omitted": {
+          "description": "number of results left out by truncation",
+          "type": "integer"
+        },
+        "pin_source": {
+          "description": "where the season came from: arg | query | default",
+          "type": "string"
+        },
+        "status": {
+          "description": "ok | low_confidence | no_match | version_mismatch | syncing",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "true when results were cut to fit the token budget",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "freshness",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "title": "Resolve FRC vendordeps"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": "Verify robot code against the season API"
+    },
+    "description": "Check Java robot code against the pinned FRC season's real API before you build or deploy it. It catches imports and calls that belong to a different season (e.g. edu.wpi.first.* in a 2027 project, org.wpilib.* in 2026) with the exact replacement, and flags deprecated APIs (e.g. XboxController.getLeftBumper → getLeftBumperButton).\n\nUse when: you wrote or changed robot code that uses WPILib, before telling the user it is done; when a build fails with \"cannot find symbol\" after a season update.\nDon't use when: you want documentation — use frc_search / frc_api.\n\nSeverity: error = wrong-season API with a known counterpart (fix it); warning = deprecated or no equivalent in this season; info = not resolvable (team code, inherited member, or a library not indexed yet). Read `coverage`: libraries marked none were not checked. Examples:\n{\"code\": \"import edu.wpi.first.wpilibj.XboxController;\\n…\", \"frc_season\": \"2027\"}\n{\"path\": \"src/main/java/frc/robot/RobotContainer.java\", \"pin\": \"pin1.…\"}",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "description": "Java source to check",
+          "maxLength": 524288,
+          "type": "string"
+        },
+        "frc_season": {
+          "description": "FRC season to check against (default: pin, then the current stable season)",
+          "pattern": "^20[2-3][0-9]$",
+          "type": "string"
+        },
+        "language": {
+          "description": "java (C++ and Python arrive in M3)",
+          "enum": [
+            "java",
+            "cpp",
+            "python"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "description": "alternative to code: a .java file under the project root (local servers only)",
+          "type": "string"
+        },
+        "pin": {
+          "description": "pin handle from frc_context",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "frc_verify_code",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "checked": {
+          "type": "integer"
+        },
+        "confidence": {
+          "description": "0..1 confidence in the top result",
+          "type": "number"
+        },
+        "coverage": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "what was checked per library; 'none' means not checked — silence is not approval",
+          "type": "object"
+        },
+        "degraded": {
+          "description": "retrievers that were unavailable for this call",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "errors": {
+          "type": "integer"
+        },
+        "file": {
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "col": {
+                "type": "integer"
+              },
+              "fix": {
+                "type": "string"
+              },
+              "kind": {
+                "description": "wrong_season | deprecated | unknown",
+                "type": "string"
+              },
+              "line": {
+                "type": "integer"
+              },
+              "message": {
+                "type": "string"
+              },
+              "severity": {
+                "description": "error | warning | info",
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              },
+              "symbol": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "line",
+              "col",
+              "symbol",
+              "severity",
+              "kind",
+              "message"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "frc_season": {
+          "description": "effective FRC season the results are pinned to",
+          "type": "string"
+        },
+        "freshness": {
+          "description": "shard (served from the local index) | live",
+          "type": "string"
+        },
+        "index_age": {
+          "description": "age of the newest loaded index shard",
+          "type": "string"
+        },
+        "index_stale": {
+          "description": "true when the index manifest is past its expiry",
+          "type": "boolean"
+        },
+        "language": {
+          "description": "effective language filter",
+          "type": "string"
+        },
+        "next": {
+          "description": "suggested next tool calls",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "next_cursor": {
+          "description": "pass back as cursor to get the next page",
+          "type": "string"
+        },
+        "omitted": {
+          "description": "number of results left out by truncation",
+          "type": "integer"
+        },
+        "pin_source": {
+          "description": "where the season came from: arg | query | default",
+          "type": "string"
+        },
+        "status": {
+          "description": "ok | low_confidence | no_match | version_mismatch | syncing",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "true when results were cut to fit the token budget",
+          "type": "boolean"
+        },
+        "warnings": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "freshness",
+        "truncated",
+        "findings",
+        "coverage",
+        "checked",
+        "errors",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "title": "Verify robot code against the season API"
   }
 ]

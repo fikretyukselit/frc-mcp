@@ -2,6 +2,7 @@ package index
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,10 +14,19 @@ import (
 // OpenDir opens every *.sqlite shard in dir, sorted by file name. Shards that
 // fail to open (e.g. incompatible schema) are skipped and reported in errs so
 // one bad shard never takes the server down. A missing dir is not an error.
+//
+// When dir holds a synced manifest.json (frc-mcp sync), only the shards it
+// lists are opened, so a previous version's files that are still on disk are
+// never loaded next to the new ones.
 func OpenDir(ctx context.Context, dir string) (shards []*Reader, errs []error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*.sqlite"))
+	paths, err := manifestShards(dir)
 	if err != nil {
-		return nil, []error{err}
+		errs = append(errs, err)
+	}
+	if paths == nil {
+		if paths, err = filepath.Glob(filepath.Join(dir, "*.sqlite")); err != nil {
+			return nil, []error{err}
+		}
 	}
 	sort.Strings(paths)
 	for _, p := range paths {
@@ -33,6 +43,35 @@ func OpenDir(ctx context.Context, dir string) (shards []*Reader, errs []error) {
 		}
 	}
 	return shards, errs
+}
+
+// manifestShards returns the shard paths listed in dir/manifest.json, or nil
+// when there is no manifest.
+func manifestShards(dir string) ([]string, error) {
+	b, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var m struct {
+		Shards []struct {
+			DB struct {
+				Name string `json:"name"`
+			} `json:"db"`
+		} `json:"shards"`
+	}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("index: %s/manifest.json: %w", dir, err)
+	}
+	out := []string{}
+	for _, s := range m.Shards {
+		if n := s.DB.Name; n != "" && !strings.Contains(n, "..") && !filepath.IsAbs(n) {
+			out = append(out, filepath.Join(dir, n))
+		}
+	}
+	return out, nil
 }
 
 // DefaultEmbedModel is the lite-profile embedding model (ADR-0002/0005).

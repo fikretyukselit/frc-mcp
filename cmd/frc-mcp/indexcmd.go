@@ -46,8 +46,15 @@ func indexRun(ctx context.Context, args []string) error {
 }
 
 func indexCmd(ctx context.Context, args []string) error {
-	if len(args) > 0 && args[0] == "run" {
-		return indexRun(ctx, args[1:])
+	if len(args) > 0 {
+		switch args[0] {
+		case "run":
+			return indexRun(ctx, args[1:])
+		case "publish":
+			return indexPublish(ctx, args[1:])
+		case "keygen":
+			return indexKeygen()
+		}
 	}
 	if len(args) == 0 || args[0] != "build" {
 		return errors.New("usage:\n  frc-mcp index run   [--sources data/sources.yaml] [--out DIR] [--only id,…] [--no-embed]\n  frc-mcp index build --chunks F [--symbols F] --out SHARD.sqlite [--name N]")

@@ -140,6 +140,9 @@ Detects or declares the project's pin set.
   - `coverage` per `(library, language)`: `full|partial|none`, stating which checks ran. Silence without coverage is not
     approval.
   - Summary counts.
+- **Status:** implemented for Java in M2. False-positive gate: 0 errors in 128k LOC of public 2026 team code
+  (`docs/benchmarks.md`). Member checks walk the pinned season's supertype hierarchy; a hierarchy that cannot be
+  resolved yields no finding.
 - **MVP scope (M2):**
   - Java: imports (including wildcard and static), qualified type names, and `new X(`.
   - C++ (M3): `#include` and `ns::Type`.

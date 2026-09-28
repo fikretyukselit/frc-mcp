@@ -112,22 +112,89 @@ type APIOut struct {
 	OtherSeasons []SymbolOut `json:"other_seasons,omitempty" jsonschema:"the same symbol in other seasons (e.g. before/after a package move)"`
 }
 
-// VendordepOut is a detected vendordep.
-type VendordepOut struct {
+// DetectedVendordep is a vendordep found in the project.
+type DetectedVendordep struct {
 	File    string `json:"file"`
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	FRCYear string `json:"frc_year,omitempty"`
+	UUID    string `json:"uuid,omitempty"`
 }
 
 // ContextOut is frc_context's structured result.
 type ContextOut struct {
 	Envelope
-	Pin        string            `json:"pin" jsonschema:"opaque handle; pass as pin to frc_search / frc_api to apply this project's season, language and versions"`
-	Channel    string            `json:"channel,omitempty"`
-	WPILib     string            `json:"wpilib_version,omitempty"`
-	Libraries  map[string]string `json:"libraries,omitempty" jsonschema:"library name → version pinned by the project"`
-	Vendordeps []VendordepOut    `json:"vendordeps"`
-	Files      []string          `json:"files" jsonschema:"project files that were read"`
-	Warnings   []string          `json:"warnings,omitempty" jsonschema:"compatibility problems found (e.g. vendordep frcYear does not match the WPILib season)"`
+	Pin        string              `json:"pin" jsonschema:"opaque handle; pass as pin to frc_search / frc_api to apply this project's season, language and versions"`
+	Channel    string              `json:"channel,omitempty"`
+	WPILib     string              `json:"wpilib_version,omitempty"`
+	Libraries  map[string]string   `json:"libraries,omitempty" jsonschema:"library name → version pinned by the project"`
+	Vendordeps []DetectedVendordep `json:"vendordeps"`
+	Files      []string            `json:"files" jsonschema:"project files that were read"`
+	Warnings   []string            `json:"warnings,omitempty" jsonschema:"compatibility problems found (e.g. vendordep frcYear does not match the WPILib season)"`
+	Upgrades   []UpgradeHint       `json:"upgrades,omitempty" jsonschema:"installed vendordeps that are outdated or for the wrong year, per the WPILib catalog"`
+}
+
+// VendordepInfo is a resolved catalog library.
+type VendordepInfo struct {
+	Name          string   `json:"name"`
+	UUID          string   `json:"uuid"`
+	Latest        string   `json:"latest_version"`
+	Versions      []string `json:"versions" jsonschema:"all catalog versions for the season, ascending"`
+	FRCYear       string   `json:"frc_year"`
+	FileName      string   `json:"file_name"`
+	JSONURL       string   `json:"json_url,omitempty" jsonschema:"online vendordep URL from the WPILib catalog"`
+	MavenURLs     []string `json:"maven_urls,omitempty"`
+	Install       string   `json:"install,omitempty" jsonschema:"command that installs or updates the vendordep"`
+	ConflictsWith []string `json:"conflicts_with,omitempty"`
+	Citation      Citation `json:"citation"`
+}
+
+// CompatFinding is a set-mode verdict.
+type CompatFinding struct {
+	Name      string `json:"name"`
+	Installed string `json:"installed"`
+	Latest    string `json:"latest,omitempty"`
+	Status    string `json:"status" jsonschema:"ok | outdated | wrong_year | newer_than_catalog | unknown | conflict"`
+	Message   string `json:"message"`
+	Fix       string `json:"fix,omitempty"`
+}
+
+// VendordepOut is frc_vendordep's structured result.
+type VendordepOut struct {
+	Envelope
+	Library    *VendordepInfo  `json:"library,omitempty"`
+	Findings   []CompatFinding `json:"findings,omitempty"`
+	Candidates []string        `json:"candidates,omitempty" jsonschema:"catalog names when the query was ambiguous or unknown"`
+}
+
+// UpgradeHint is a frc_context suggestion.
+type UpgradeHint struct {
+	Name      string `json:"name"`
+	Installed string `json:"installed"`
+	Latest    string `json:"latest"`
+	Status    string `json:"status"`
+	Fix       string `json:"fix,omitempty"`
+}
+
+// VerifyFinding is one frc_verify_code finding.
+type VerifyFinding struct {
+	Line      int    `json:"line"`
+	Col       int    `json:"col"`
+	Symbol    string `json:"symbol"`
+	Severity  string `json:"severity" jsonschema:"error | warning | info"`
+	Kind      string `json:"kind" jsonschema:"wrong_season | deprecated | unknown"`
+	Message   string `json:"message"`
+	Fix       string `json:"fix,omitempty"`
+	SourceURL string `json:"source_url,omitempty"`
+}
+
+// VerifyOut is frc_verify_code's structured result.
+type VerifyOut struct {
+	Envelope
+	File     string            `json:"file,omitempty"`
+	Findings []VerifyFinding   `json:"findings"`
+	Coverage map[string]string `json:"coverage" jsonschema:"what was checked per library; 'none' means not checked — silence is not approval"`
+	Checked  int               `json:"checked"`
+	Errors   int               `json:"errors"`
+	Warnings int               `json:"warnings"`
 }

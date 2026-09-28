@@ -77,6 +77,31 @@ CREATE TABLE symbol (
 ) WITHOUT ROWID;
 CREATE INDEX symbol_simple ON symbol (simple, season);
 CREATE INDEX symbol_fqn    ON symbol (fqn, season);
+CREATE INDEX symbol_repl   ON symbol (replacement) WHERE replacement <> '';
+
+-- Exact vendordep facts from WPILib's vendor-json-repo catalog (never embedded).
+CREATE TABLE vendordep (
+  uuid         TEXT NOT NULL,
+  name         TEXT NOT NULL COLLATE NOCASE,
+  version      TEXT NOT NULL,
+  season       TEXT NOT NULL,
+  channel      TEXT NOT NULL,
+  frc_year     TEXT NOT NULL DEFAULT '',
+  file_name    TEXT NOT NULL DEFAULT '',
+  json_url     TEXT NOT NULL DEFAULT '',
+  maven_urls   TEXT NOT NULL DEFAULT '[]', -- JSON array
+  conflicts    TEXT NOT NULL DEFAULT '[]', -- JSON array of {uuid, errorMessage, offlineFileName}
+  java_deps    INTEGER NOT NULL DEFAULT 0,
+  cpp_deps     INTEGER NOT NULL DEFAULT 0,
+  description  TEXT NOT NULL DEFAULT '',
+  website      TEXT NOT NULL DEFAULT '',
+  raw_json     TEXT NOT NULL,
+  source_url   TEXT NOT NULL,
+  upstream_rev TEXT NOT NULL,
+  retrieved_at INTEGER NOT NULL,
+  PRIMARY KEY (uuid, version, season)
+) WITHOUT ROWID;
+CREATE INDEX vendordep_name ON vendordep (name, season);
 `
 
 // Enum codes returned by the light FTS query (no per-row string allocation).

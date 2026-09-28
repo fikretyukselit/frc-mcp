@@ -17,7 +17,7 @@ agents, and it lists what must stay true.
 
 ## 2. What exists today vs. what is planned
 
-The docs describe the **target** design. The code implements milestones **M0 and M1**:
+The docs describe the **target** design. The code implements milestones **M0, M1 and M2**:
 
 | Area | Status |
 |---|---|
@@ -29,9 +29,11 @@ The docs describe the **target** design. The code implements milestones **M0 and
 | Project detection + pin handles (`internal/project`) | ✅ implemented |
 | Eval harness + judged queries + CI gate (`internal/eval`, `eval/`) | ✅ 184 queries; a human-written holdout is still needed |
 | Egress guard, sanitizer (`internal/netguard`, `internal/ingest/sanitize`) | ✅ implemented |
-| Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context` | ✅ implemented |
-| `frc_vendordep`, `frc_verify_code`, `frc_migrate`, `frc_whats_new`, `frc_hardware` | ⏳ M2–M4 |
-| Vendor sources, C++/Python symbol tables, shard sync/signing | ⏳ M2–M3 |
+| Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context`, `frc_vendordep`, `frc_verify_code` (Java) | ✅ implemented |
+| Vendordep catalog facts (`internal/facts`, `source/vendordeps`) | ✅ WPILib vendor-json-repo, 2026 + 2027-alpha |
+| Verifier (`internal/verify`, `frc-mcp verify`) | ✅ Java: 0 false errors on 128k LOC of public 2026 team code |
+| Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
+| `frc_migrate`, `frc_whats_new`, `frc_hardware`, vendor docs/APIs, C++/Python symbol tables | ⏳ M3–M4 |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -75,6 +77,8 @@ By contributing, you agree that your contributions are licensed under the projec
 ## 6. Good first contributions
 
 - Add adversarial cases to the router tests (`internal/router/router_test.go`) or the sanitizer corpus.
+- **Verifier false-positive reports:** run `frc-mcp verify path/to/robot` on your team's code. Every `error` on code
+  that compiles is a bug; please open an issue with the snippet.
 - **Most wanted:** human-written eval queries (`eval/queries.jsonl`, `"author": "human"`, `"split": "holdout"`).
   These should be real questions students asked, mapped to the WPILib page that answers them. The current 184
   queries were written by the plan author and are biased toward the docs' own vocabulary.

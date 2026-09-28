@@ -12,6 +12,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/mcpserver"
 	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
 	"github.com/fikretyukselit/frc-mcp/internal/testfixture"
@@ -99,7 +100,7 @@ func TestToolAnnotationsReadOnly(t *testing.T) {
 		}
 	}
 	// The SDK lists tools sorted by name: deterministic, as SEP-2549 asks.
-	if strings.Join(names, ",") != "frc_api,frc_context,frc_fetch,frc_search" {
+	if strings.Join(names, ",") != "frc_api,frc_context,frc_fetch,frc_search,frc_vendordep,frc_verify_code" {
 		t.Fatalf("tool order = %v", names)
 	}
 }
@@ -276,5 +277,107 @@ func BenchmarkSearchOverProtocol(b *testing.B) {
 		if _, err := cs.CallTool(ctx, params); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// catalogEngine builds a shard holding only vendordep facts.
+func catalogEngine(t *testing.T) *retrieve.Engine {
+	t.Helper()
+	ctx := context.Background()
+	p := filepath.Join(t.TempDir(), "vendordeps-2026.sqlite")
+	w, err := index.Create(ctx, p, "vendordeps-2026")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_790_000_000, 0)
+	for _, v := range []index.Vendordep{
+		{UUID: "3f48eb8c", Name: "REVLib", Version: "2026.0.0", Season: "2026", Channel: "stable", FRCYear: "2026", FileName: "REVLib.json",
+			JSONURL: "https://software-metadata.revrobotics.com/REVLib-2026.json"},
+		{UUID: "3f48eb8c", Name: "REVLib", Version: "2026.0.5", Season: "2026", Channel: "stable", FRCYear: "2026", FileName: "REVLib.json",
+			JSONURL: "https://software-metadata.revrobotics.com/REVLib-2026.json"},
+		{UUID: "badjson", Name: "Sketchy", Version: "1.0.0", Season: "2026", Channel: "stable", FRCYear: "2026", JSONURL: "http://evil.example/x.json"},
+	} {
+		v.Raw, v.SourceURL, v.UpstreamRev, v.RetrievedAt = []byte(`{}`), "https://raw.githubusercontent.com/x", "r", now
+		if err := w.AddVendordep(ctx, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := index.Open(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	return retrieve.New([]*index.Reader{r}, retrieve.Options{DefaultSeason: "2026"})
+}
+
+func TestVendordepTool(t *testing.T) {
+	cs := connect(t, catalogEngine(t))
+	_, sc, text := call(t, cs, "frc_vendordep", map[string]any{"name": "sparkmax"})
+	lib, _ := sc["library"].(map[string]any)
+	if lib["latest_version"] != "2026.0.5" || lib["install"] != "./gradlew vendordep --url=https://software-metadata.revrobotics.com/REVLib-2026.json" {
+		t.Fatalf("resolve: %v\n%s", sc, text)
+	}
+	_, sc, _ = call(t, cs, "frc_vendordep", map[string]any{"vendordeps": []string{"REVLib@2026.0.0"}})
+	f := sc["findings"].([]any)[0].(map[string]any)
+	if f["status"] != "outdated" || f["latest"] != "2026.0.5" {
+		t.Fatalf("set mode: %v", f)
+	}
+	// A non-https jsonUrl from the catalog is never handed out as an install command.
+	_, sc, _ = call(t, cs, "frc_vendordep", map[string]any{"name": "Sketchy"})
+	if lib := sc["library"].(map[string]any); lib["install"] != nil || lib["json_url"] != nil {
+		t.Fatalf("non-https install URL leaked: %v", lib)
+	}
+	_, sc, _ = call(t, cs, "frc_vendordep", map[string]any{"name": "nonexistentlib"})
+	if sc["status"] != "no_match" || len(sc["candidates"].([]any)) == 0 {
+		t.Fatalf("unknown: %v", sc)
+	}
+}
+
+func TestVerifyCodeTool(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src := "package frc.robot;\nimport edu.wpi.first.math.kinematics.SwerveDriveKinematics;\npublic class Drive {}\n"
+	if err := os.WriteFile(filepath.Join(root, "src", "Drive.java"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	secret := filepath.Join(t.TempDir(), "Secret.java")
+	if err := os.WriteFile(secret, []byte("class S {}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := mcpserver.New(testfixture.Engine(t), mcpserver.Options{Version: "t", ProjectRoot: root})
+	ctx := context.Background()
+	ct, st := mcp.NewInMemoryTransports()
+	ss, _ := srv.MCP().Connect(ctx, st, nil)
+	cs, _ := mcp.NewClient(&mcp.Implementation{Name: "c", Version: "0"}, nil).Connect(ctx, ct, nil)
+	defer cs.Close()
+	defer ss.Close()
+
+	_, sc, text := call(t, cs, "frc_verify_code", map[string]any{"path": "src/Drive.java", "frc_season": "2027"})
+	if sc["errors"] != float64(1) || sc["status"] != "version_mismatch" || !strings.Contains(text, "use org.wpilib.math.kinematics.SwerveDriveKinematics") {
+		t.Fatalf("verify path: %v\n%s", sc, text)
+	}
+	_, sc, _ = call(t, cs, "frc_verify_code", map[string]any{"code": src, "frc_season": "2026"})
+	if sc["errors"] != float64(0) || sc["status"] != "ok" {
+		t.Fatalf("2026 clean: %v", sc)
+	}
+	for _, bad := range []string{"../" + filepath.Base(filepath.Dir(secret)) + "/Secret.java", secret, "src/../../etc/passwd.java", "build.gradle"} {
+		res, _, text := call(t, cs, "frc_verify_code", map[string]any{"path": bad})
+		if !res.IsError {
+			t.Errorf("path %q must be refused: %s", bad, text)
+		}
+	}
+	hosted := mcpserver.New(testfixture.Engine(t), mcpserver.Options{Version: "t", ProjectRoot: root, NoFilesystem: true})
+	ct2, st2 := mcp.NewInMemoryTransports()
+	ss2, _ := hosted.MCP().Connect(ctx, st2, nil)
+	cs2, _ := mcp.NewClient(&mcp.Implementation{Name: "c", Version: "0"}, nil).Connect(ctx, ct2, nil)
+	defer cs2.Close()
+	defer ss2.Close()
+	if res, _, _ := call(t, cs2, "frc_verify_code", map[string]any{"path": "src/Drive.java"}); !res.IsError {
+		t.Error("hosted server must refuse path")
 	}
 }

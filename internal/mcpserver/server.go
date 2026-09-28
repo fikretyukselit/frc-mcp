@@ -17,11 +17,13 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/fikretyukselit/frc-mcp/internal/facts"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/mcpserver/surface"
 	"github.com/fikretyukselit/frc-mcp/internal/project"
 	"github.com/fikretyukselit/frc-mcp/internal/render"
 	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
+	"github.com/fikretyukselit/frc-mcp/internal/verify"
 )
 
 // Server is the frc-mcp MCP server. The engine can be swapped atomically
@@ -108,6 +110,10 @@ func (s *Server) register() {
 		Annotations: readOnly("Look up FRC API symbol"), InputSchema: apiSchema()}, s.api)
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_context", Title: "Detect FRC project versions", Description: surface.Context(),
 		Annotations: readOnly("Detect FRC project versions"), InputSchema: contextSchema()}, s.context)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_vendordep", Title: "Resolve FRC vendordeps", Description: surface.Vendordep(),
+		Annotations: readOnly("Resolve FRC vendordeps"), InputSchema: vendordepSchema()}, s.vendordep)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_verify_code", Title: "Verify robot code against the season API", Description: surface.VerifyCode(),
+		Annotations: readOnly("Verify robot code against the season API"), InputSchema: verifySchema()}, s.verifyCode)
 	s.mcp.AddResource(&mcp.Resource{URI: "frc://index/manifest", Name: "index-manifest", Title: "Loaded index shards",
 		Description: "Shards currently loaded: names, build ids, build times, seasons, chunk and symbol counts.",
 		MIMEType:    "application/json"}, s.manifest)
@@ -163,6 +169,7 @@ func (s *Server) search(ctx context.Context, _ *mcp.CallToolRequest, in SearchIn
 	if fromPin && out.PinSource == "arg" {
 		out.PinSource = "handle"
 	}
+	out.IndexStale = e.Stale(s.now())
 	return text(render.SearchMarkdown(out)), out, nil
 }
 
@@ -248,6 +255,7 @@ func (s *Server) fetch(ctx context.Context, _ *mcp.CallToolRequest, in FetchIn) 
 	}
 	out := render.Fetch(c, render.Context{Now: s.now(), BuiltAt: e.BuiltAt(), Digest: e.Digest(),
 		MaxTok: in.MaxTokens, Offset: offset, QueryKey: key})
+	out.IndexStale = e.Stale(s.now())
 	return text(render.FetchMarkdown(out)), out, nil
 }
 
@@ -333,6 +341,7 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 		out.PinSource = "arg"
 	}
 	out.Language = in.Language
+	out.IndexStale = e.Stale(s.now())
 	return text(render.APIMarkdown(out)), out, nil
 }
 
@@ -353,7 +362,7 @@ type ContextIn struct {
 
 func (s *Server) context(_ context.Context, _ *mcp.CallToolRequest, in ContextIn) (*mcp.CallToolResult, render.ContextOut, error) {
 	out := render.ContextOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
-		PinSource: "project"}, Vendordeps: []render.VendordepOut{}, Files: []string{}}
+		PinSource: "project"}, Vendordeps: []render.DetectedVendordep{}, Files: []string{}}
 	pin := project.Pin{}
 	if !s.opt.NoFilesystem || in.ProjectRoot != "" {
 		if s.opt.NoFilesystem {
@@ -375,7 +384,7 @@ func (s *Server) context(_ context.Context, _ *mcp.CallToolRequest, in ContextIn
 			pin = p.PinOf()
 			out.WPILib, out.Files, out.Warnings = p.WPILib, p.Files, p.Warnings
 			for _, v := range p.Vendordeps {
-				out.Vendordeps = append(out.Vendordeps, render.VendordepOut{File: v.File, Name: v.Name, Version: v.Version, FRCYear: v.FRCYear})
+				out.Vendordeps = append(out.Vendordeps, render.DetectedVendordep{File: v.File, Name: v.Name, Version: v.Version, FRCYear: v.FRCYear, UUID: v.UUID})
 			}
 		}
 	}
@@ -403,8 +412,192 @@ func (s *Server) context(_ context.Context, _ *mcp.CallToolRequest, in ContextIn
 		out.Status = retrieve.StatusVersionMismatch
 		out.Warnings = append(out.Warnings, fmt.Sprintf("the loaded index has no data for season %s", pin.Season))
 	}
-	out.Next = []string{fmt.Sprintf("pass {\"pin\": %q} to frc_search and frc_api", out.Pin)}
+	if e := s.engine.Load(); e.Ready() && !e.Catalog().Empty() && len(out.Vendordeps) > 0 {
+		var installed []facts.Installed
+		for _, v := range out.Vendordeps {
+			installed = append(installed, facts.Installed{Name: v.Name, Version: v.Version, UUID: v.UUID, FRCYear: v.FRCYear})
+		}
+		for _, f := range e.Catalog().Check(installed, pin.Season) {
+			if f.Status == "outdated" || f.Status == "wrong_year" {
+				out.Upgrades = append(out.Upgrades, render.UpgradeHint{Name: f.Name, Installed: f.Installed, Latest: f.Latest, Status: f.Status, Fix: f.Fix})
+			}
+		}
+	}
+	out.Next = []string{fmt.Sprintf("pass {\"pin\": %q} to frc_search, frc_api and frc_vendordep", out.Pin)}
 	return text(render.ContextMarkdown(out)), out, nil
+}
+
+// ---- frc_verify_code ----
+
+const maxVerifyBytes = 512 << 10
+
+// VerifyIn is frc_verify_code's input.
+type VerifyIn struct {
+	Code     string `json:"code,omitempty" jsonschema:"Java source to check"`
+	Path     string `json:"path,omitempty" jsonschema:"alternative to code: a .java file under the project root (local servers only)"`
+	Language string `json:"language,omitempty" jsonschema:"java (C++ and Python arrive in M3)"`
+	Season   string `json:"frc_season,omitempty" jsonschema:"FRC season to check against (default: pin, then the current stable season)"`
+	Pin      string `json:"pin,omitempty" jsonschema:"pin handle from frc_context"`
+}
+
+func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in VerifyIn) (*mcp.CallToolResult, render.VerifyOut, error) {
+	var lang, channel string
+	fromPin, err := applyPin(in.Pin, &in.Season, &lang, &channel)
+	if err != nil {
+		return nil, render.VerifyOut{}, err
+	}
+	if in.Language == "" {
+		in.Language = "java"
+	}
+	if err := validateCommon(in.Season, "", in.Language); err != nil {
+		return nil, render.VerifyOut{}, err
+	}
+	code, file := in.Code, ""
+	switch {
+	case in.Code != "" && in.Path != "":
+		return nil, render.VerifyOut{}, errors.New("pass either code or path, not both")
+	case in.Path != "":
+		if s.opt.NoFilesystem {
+			return nil, render.VerifyOut{}, errors.New("path is disabled on this (hosted) server; pass the file content as code")
+		}
+		root := s.opt.ProjectRoot
+		if root == "" {
+			root = "."
+		}
+		b, err := project.ReadSource(root, in.Path, maxVerifyBytes)
+		if err != nil {
+			return nil, render.VerifyOut{}, fmt.Errorf("%w; path must be a .java file under the project root %s", err, root)
+		}
+		code, file = string(b), in.Path
+	case in.Code == "":
+		return nil, render.VerifyOut{}, errors.New(`pass code (Java source) or path, e.g. {"code": "import edu.wpi.first.wpilibj.TimedRobot; …"}`)
+	case len(in.Code) > maxVerifyBytes:
+		return nil, render.VerifyOut{}, fmt.Errorf("code is %d bytes; the limit is %d — verify one file per call", len(in.Code), maxVerifyBytes)
+	}
+	e := s.engine.Load()
+	if !e.Ready() {
+		out := render.VerifyOut{Envelope: syncing(), Findings: []render.VerifyFinding{}}
+		return text(render.VerifyMarkdown(out)), out, nil
+	}
+	pinSource := "arg"
+	switch {
+	case fromPin:
+		pinSource = "handle"
+	case in.Season == "":
+		in.Season, pinSource = e.DefaultSeason(), "default"
+	}
+	out := render.VerifyOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
+		Season: in.Season, PinSource: pinSource, Language: in.Language}, File: file, Findings: []render.VerifyFinding{}}
+	if in.Language != "java" {
+		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
+		out.Coverage = map[string]string{"wpilib": "none (" + in.Language + " verification arrives in M3)"}
+		out.Next = []string{"only Java is verified today; use frc_api to check individual " + in.Language + " symbols"}
+		return text(render.VerifyMarkdown(out)), out, nil
+	}
+	r := verify.Java(ctx, e, code, in.Season)
+	out.Coverage, out.Checked, out.Errors, out.Warnings = r.Coverage, r.Checked, r.Errors, r.Warnings
+	for _, f := range r.Findings {
+		out.Findings = append(out.Findings, render.VerifyFinding(f))
+	}
+	if r.Errors > 0 {
+		out.Status = retrieve.StatusVersionMismatch
+		out.Next = []string{"apply the fixes above, then run frc_verify_code again"}
+	}
+	return text(render.VerifyMarkdown(out)), out, nil
+}
+
+// ---- frc_vendordep ----
+
+// VendordepIn is frc_vendordep's input.
+type VendordepIn struct {
+	Name       string   `json:"name,omitempty" jsonschema:"library name or alias (rev, phoenix6, photon, pathplanner, choreo, advantagekit, yagsl, …)"`
+	Vendordeps []string `json:"vendordeps,omitempty" jsonschema:"set mode: installed vendordeps as raw JSON documents or name@version"`
+	Season     string   `json:"frc_season,omitempty" jsonschema:"FRC season, e.g. 2026 (default: pin, then the current stable season)"`
+	Pin        string   `json:"pin,omitempty" jsonschema:"pin handle from frc_context; set mode checks the project's own vendordeps"`
+}
+
+func (s *Server) vendordep(_ context.Context, _ *mcp.CallToolRequest, in VendordepIn) (*mcp.CallToolResult, render.VendordepOut, error) {
+	var lang, channel string
+	fromPin, err := applyPin(in.Pin, &in.Season, &lang, &channel)
+	if err != nil {
+		return nil, render.VendordepOut{}, err
+	}
+	if err := validateCommon(in.Season, "", ""); err != nil {
+		return nil, render.VendordepOut{}, err
+	}
+	e := s.engine.Load()
+	if !e.Ready() || e.Catalog().Empty() {
+		out := render.VendordepOut{Envelope: syncing()}
+		return text(render.VendordepMarkdown(out)), out, nil
+	}
+	pinSource := "arg"
+	switch {
+	case fromPin:
+		pinSource = "handle"
+	case in.Season == "":
+		in.Season, pinSource = e.DefaultSeason(), "default"
+	}
+	out := render.VendordepOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
+		Season: in.Season, PinSource: pinSource}}
+	cat := e.Catalog()
+
+	// Set mode: explicit list, or the pin's libraries.
+	var installed []facts.Installed
+	for _, raw := range in.Vendordeps {
+		v, err := facts.ParseInstalled(raw)
+		if err != nil {
+			return nil, out, err
+		}
+		installed = append(installed, v)
+	}
+	if len(installed) == 0 && in.Name == "" && in.Pin != "" {
+		p, _ := project.DecodePin(in.Pin)
+		for name, ver := range p.Libs {
+			if name != "wpilib" {
+				installed = append(installed, facts.Installed{Name: name, Version: ver})
+			}
+		}
+		slices.SortFunc(installed, func(a, b facts.Installed) int { return strings.Compare(a.Name, b.Name) })
+	}
+	if len(installed) > 0 {
+		for _, f := range cat.Check(installed, in.Season) {
+			out.Findings = append(out.Findings, render.CompatFinding(f))
+			if f.Status == "wrong_year" || f.Status == "conflict" {
+				out.Status = retrieve.StatusVersionMismatch
+			}
+		}
+		return text(render.VendordepMarkdown(out)), out, nil
+	}
+	if in.Name == "" {
+		return nil, out, errors.New(`pass name (e.g. {"name": "rev"}) or vendordeps (e.g. {"vendordeps": ["REVLib@2026.0.0"]}) or a frc_context pin`)
+	}
+	m, cands := cat.Resolve(in.Name, in.Season)
+	if m == nil {
+		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
+		out.Candidates = cands
+		if len(cands) == 0 {
+			out.Candidates = cat.Names(in.Season)
+		}
+		out.Next = []string{"retry with one of the catalog library names listed above"}
+		return text(render.VendordepMarkdown(out)), out, nil
+	}
+	l := m.Latest
+	info := &render.VendordepInfo{Name: l.Name, UUID: l.UUID, Latest: l.Version, Versions: m.Versions, FRCYear: l.FRCYear,
+		FileName: l.FileName, JSONURL: l.JSONURL, MavenURLs: l.MavenURLs,
+		Citation: render.Citation{SourceURL: l.SourceURL, Library: "vendordeps", Version: l.Version, UpstreamRev: l.UpstreamRev,
+			RetrievedAt: l.RetrievedAt.Format(time.RFC3339), License: "vendor-specific", Trust: "official"}}
+	if l.JSONURL != "" {
+		info.Install = "./gradlew vendordep --url=" + l.JSONURL
+	}
+	for _, c := range l.Conflicts {
+		info.ConflictsWith = append(info.ConflictsWith, c.ErrorMessage)
+	}
+	if yr := l.FRCYear; yr != "" && yr != in.Season {
+		out.Status = retrieve.StatusVersionMismatch
+		out.Next = append(out.Next, fmt.Sprintf("the newest catalog entry declares frcYear %s, not %s: the vendor may not have published a %s release yet", yr, in.Season, in.Season))
+	}
+	out.Library = info
+	return text(render.VendordepMarkdown(out)), out, nil
 }
 
 // applyPin fills unset fields from a pin handle; it reports whether the
@@ -494,6 +687,21 @@ func contextSchema() *jsonschema.Schema {
 	enum(d, "language", []string{"java", "cpp", "python"})
 	enum(d, "channel", channels)
 	d.Properties["frc_season"].Pattern = seasonRe.String()
+	return s
+}
+
+func verifySchema() *jsonschema.Schema {
+	s := infer[VerifyIn]()
+	enum(s, "language", []string{"java", "cpp", "python"})
+	s.Properties["frc_season"].Pattern = seasonRe.String()
+	s.Properties["code"].MaxLength = ptr(maxVerifyBytes)
+	return s
+}
+
+func vendordepSchema() *jsonschema.Schema {
+	s := infer[VendordepIn]()
+	s.Properties["frc_season"].Pattern = seasonRe.String()
+	s.Properties["vendordeps"].MaxItems = ptr(64)
 	return s
 }
 

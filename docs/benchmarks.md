@@ -18,6 +18,33 @@ The corpus is the WPILib docs and Java API for 2026 and 2027-alpha, built by `fr
 | `frc_search`, hybrid, 184 eval queries | p50 2.2 ms · p95 5.4 ms | p95 ≤ 50 ms |
 | `frc-mcp doctor`, 200 mixed queries | p50 3.5 ms · p95 4.7 ms (lexical only: p95 4.4 ms) | p95 ≤ 50 ms |
 
+## Verifier false-positive gate (M2, 2026-09-29)
+
+`frc-mcp verify` was run over 12 public 2026 team repositories, shallow-cloned from GitHub (Java, each detected as
+season 2026). The teams are 6328 Mechanical Advantage, StuyPulse, Spartronics 4915, 5427, 4533, 102, 3082, Salem,
+166, 5409, 1810 and hammerheads5000.
+
+| Code | Files | Lines | Errors | Warnings | Errors / kLOC | Gate |
+|---|---|---|---|---|---|---|
+| All 12 repositories, pinned to their own season (2026) | 1,016 | 128,329 | **0** | 7 | **0.000** | ≤ 1.0 ✅ |
+| Team 5427 code pinned to **2027** (true-positive check) | 141 | 19,246 | 547 | 84 | 28.4 | — |
+
+- **Two false-positive classes were found and fixed during the gate:**
+  1. Inherited members such as `XboxController.isConnected` (declared on `GenericHID` in 2026). The fix walks the
+     pinned season's supertype hierarchy.
+  2. `org.wpilib.math.*` classes from **SleipnirJava**, a separate 2026 library. The rule now reports `error` only
+     when the pinned-season counterpart is known, and `warning` otherwise.
+- **The 7 remaining warnings** are those SleipnirJava imports. They are correctly worded as "ignore if it comes from
+  another library".
+
+## Distribution size (M2)
+
+`frc-mcp index publish` on the full index (6 shards + model) produces 38 MB of gzip objects:
+- 30 MB is the float16 model, which barely compresses and is downloaded once;
+- the WPILib docs, API and vendordep shards plus vector layers are about 8 MB.
+
+Objects are content-addressed, so an update downloads only shards whose content changed. Publishing takes 1.8 s.
+
 ## Fixture corpus (M0)
 
 Measured on an Apple M2 (8 cores, macOS), Go 1.27.1, `CGO_ENABLED=0`. The numbers come from

@@ -203,10 +203,16 @@ Encoded as a compact, versioned, base64url token for the `pin` handle (no server
 
 1. Binary: goreleaser → GitHub Releases, Homebrew cask, Scoop, Winget, `go install`. Cosign-signed checksums,
    SLSA provenance attestation, Syft SBOM.
-2. Index: `frc-mcp sync` resolves `ghcr.io/fikretyukselit/frc-mcp-index:<channel>` → manifest; falls back to the HTTPS
-   mirror when GHCR is unreachable (common on school networks); downloads only shards/layers whose digest changed
-   (content-addressed = free delta), resumable; verifies the cosign signature against the **pinned workflow identity**;
-   rejects a lower `serial`; decompresses to a temp dir; atomic rename.
+2. Index (implemented in M2, ADR-0006): `frc-mcp sync` fetches `manifest.json` and `manifest.json.sig` from an HTTPS
+   channel. The default is the `index-stable` GitHub release; any mirror works, and `--allow-private` enables a LAN
+   mirror.
+   - It verifies the ed25519 signature against compiled-in keys and rejects a lower `serial`.
+   - It downloads only objects whose digest changed. Objects are content-addressed gzip, so deltas come for free.
+   - Each object is checked against sha256 and the signed size, then decompressed next to the live files. Local names
+     carry the build id, so open files are never replaced.
+   - It commits by atomically replacing the local manifest, then prunes unreferenced files.
+   - `index.OpenDir` opens only the shards the installed manifest lists.
+   - GHCR/OCI is deferred to the hosted profile.
 3. First run: `serve` answers `tools/list` immediately (≤ 150 ms) and syncs in the background; tools return
    `status: syncing` with progress until the first shard set is ready — never block the client's startup timeout.
 4. Background: `serve` checks the manifest at most every 6 h (configurable; `--offline` disables) and hot-swaps.

@@ -24,6 +24,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/javadoc"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/sphinx"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/vendordeps"
 	"github.com/fikretyukselit/frc-mcp/internal/sources"
 	"github.com/fikretyukselit/frc-mcp/internal/vec"
 )
@@ -58,12 +59,13 @@ type SourceReport struct {
 }
 
 type ShardReport struct {
-	Name     string `json:"name"`
-	Chunks   int    `json:"chunks"`
-	Symbols  int    `json:"symbols"`
-	Rejected int    `json:"rejected"`
-	Vectors  int    `json:"vectors"`
-	BuildID  string `json:"build_id"`
+	Name       string `json:"name"`
+	Chunks     int    `json:"chunks"`
+	Symbols    int    `json:"symbols"`
+	Rejected   int    `json:"rejected"`
+	Vectors    int    `json:"vectors"`
+	Vendordeps int    `json:"vendordeps,omitempty"`
+	BuildID    string `json:"build_id"`
 }
 
 type DiffReport struct {
@@ -72,9 +74,10 @@ type DiffReport struct {
 }
 
 type shardData struct {
-	name    string
-	chunks  []index.Chunk
-	symbols []index.Symbol
+	name       string
+	chunks     []index.Chunk
+	symbols    []index.Symbol
+	vendordeps []index.Vendordep
 }
 
 // Run executes a build.
@@ -111,6 +114,9 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 		switch src.Adapter {
 		case "sphinx-htmlzip":
 			_, err = sphinx.Parse(res.Path, src, rev, res.FetchedAt, addChunk)
+		case "vendordep-catalog":
+			_, err = vendordeps.Parse(ctx, f, src, res.FetchedAt,
+				func(v index.Vendordep) error { sd.vendordeps = append(sd.vendordeps, v); sr.Symbols++; return nil }, addChunk)
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
@@ -224,6 +230,16 @@ func writeShard(ctx context.Context, dir string, sd *shardData, model *m2v.Model
 			return nil, err
 		}
 		rep.Symbols++
+	}
+	for _, v := range sd.vendordeps {
+		if err := w.AddVendordep(ctx, v); err != nil {
+			if errors.Is(err, index.ErrInvalidChunk) {
+				rep.Rejected++
+				continue
+			}
+			return nil, err
+		}
+		rep.Vendordeps++
 	}
 	if err := w.Close(ctx); err != nil {
 		return nil, err

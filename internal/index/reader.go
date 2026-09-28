@@ -22,7 +22,7 @@ type Reader struct {
 	meta Meta
 	path string
 
-	fts, chunks, byKey, symFQN, symSimple, symMember, docExists *sql.Stmt
+	fts, chunks, byKey, symFQN, symSimple, symMember, docExists, pkgExists, byRepl *sql.Stmt
 }
 
 // Meta describes a shard.
@@ -162,6 +162,8 @@ func (r *Reader) prepare(ctx context.Context) error {
 		{&r.chunks, `SELECT ` + chunkCols + ` FROM chunk c WHERE c.id IN (SELECT value FROM json_each(?1))`},
 		{&r.byKey, `SELECT ` + chunkCols + ` FROM chunk c WHERE c.doc_id = ?1 AND c.ord = ?2`},
 		{&r.docExists, `SELECT 1 FROM chunk WHERE doc_id = ?1 LIMIT 1`},
+		{&r.pkgExists, `SELECT 1 FROM symbol WHERE fqn >= ?1 AND fqn < ?2 AND (?3 = '' OR season = ?3) AND language = ?4 LIMIT 1`},
+		{&r.byRepl, `SELECT ` + symbolCols + ` FROM symbol WHERE replacement = ?1 AND (?2 = '' OR season = ?2) LIMIT 5`},
 		{&r.symFQN, `SELECT ` + symbolCols + ` FROM symbol WHERE fqn = ?1 AND (?2 = '' OR season = ?2)
 			AND (?3 = '' OR ?3 = 'any' OR language = ?3) ORDER BY season DESC, fqn, signature LIMIT ?4`},
 		{&r.symSimple, `SELECT ` + symbolCols + ` FROM symbol WHERE simple = ?1 AND (?2 = '' OR season = ?2)
@@ -253,6 +255,36 @@ func (r *Reader) Chunks(ctx context.Context, ids []int64) (map[int64]*Chunk, err
 	return out, rows.Err()
 }
 
+// PackageExists reports whether any symbol lives in pkg (Java package or
+// C++ namespace prefix) for a season ("" = any) and language.
+func (r *Reader) PackageExists(ctx context.Context, pkg, season, language string) bool {
+	var one int
+	return r.pkgExists.QueryRowContext(ctx, pkg+".", pkg+"/", season, language).Scan(&one) == nil
+}
+
+// SymbolsReplacedBy finds symbols whose generated or upstream Replacement is
+// fqn (reverse of the migration map: which older API became this one).
+func (r *Reader) SymbolsReplacedBy(ctx context.Context, fqn, season string) ([]Symbol, error) {
+	rows, err := r.byRepl.QueryContext(ctx, fqn, season)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Symbol
+	for rows.Next() {
+		var s Symbol
+		var at int64
+		if err := rows.Scan(&s.FQN, &s.Library, &s.Version, &s.Season, &s.Language, &s.Kind, &s.Signature,
+			&s.Summary, &s.Since, &s.DeprecatedIn, &s.RemovedIn, &s.Replacement, &s.ChunkID, &s.SourceURL,
+			&s.UpstreamRev, &at, &s.License, &s.Trust); err != nil {
+			return nil, err
+		}
+		s.RetrievedAt = time.Unix(at, 0).UTC()
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 // DocExists reports whether any chunk belongs to docID.
 func (r *Reader) DocExists(ctx context.Context, docID string) bool {
 	var one int
@@ -293,6 +325,10 @@ type SymbolQuery struct {
 	Season   string
 	Language string
 	Limit    int
+	// Exact disables the simple-name fallback for qualified names (the
+	// verifier must never treat "edu.wpi.first.X" as found because some
+	// other package declares X).
+	Exact bool
 }
 
 // Symbols performs an exact lookup, trying FQN, then Type#member, then simple
@@ -334,7 +370,7 @@ func (r *Reader) Symbols(ctx context.Context, q SymbolQuery) ([]Symbol, error) {
 	}
 	// A qualified name that is not an FQN may still be Type#member written as
 	// "Type.member" or a C++ "ns::Type::member"; fall back to simple lookup.
-	if len(out) == 0 && isQualified && !strings.Contains(name, "#") {
+	if len(out) == 0 && isQualified && !strings.Contains(name, "#") && !q.Exact {
 		return r.Symbols(ctx, SymbolQuery{Name: SimpleName(name), Season: q.Season, Language: q.Language, Limit: q.Limit})
 	}
 	return out, nil

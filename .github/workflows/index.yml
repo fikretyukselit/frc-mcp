@@ -1,0 +1,71 @@
+# Ingestion plane (ADR-0003 / ADR-0006): build the index on a fixed schedule,
+# gate it with the retrieval eval, then sign and publish it in an isolated
+# job. The build job holds no secrets; only the publish job can sign.
+name: index
+on:
+  schedule:
+    - cron: "17 6 * * *" # daily; the adaptive scheduler replaces this in M5
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: index
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/fetch
+          key: fetch-${{ hashFiles('data/sources.yaml') }}-${{ github.run_id }}
+          restore-keys: fetch-${{ hashFiles('data/sources.yaml') }}-
+      - name: Build index
+        env:
+          CGO_ENABLED: "0"
+          GITHUB_TOKEN: ${{ github.token }} # read-only; used for api.github.com listings only
+        run: go run ./cmd/frc-mcp index run --out .shards
+      - name: Eval gate
+        run: go run ./cmd/frc-mcp eval --index .shards --ab --baseline eval/baseline.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shards
+          path: .shards/
+          retention-days: 3
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: index-publish # protected: main only, holds FRC_MCP_INDEX_KEY
+    permissions:
+      contents: write # upload release assets
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: shards
+          path: .shards/
+      - name: Previous manifest (for the monotonic serial)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prev
+          gh release download index-stable -p manifest.json -D prev || echo "no previous release"
+      - name: Sign and package
+        env:
+          FRC_MCP_INDEX_KEY: ${{ secrets.FRC_MCP_INDEX_KEY }}
+        run: go run ./cmd/frc-mcp index publish --in .shards --out dist/index --channel stable --prev prev/manifest.json
+      - name: Upload to the index-stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view index-stable >/dev/null 2>&1 || gh release create index-stable --title "Index (stable channel)" --notes "Signed frc-mcp index. Managed by the index workflow; do not edit by hand." --prerelease
+          # Objects first (content-addressed, idempotent), manifest last: clients only switch after everything is uploaded.
+          gh release upload index-stable dist/index/*.gz --clobber
+          gh release upload index-stable dist/index/manifest.json.sig dist/index/manifest.json --clobber

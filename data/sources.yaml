@@ -6,6 +6,7 @@ user_agent: "frc-mcp-indexer/{version} (+https://github.com/fikretyukselit/frc-m
 extra_hosts:
   - storage.googleapis.com # frcmaven.wpi.edu (Artifactory) redirects artifact downloads here
   - "*.hf.co"              # huggingface.co redirects model files to its CDN (us.aws.cdn.hf.co, cas-bridge.xethub.hf.co)
+  - raw.githubusercontent.com # vendordep JSON files listed by the GitHub contents API (download_url)
 
 sources:
   # ---- WPILib documentation (frc-docs, now wpilibsuite/wpilib-docs; CC BY 4.0) ----
@@ -67,6 +68,36 @@ sources:
     license: BSD-3-Clause
     trust: official
     shard: wpilib-java-2027
+    verified: true
+
+  # ---- Vendordep catalog (wpilibsuite/vendor-json-repo) ----
+  # The list the WPILib Dependency Manager shows. Every vendordep JSON becomes
+  # an exact fact row (frc_vendordep); the newest version per library also
+  # becomes one searchable chunk. Folder listing via the GitHub contents API
+  # (GITHUB_TOKEN used when set); files via raw.githubusercontent.com (ETag).
+  - id: vendordeps-2026
+    adapter: vendordep-catalog
+    url: https://api.github.com/repos/wpilibsuite/vendor-json-repo/contents/2026
+    base_url: https://github.com/wpilibsuite/vendor-json-repo/tree/main/2026
+    library: vendordeps
+    season: "2026"
+    channel: stable
+    version: "2026"
+    license: vendor-specific (catalog metadata; see each vendor)
+    trust: official
+    shard: vendordeps-2026
+    verified: true
+  - id: vendordeps-2027
+    adapter: vendordep-catalog
+    url: https://api.github.com/repos/wpilibsuite/vendor-json-repo/contents/2027_alpha7
+    base_url: https://github.com/wpilibsuite/vendor-json-repo/tree/main/2027_alpha7
+    library: vendordeps
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-7
+    license: vendor-specific (catalog metadata; see each vendor)
+    trust: official
+    shard: vendordeps-2027
     verified: true
 
 models:

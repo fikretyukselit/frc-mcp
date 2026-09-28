@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
+	"github.com/fikretyukselit/frc-mcp/internal/facts"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/router"
 	"github.com/fikretyukselit/frc-mcp/internal/textutil"
@@ -67,6 +68,9 @@ type Engine struct {
 	allowMu  sync.Mutex
 	allow    map[string][][]uint64 // filter key → per-shard bitsets
 	warnings []string
+
+	catalog *facts.Catalog // vendordep facts from every shard
+	expires time.Time
 }
 
 // Options configures an Engine.
@@ -79,11 +83,13 @@ type Options struct {
 	Model *m2v.Model
 	// DisableDense turns dense retrieval off even when available (eval A/B).
 	DisableDense bool
+	// Expires is the installed manifest's expiry (zero: unmanaged/dev index).
+	Expires time.Time
 }
 
 // New builds an engine over opened shards (which it does not own).
 func New(shards []*index.Reader, opt Options) *Engine {
-	e := &Engine{shards: shards, defaultSeason: opt.DefaultSeason}
+	e := &Engine{shards: shards, defaultSeason: opt.DefaultSeason, expires: opt.Expires}
 	h := sha256.New()
 	best := ""
 	for _, s := range shards {
@@ -105,8 +111,25 @@ func New(shards []*index.Reader, opt Options) *Engine {
 	if opt.Model != nil && !opt.DisableDense {
 		e.loadDense(opt.Model)
 	}
+	var vds []index.Vendordep
+	for _, s := range shards {
+		rows, err := s.Vendordeps(context.Background(), "")
+		if err != nil {
+			e.warnings = append(e.warnings, "vendordeps:"+s.Meta().Name+": "+err.Error())
+			continue
+		}
+		vds = append(vds, rows...)
+	}
+	e.catalog = facts.NewCatalog(vds)
 	return e
 }
+
+// Stale reports whether the installed index is past its manifest expiry
+// (a stalled publisher or a freeze attack; docs/security.md §2.4).
+func (e *Engine) Stale(now time.Time) bool { return !e.expires.IsZero() && now.After(e.expires) }
+
+// Catalog returns the vendordep catalog (possibly empty).
+func (e *Engine) Catalog() *facts.Catalog { return e.catalog }
 
 // loadDense opens vector layers whose model id and row count match. A
 // mismatched or missing layer disables dense for that shard only (reported by
@@ -721,6 +744,27 @@ func (e *Engine) DocExists(ctx context.Context, id string) bool {
 		}
 	}
 	return false
+}
+
+// PackageExists reports whether a Java package / C++ namespace exists.
+func (e *Engine) PackageExists(ctx context.Context, pkg, season, language string) bool {
+	for _, s := range e.shards {
+		if s.PackageExists(ctx, pkg, season, language) {
+			return true
+		}
+	}
+	return false
+}
+
+// SymbolsReplacedBy is the reverse migration lookup across shards.
+func (e *Engine) SymbolsReplacedBy(ctx context.Context, fqn, season string) []index.Symbol {
+	var out []index.Symbol
+	for _, s := range e.shards {
+		if r, err := s.SymbolsReplacedBy(ctx, fqn, season); err == nil {
+			out = append(out, r...)
+		}
+	}
+	return out
 }
 
 // HasSeason reports whether any shard contains the season.

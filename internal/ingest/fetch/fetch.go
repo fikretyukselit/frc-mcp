@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fikretyukselit/frc-mcp/internal/netguard"
@@ -60,6 +61,12 @@ func (f *Fetcher) Get(ctx context.Context, url string) (*Result, error) {
 		}
 	}
 	hdr := http.Header{}
+	// Authenticated GitHub API calls get 5,000 req/h and free 304s; the token
+	// is sent to api.github.com only, never to redirects or other hosts.
+	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" && strings.HasPrefix(url, "https://api.github.com/") {
+		hdr.Set("Authorization", "Bearer "+tok)
+		hdr.Set("X-GitHub-Api-Version", "2022-11-28")
+	}
 	if cached != nil {
 		if cached.ETag != "" {
 			hdr.Set("If-None-Match", cached.ETag)

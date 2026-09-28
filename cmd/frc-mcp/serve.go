@@ -11,10 +11,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/fikretyukselit/frc-mcp/internal/dist"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/mcpserver"
 )
@@ -26,6 +28,9 @@ func serve(ctx context.Context, log *slog.Logger, args []string) error {
 	addr := fs.String("addr", "127.0.0.1:7424", "listen address for --transport http")
 	season := fs.String("default-season", "", "season used when nothing pins one (default: newest stable season in the index)")
 	noDense := fs.Bool("no-dense", false, "disable dense (vector) retrieval")
+	offline := fs.Bool("offline", false, "never contact the network (no index sync)")
+	syncURL := fs.String("sync-url", dist.DefaultSyncURL, "signed index channel to sync from")
+	syncEvery := fs.Duration("sync-every", 6*time.Hour, "index sync interval")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -34,24 +39,64 @@ func serve(ctx context.Context, log *slog.Logger, args []string) error {
 	// cold start far below client startup timeouts on any index size.
 	cwd, _ := os.Getwd()
 	srv := mcpserver.New(nil, mcpserver.Options{Version: buildVersion(), ProjectRoot: cwd, NoFilesystem: *transport == "http"})
-	var shards []*index.Reader
-	loaded := make(chan struct{})
-	go func() {
-		defer close(loaded)
+	var mu sync.Mutex
+	var current []*index.Reader
+	load := func(reason string) {
 		start := time.Now()
 		engine, sh := openEngine(ctx, log, *dir, *season, !*noDense)
 		if engine == nil {
-			log.Warn("no index shards found; tools will report status=syncing", "dir", *dir)
+			log.Warn("no index shards found; tools report status=syncing", "dir", *dir, "hint", "run `frc-mcp sync`")
 			return
 		}
-		shards = sh
 		srv.SetEngine(engine)
-		log.Info("index loaded", "dir", *dir, "shards", len(sh), "default_season", engine.DefaultSeason(),
+		mu.Lock()
+		old := current
+		current = sh
+		mu.Unlock()
+		// Give in-flight requests on the previous engine time to finish.
+		time.AfterFunc(2*time.Minute, func() {
+			for _, s := range old {
+				s.Close()
+			}
+		})
+		log.Info("index loaded", "reason", reason, "dir", *dir, "shards", len(sh), "default_season", engine.DefaultSeason(),
 			"dense", engine.Dense(), "digest", engine.Digest(), "load_ms", time.Since(start).Milliseconds())
+	}
+	go func() {
+		load("startup")
+		if *offline {
+			return
+		}
+		kr, err := dist.TrustedKeyring("")
+		if err != nil || len(kr) == 0 {
+			log.Info("index sync disabled: no trusted signing keys configured (use `frc-mcp sync --trusted-key` for a mirror)")
+			return
+		}
+		client, err := syncClient(*syncURL, false)
+		if err != nil {
+			log.Warn("index sync disabled", "err", err)
+			return
+		}
+		for {
+			res, err := dist.Sync(ctx, dist.SyncOptions{BaseURL: *syncURL, Dir: *dir, Keyring: kr, Client: client})
+			switch {
+			case err != nil:
+				log.Warn("index sync failed; serving the installed index", "err", err)
+			case res.Updated:
+				log.Info("index synced", "serial", res.Serial, "files", res.Downloaded, "bytes", res.Bytes)
+				load("sync")
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(*syncEvery):
+			}
+		}
 	}()
 	defer func() {
-		<-loaded
-		for _, s := range shards {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, s := range current {
 			s.Close()
 		}
 	}()

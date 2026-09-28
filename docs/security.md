@@ -63,9 +63,15 @@ attacker-controlled text that the agent then obeys**.
   - HTTP mode: `project_root` and `path` are disabled; only inline content and `declare` are accepted.
 
 ### 2.4 Index supply chain (T4)
-- The manifest is signed with cosign keyless. The verifier pins the **certificate identity** to
-  `https://github.com/fikretyukselit/frc-mcp/.github/workflows/index.yml@refs/heads/main` and the GitHub OIDC issuer,
-  not just the repository.
+- The manifest is signed with **ed25519**. The client verifies it against compiled-in public keys
+  (`internal/dist/keys.go`); ADR-0006 supersedes the earlier cosign-keyless plan for the index. Binaries remain cosign
+  keyless.
+- The signing seed exists only as `FRC_MCP_INDEX_KEY` in the protected `index-publish` environment. The build job has
+  no secrets.
+- Sync **fails closed** when no trusted key is configured. Self-hosted mirrors pass their own key explicitly with
+  `--trusted-key` / `FRC_MCP_TRUSTED_KEYS`.
+- Downloads are bounded by the signed sizes on both the compressed and decompressed side, which blocks decompression
+  bombs. A failed sync never commits a manifest.
 - The manifest carries a monotonic `serial` and an `expires_at` (default 30 days):
   - a lower serial is rejected (rollback);
   - an expired manifest keeps serving but reports `index_stale: true` (freeze attack visible to the agent).

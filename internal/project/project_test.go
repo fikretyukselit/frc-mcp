@@ -16,6 +16,7 @@ func TestDetect(t *testing.T) {
 		{"java2026", "2026", "stable", "java", "2026.2.1", 2, 1},
 		{"py2026", "2026", "stable", "python", "2026.2.1.1", 0, 0},
 		{"cpp2027", "2027", "alpha", "cpp", "2027.0.0-alpha-7", 0, 0},
+		{"props2026", "2026", "stable", "java", "2026.2.1", 0, 0},
 	} {
 		p, err := Detect(filepath.Join("testdata", tc.dir))
 		if err != nil {
