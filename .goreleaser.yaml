@@ -1,0 +1,33 @@
+# goreleaser v2 — snapshot-ready in M0; signing/publishing is wired in M2
+# (cosign keyless with pinned identity, SLSA attestations, notarization).
+version: 2
+project_name: frc-mcp
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - id: frc-mcp
+    main: ./cmd/frc-mcp
+    binary: frc-mcp
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [README.md, LICENSE*]
+checksum:
+  name_template: checksums.txt
+sboms:
+  - artifacts: archive
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+changelog:
+  use: github
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]

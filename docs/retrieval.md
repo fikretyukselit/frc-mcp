@@ -61,7 +61,8 @@ Code blocks are never split. Chunks record `tokens` so the renderer can budget w
 - **Model:** `minishlab/potion-code-16M-v2` (MIT, 256-d). Inference = tokenizer → token-id embedding lookup → weighted
   mean → L2 normalize. Implemented in `internal/embed/m2v` (~300 LOC, pure Go, golden-tested against the Python
   reference to 1e-5 cosine). Weights loaded via mmap from the shard bundle (`models/potion-code-16M-v2.safetensors`).
-- **Storage:** int8 symmetric quantization per dimension (scale stored in manifest); 256 B/chunk → 100k chunks ≈ 25 MB.
+- **Storage:** int8 symmetric quantization with a per-row scale (max |x| → 127) stored in the layer file;
+  256 B/chunk → 100k chunks ≈ 25 MB. Format and scan: `internal/vec` (measured numbers: `docs/benchmarks.md`).
   Each model has its own row-aligned layer `chunk.vec.<embed_model_id>`; a layer is used only when the query encoder id
   matches, otherwise dense is skipped for it and reported in `_meta.degraded` (ADR-0005).
 - **M1 exit rule:** BM25 + exact symbol is the baseline; potion stays in lite only if it adds ≥ 1 nDCG@10 point.

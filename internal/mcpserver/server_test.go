@@ -1,0 +1,239 @@
+package mcpserver_test
+
+import (
+	"context"
+	"encoding/json"
+	"flag"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/fikretyukselit/frc-mcp/internal/mcpserver"
+	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
+	"github.com/fikretyukselit/frc-mcp/internal/testfixture"
+)
+
+var update = flag.Bool("update", false, "rewrite golden files")
+
+func connect(t testing.TB, e *retrieve.Engine) *mcp.ClientSession {
+	t.Helper()
+	ctx := context.Background()
+	srv := mcpserver.New(e, mcpserver.Options{Version: "test",
+		Now: func() time.Time { return time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC) }})
+	ct, st := mcp.NewInMemoryTransports()
+	ss, err := srv.MCP().Connect(ctx, st, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { cs.Close(); ss.Close() })
+	return cs
+}
+
+func toolsJSON(t *testing.T, cs *mcp.ClientSession) string {
+	t.Helper()
+	res, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.MarshalIndent(res.Tools, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b) + "\n"
+}
+
+// TestToolSurfaceGolden pins the exact tools/list bytes (names, order,
+// descriptions, schemas, annotations). Any change must be reviewed.
+func TestToolSurfaceGolden(t *testing.T) {
+	got := toolsJSON(t, connect(t, testfixture.Engine(t)))
+	p := filepath.Join("testdata", "tools_list.golden.json")
+	if *update {
+		if err := os.MkdirAll("testdata", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatalf("%v (run go test ./internal/mcpserver -update)", err)
+	}
+	if string(want) != got {
+		t.Fatalf("tools/list changed; review and run -update.\n%s", got)
+	}
+}
+
+// TestSurfaceIndependentOfIndex: a shard (possibly poisoned) must never change
+// what the model is told about the tools (docs/security.md §2.2).
+func TestSurfaceIndependentOfIndex(t *testing.T) {
+	withIndex := toolsJSON(t, connect(t, testfixture.Engine(t)))
+	without := toolsJSON(t, connect(t, nil))
+	if withIndex != without {
+		t.Fatal("tools/list depends on loaded index data")
+	}
+}
+
+func TestToolAnnotationsReadOnly(t *testing.T) {
+	res, err := connect(t, nil).ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := []string{}
+	for _, tool := range res.Tools {
+		names = append(names, tool.Name)
+		a := tool.Annotations
+		if a == nil || !a.ReadOnlyHint || !a.IdempotentHint || a.DestructiveHint == nil || *a.DestructiveHint {
+			t.Errorf("%s: annotations must be read-only/idempotent/non-destructive: %+v", tool.Name, a)
+		}
+		if tool.OutputSchema == nil {
+			t.Errorf("%s: missing output schema", tool.Name)
+		}
+	}
+	// The SDK lists tools sorted by name: deterministic, as SEP-2549 asks.
+	if strings.Join(names, ",") != "frc_api,frc_fetch,frc_search" {
+		t.Fatalf("tool order = %v", names)
+	}
+}
+
+func call(t *testing.T, cs *mcp.ClientSession, name string, args map[string]any) (*mcp.CallToolResult, map[string]any, string) {
+	t.Helper()
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+	if err != nil {
+		t.Fatalf("%s: protocol error: %v", name, err)
+	}
+	var text string
+	for _, c := range res.Content {
+		if tc, ok := c.(*mcp.TextContent); ok {
+			text += tc.Text
+		}
+	}
+	var sc map[string]any
+	if res.StructuredContent != nil {
+		b, _ := json.Marshal(res.StructuredContent)
+		_ = json.Unmarshal(b, &sc)
+	}
+	return res, sc, text
+}
+
+func TestSearchEndToEnd(t *testing.T) {
+	cs := connect(t, testfixture.Engine(t))
+	res, sc, text := call(t, cs, "frc_search", map[string]any{"query": "How do I configure Motion Magic on a TalonFX?", "language": "java"})
+	if res.IsError {
+		t.Fatalf("unexpected error: %s", text)
+	}
+	hits, _ := sc["hits"].([]any)
+	if sc["status"] != "ok" || sc["frc_season"] != "2026" || len(hits) == 0 {
+		t.Fatalf("structured = %v", sc)
+	}
+	top := hits[0].(map[string]any)
+	if top["id"] != "phoenix6/2026/motion-magic#0" || !strings.Contains(text, "phoenix6/2026/motion-magic#0") {
+		t.Fatalf("top hit = %v", top["id"])
+	}
+
+	// search → fetch round trip
+	res, sc, text = call(t, cs, "frc_fetch", map[string]any{"id": top["id"]})
+	if res.IsError || !strings.Contains(sc["body"].(string), "MotionMagicVoltage") || !strings.Contains(text, "MotionMagicVoltage") {
+		t.Fatalf("fetch: %v %s", res.IsError, text)
+	}
+}
+
+func TestAPIEndToEnd(t *testing.T) {
+	cs := connect(t, testfixture.Engine(t))
+	_, sc, text := call(t, cs, "frc_api", map[string]any{"symbol": "CANSparkMax"})
+	if sc["status"] != "version_mismatch" || !strings.Contains(text, "removed in 2025.0.0") {
+		t.Fatalf("CANSparkMax in 2026 must be version_mismatch: %v\n%s", sc["status"], text)
+	}
+	_, sc, _ = call(t, cs, "frc_api", map[string]any{"symbol": "SwerveDriveKinematics", "frc_season": "2027", "language": "java"})
+	m := sc["matches"].([]any)
+	if len(m) != 1 || m[0].(map[string]any)["fqn"] != "org.wpilib.math.kinematics.SwerveDriveKinematics" {
+		t.Fatalf("2027 lookup: %v", m)
+	}
+	if others, _ := sc["other_seasons"].([]any); len(others) == 0 {
+		t.Fatal("expected the 2026 edu.wpi.first location in other_seasons")
+	}
+}
+
+func TestInstructiveErrors(t *testing.T) {
+	cs := connect(t, testfixture.Engine(t))
+	for _, tc := range []struct {
+		tool string
+		args map[string]any
+		want string
+	}{
+		{"frc_search", map[string]any{"query": "   "}, "query is required"},
+		// Enum/pattern violations are caught by the SDK's schema validator; the
+		// message still names the valid values, which is what the model needs.
+		{"frc_search", map[string]any{"query": "x", "language": "kotlin"}, "java cpp python any"},
+		{"frc_search", map[string]any{"query": "x", "frc_season": "26"}, "^20[2-3][0-9]$"},
+		{"frc_search", map[string]any{"query": "x", "cursor": "bogus!"}, "invalid cursor"},
+		{"frc_fetch", map[string]any{"uri": "https://evil.example/x"}, "no arbitrary URLs"},
+		{"frc_fetch", map[string]any{"id": "nope#0"}, "run frc_search again"},
+		{"frc_api", map[string]any{"symbol": ""}, "symbol is required"},
+	} {
+		res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: tc.tool, Arguments: tc.args})
+		if err != nil {
+			// Schema violations are reported by the SDK; they must still be tool errors, not protocol errors.
+			t.Errorf("%s %v: protocol error %v", tc.tool, tc.args, err)
+			continue
+		}
+		var text string
+		for _, c := range res.Content {
+			if tc, ok := c.(*mcp.TextContent); ok {
+				text += tc.Text
+			}
+		}
+		if !res.IsError || !strings.Contains(text, tc.want) {
+			t.Errorf("%s %v: isError=%v text=%q, want %q", tc.tool, tc.args, res.IsError, text, tc.want)
+		}
+	}
+}
+
+func TestSyncingWithoutIndex(t *testing.T) {
+	_, sc, text := call(t, connect(t, nil), "frc_search", map[string]any{"query": "TalonFX"})
+	if sc["status"] != "syncing" || !strings.Contains(text, "not available yet") {
+		t.Fatalf("got %v / %s", sc["status"], text)
+	}
+}
+
+func TestPaginationThroughProtocol(t *testing.T) {
+	cs := connect(t, testfixture.Engine(t))
+	args := map[string]any{"query": "swerve kinematics module states translation", "k": 1}
+	_, sc, _ := call(t, cs, "frc_search", args)
+	cur, _ := sc["next_cursor"].(string)
+	first := sc["hits"].([]any)[0].(map[string]any)["id"]
+	if cur == "" {
+		t.Fatal("expected next_cursor")
+	}
+	args["cursor"] = cur
+	_, sc, _ = call(t, cs, "frc_search", args)
+	second := sc["hits"].([]any)[0].(map[string]any)["id"]
+	if second == first {
+		t.Fatalf("page 2 repeated page 1: %v", first)
+	}
+}
+
+func BenchmarkSearchOverProtocol(b *testing.B) {
+	srv := mcpserver.New(testfixture.Engine(b), mcpserver.Options{Version: "bench"})
+	ctx := context.Background()
+	ct, st := mcp.NewInMemoryTransports()
+	ss, _ := srv.MCP().Connect(ctx, st, nil)
+	cs, _ := mcp.NewClient(&mcp.Implementation{Name: "b", Version: "0"}, nil).Connect(ctx, ct, nil)
+	defer cs.Close()
+	defer ss.Close()
+	params := &mcp.CallToolParams{Name: "frc_search", Arguments: map[string]any{"query": "How do I configure Motion Magic on a TalonFX?", "language": "java"}}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := cs.CallTool(ctx, params); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
