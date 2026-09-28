@@ -1,0 +1,14 @@
+/bin/
+/dist/
+/.shards/
+/.cache/
+*.sqlite
+*.sqlite-*
+*.vec
+*.test
+*.out
+*.prof
+coverage.*
+.env
+.DS_Store
+/state.db
