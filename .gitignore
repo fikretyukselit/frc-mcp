@@ -12,3 +12,5 @@ coverage.*
 .env
 .DS_Store
 /state.db
+eval/last-report.json
+/.fixture/

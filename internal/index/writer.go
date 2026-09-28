@@ -80,6 +80,13 @@ func Create(ctx context.Context, path, name string) (*Writer, error) {
 // symbol and body are cleaned of hidden-text vectors; Suspect is OR-ed with
 // the detector's verdict so an upstream flag is never cleared.
 func (w *Writer) AddChunk(ctx context.Context, c Chunk) error {
+	_, _, err := w.Add(ctx, c)
+	return err
+}
+
+// Add is AddChunk returning the stored row id (1-based, dense: row i+1 is the
+// i-th accepted chunk, which aligns vector layers) and the sanitized chunk.
+func (w *Writer) Add(ctx context.Context, c Chunk) (int64, Chunk, error) {
 	c.Title = sanitize.Clean(c.Title)
 	c.HeadingPath = sanitize.Clean(c.HeadingPath)
 	c.Body = sanitize.Clean(c.Body)
@@ -91,7 +98,7 @@ func (w *Writer) AddChunk(ctx context.Context, c Chunk) error {
 		c.Tokens = textutil.EstimateTokens(c.Body)
 	}
 	if err := c.Validate(); err != nil {
-		return err
+		return 0, c, err
 	}
 	expand := textutil.Expand(c.Symbol, c.Title, c.Body)
 	num, ok := w.docNums[c.DocID]
@@ -103,14 +110,19 @@ func (w *Writer) AddChunk(ctx context.Context, c Chunk) error {
 	if c.Symbol != "" {
 		symKey = strings.ToLower(SimpleName(c.Symbol))
 	}
-	if _, err := w.chunk.ExecContext(ctx, c.DocID, num, c.Ord, c.Library, c.VersionLo, c.VersionHi, c.Season,
+	res, err := w.chunk.ExecContext(ctx, c.DocID, num, c.Ord, c.Library, c.VersionLo, c.VersionHi, c.Season,
 		c.Channel, c.Language, c.Kind, c.Title, c.HeadingPath, c.Symbol, symKey, c.Prefix, expand, c.Body, c.SourceURL,
-		c.Anchor, c.UpstreamRev, c.RetrievedAt.Unix(), c.License, c.Trust, b2i(c.Suspect), c.Authority, c.Tokens); err != nil {
-		return fmt.Errorf("index: insert %s: %w", c.ID(), err)
+		c.Anchor, c.UpstreamRev, c.RetrievedAt.Unix(), c.License, c.Trust, b2i(c.Suspect), c.Authority, c.Tokens)
+	if err != nil {
+		return 0, c, fmt.Errorf("index: insert %s: %w", c.ID(), err)
+	}
+	row, err := res.LastInsertId()
+	if err != nil {
+		return 0, c, err
 	}
 	w.digest(c)
 	w.nChunk++
-	return nil
+	return row, c, nil
 }
 
 // AddSymbol validates and appends an API symbol.

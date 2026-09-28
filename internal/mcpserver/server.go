@@ -19,6 +19,7 @@ import (
 
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/mcpserver/surface"
+	"github.com/fikretyukselit/frc-mcp/internal/project"
 	"github.com/fikretyukselit/frc-mcp/internal/render"
 	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
 )
@@ -29,12 +30,19 @@ type Server struct {
 	mcp    *mcp.Server
 	engine atomic.Pointer[retrieve.Engine]
 	now    func() time.Time
+	opt    Options
 }
 
 // Options configures the server.
 type Options struct {
 	Version string
 	Now     func() time.Time // for deterministic tests
+	// ProjectRoot is the default root for frc_context (normally the server's
+	// working directory, which MCP clients set to the workspace).
+	ProjectRoot string
+	// NoFilesystem disables filesystem-reading arguments (HTTP / hosted mode,
+	// docs/security.md §2.3): frc_context accepts only declare.
+	NoFilesystem bool
 }
 
 // Limits and enumerations for argument validation.
@@ -59,7 +67,7 @@ func New(engine *retrieve.Engine, opt Options) *Server {
 	if opt.Version == "" {
 		opt.Version = "dev"
 	}
-	s := &Server{now: opt.Now}
+	s := &Server{now: opt.Now, opt: opt}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -98,6 +106,8 @@ func (s *Server) register() {
 		Annotations: readOnly("Fetch FRC doc section"), InputSchema: fetchSchema()}, s.fetch)
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_api", Title: "Look up FRC API symbol", Description: surface.API(),
 		Annotations: readOnly("Look up FRC API symbol"), InputSchema: apiSchema()}, s.api)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_context", Title: "Detect FRC project versions", Description: surface.Context(),
+		Annotations: readOnly("Detect FRC project versions"), InputSchema: contextSchema()}, s.context)
 	s.mcp.AddResource(&mcp.Resource{URI: "frc://index/manifest", Name: "index-manifest", Title: "Loaded index shards",
 		Description: "Shards currently loaded: names, build ids, build times, seasons, chunk and symbol counts.",
 		MIMEType:    "application/json"}, s.manifest)
@@ -108,6 +118,7 @@ func (s *Server) register() {
 // SearchIn is frc_search's input.
 type SearchIn struct {
 	Query          string   `json:"query" jsonschema:"what you are looking for, in natural language or with exact class/method names"`
+	Pin            string   `json:"pin,omitempty" jsonschema:"pin handle from frc_context; supplies season and language unless given explicitly"`
 	Season         string   `json:"frc_season,omitempty" jsonschema:"FRC season to pin results to, e.g. 2026. Defaults to the current stable season"`
 	Channel        string   `json:"channel,omitempty" jsonschema:"release channel of the pinned season"`
 	Language       string   `json:"language,omitempty" jsonschema:"robot code language; 'any' disables the filter"`
@@ -121,6 +132,10 @@ type SearchIn struct {
 
 func (s *Server) search(ctx context.Context, _ *mcp.CallToolRequest, in SearchIn) (*mcp.CallToolResult, render.SearchOut, error) {
 	in.Query = strings.TrimSpace(in.Query)
+	fromPin, err := applyPin(in.Pin, &in.Season, &in.Language, &in.Channel)
+	if err != nil {
+		return nil, render.SearchOut{}, err
+	}
 	if err := validateSearch(&in); err != nil {
 		return nil, render.SearchOut{}, err
 	}
@@ -145,6 +160,9 @@ func (s *Server) search(ctx context.Context, _ *mcp.CallToolRequest, in SearchIn
 	}
 	out := render.Search(res, render.Context{Now: s.now(), BuiltAt: e.BuiltAt(), Digest: e.Digest(),
 		Format: in.ResponseFormat, MaxTok: in.MaxTokens, Offset: offset, Limit: in.K, QueryKey: key})
+	if fromPin && out.PinSource == "arg" {
+		out.PinSource = "handle"
+	}
 	return text(render.SearchMarkdown(out)), out, nil
 }
 
@@ -259,6 +277,7 @@ func fetchID(in FetchIn) (string, error) {
 // APIIn is frc_api's input.
 type APIIn struct {
 	Symbol   string `json:"symbol" jsonschema:"class, member or qualified name: TalonFX, SparkMax#configure, frc::DCMotor, edu.wpi.first.wpilibj.TimedRobot"`
+	Pin      string `json:"pin,omitempty" jsonschema:"pin handle from frc_context; supplies season and language unless given explicitly"`
 	Season   string `json:"frc_season,omitempty" jsonschema:"FRC season, e.g. 2026. Defaults to the current stable season"`
 	Language string `json:"language,omitempty" jsonschema:"java, cpp or python; empty searches all languages"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"maximum matches (default 10, max 50)"`
@@ -266,6 +285,11 @@ type APIIn struct {
 
 func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mcp.CallToolResult, render.APIOut, error) {
 	in.Symbol = strings.TrimSpace(in.Symbol)
+	var channel string
+	fromPin, err := applyPin(in.Pin, &in.Season, &in.Language, &channel)
+	if err != nil {
+		return nil, render.APIOut{}, err
+	}
 	switch {
 	case in.Symbol == "":
 		return nil, render.APIOut{}, errors.New(`symbol is required. Example: {"symbol": "TalonFX", "language": "java"}`)
@@ -302,11 +326,108 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 	others := slices.DeleteFunc(all, func(x index.Symbol) bool { return x.Season == season })
 	out := render.API(matches, others[:min(len(others), 5)], render.Context{Now: s.now(), BuiltAt: e.BuiltAt()}, season)
 	out.PinSource = "default"
-	if in.Season != "" {
+	switch {
+	case fromPin:
+		out.PinSource = "handle"
+	case in.Season != "":
 		out.PinSource = "arg"
 	}
 	out.Language = in.Language
 	return text(render.APIMarkdown(out)), out, nil
+}
+
+// ---- frc_context ----
+
+// Declare is an explicit pin set.
+type Declare struct {
+	Season   string `json:"frc_season,omitempty" jsonschema:"FRC season, e.g. 2026"`
+	Channel  string `json:"channel,omitempty" jsonschema:"stable, beta or alpha"`
+	Language string `json:"language,omitempty" jsonschema:"java, cpp or python"`
+}
+
+// ContextIn is frc_context's input.
+type ContextIn struct {
+	ProjectRoot string   `json:"project_root,omitempty" jsonschema:"robot project directory (default: the server's working directory); unavailable on hosted servers"`
+	Declare     *Declare `json:"declare,omitempty" jsonschema:"declare the pin set instead of (or on top of) detecting it"`
+}
+
+func (s *Server) context(_ context.Context, _ *mcp.CallToolRequest, in ContextIn) (*mcp.CallToolResult, render.ContextOut, error) {
+	out := render.ContextOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
+		PinSource: "project"}, Vendordeps: []render.VendordepOut{}, Files: []string{}}
+	pin := project.Pin{}
+	if !s.opt.NoFilesystem || in.ProjectRoot != "" {
+		if s.opt.NoFilesystem {
+			return nil, out, errors.New("project_root is disabled on this (hosted) server; pass declare instead, e.g. {\"declare\": {\"frc_season\": \"2026\", \"language\": \"java\"}}")
+		}
+		root := in.ProjectRoot
+		if root == "" {
+			root = s.opt.ProjectRoot
+		}
+		if root == "" {
+			root = "."
+		}
+		p, err := project.Detect(root)
+		switch {
+		case errors.Is(err, project.ErrNotProject) && in.Declare != nil:
+		case err != nil:
+			return nil, out, fmt.Errorf("%w in %s; pass project_root pointing at the robot project, or declare the season: {\"declare\": {\"frc_season\": \"2026\"}}", err, root)
+		default:
+			pin = p.PinOf()
+			out.WPILib, out.Files, out.Warnings = p.WPILib, p.Files, p.Warnings
+			for _, v := range p.Vendordeps {
+				out.Vendordeps = append(out.Vendordeps, render.VendordepOut{File: v.File, Name: v.Name, Version: v.Version, FRCYear: v.FRCYear})
+			}
+		}
+	}
+	if d := in.Declare; d != nil {
+		if err := validateCommon(d.Season, d.Channel, d.Language); err != nil {
+			return nil, out, err
+		}
+		if d.Season != "" {
+			pin.Season = d.Season
+		}
+		if d.Channel != "" {
+			pin.Channel = d.Channel
+		}
+		if d.Language != "" {
+			pin.Language = d.Language
+		}
+		out.PinSource = "arg"
+	}
+	if pin.Season == "" {
+		return nil, out, errors.New("could not determine the FRC season; pass declare.frc_season")
+	}
+	out.Season, out.Channel, out.Language, out.Libraries = pin.Season, pin.Channel, pin.Language, pin.Libs
+	out.Pin = pin.Encode()
+	if e := s.engine.Load(); e.Ready() && !e.HasSeason(pin.Season) {
+		out.Status = retrieve.StatusVersionMismatch
+		out.Warnings = append(out.Warnings, fmt.Sprintf("the loaded index has no data for season %s", pin.Season))
+	}
+	out.Next = []string{fmt.Sprintf("pass {\"pin\": %q} to frc_search and frc_api", out.Pin)}
+	return text(render.ContextMarkdown(out)), out, nil
+}
+
+// applyPin fills unset fields from a pin handle; it reports whether the
+// handle supplied the season.
+func applyPin(h string, season, language, channel *string) (bool, error) {
+	if h == "" {
+		return false, nil
+	}
+	p, err := project.DecodePin(h)
+	if err != nil {
+		return false, fmt.Errorf("%w; call frc_context to get a fresh pin", err)
+	}
+	fromPin := *season == "" && p.Season != ""
+	if *season == "" {
+		*season = p.Season
+	}
+	if *language == "" {
+		*language = p.Language
+	}
+	if *channel == "" {
+		*channel = p.Channel
+	}
+	return fromPin, nil
 }
 
 // ---- resources ----
@@ -364,6 +485,15 @@ func searchSchema() *jsonschema.Schema {
 func fetchSchema() *jsonschema.Schema {
 	s := infer[FetchIn]()
 	s.Properties["max_tokens"].Minimum, s.Properties["max_tokens"].Maximum = ptr(1.0), ptr(float64(render.HardMaxTokens))
+	return s
+}
+
+func contextSchema() *jsonschema.Schema {
+	s := infer[ContextIn]()
+	d := s.Properties["declare"]
+	enum(d, "language", []string{"java", "cpp", "python"})
+	enum(d, "channel", channels)
+	d.Properties["frc_season"].Pattern = seasonRe.String()
 	return s
 }
 

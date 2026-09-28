@@ -199,3 +199,29 @@ func indent(s, pad string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// ContextMarkdown renders frc_context.
+func ContextMarkdown(o ContextOut) string {
+	var b strings.Builder
+	envelope(&b, "frc_context", o.Envelope)
+	if o.WPILib != "" {
+		fmt.Fprintf(&b, "\nWPILib %s (season %s, %s channel)\n", o.WPILib, o.Season, o.Channel)
+	}
+	if len(o.Vendordeps) > 0 {
+		b.WriteString("\nVendordeps:\n")
+		for _, v := range o.Vendordeps {
+			fmt.Fprintf(&b, "- %s %s (frcYear %s) — %s\n", v.Name, v.Version, orDash(v.FRCYear), v.File)
+		}
+	}
+	for _, w := range o.Warnings {
+		fmt.Fprintf(&b, "\n⚠ %s\n", w)
+	}
+	if len(o.Files) > 0 {
+		fmt.Fprintf(&b, "\nRead: %s\n", strings.Join(o.Files, ", "))
+	}
+	if o.Pin != "" {
+		fmt.Fprintf(&b, "\nPin handle: `%s`\n", o.Pin)
+	}
+	footer(&b, o.Envelope)
+	return b.String()
+}

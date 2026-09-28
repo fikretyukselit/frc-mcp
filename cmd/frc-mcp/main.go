@@ -51,6 +51,8 @@ func run() int {
 		err = indexCmd(ctx, args)
 	case "doctor":
 		err = doctor(ctx, args)
+	case "eval":
+		err = evalCmd(ctx, args)
 	case "version":
 		fmt.Println(buildVersion())
 	case "help", "-h", "--help":
@@ -73,7 +75,9 @@ func usage() {
 Usage:
   frc-mcp [serve] [flags]        run the MCP server (stdio by default)
   frc-mcp index build [flags]    build a shard from JSONL chunks/symbols
+  frc-mcp index run [flags]      ingest data/sources.yaml into shards
   frc-mcp doctor [flags]         check the local index and measure latency
+  frc-mcp eval [flags]           retrieval metrics on eval/queries.jsonl
   frc-mcp version                print the version
 
 Run "frc-mcp <command> -h" for flags.

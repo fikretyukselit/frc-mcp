@@ -3,7 +3,8 @@
 This is the operating manual for any coding agent working in this repository. Read all of it before you change code.
 Design rationale lives in `docs/`. This file states **what is true and what must stay true**.
 
-- Plan version: **v0.2** (2026-09-29). Implementation: **M0 complete**; measured numbers are in `docs/benchmarks.md`.
+- Plan version: **v0.2** (2026-09-29). Implementation: **M0 and M1 complete**. Measured numbers are in
+  `docs/benchmarks.md`; eval results are in `docs/retrieval.md` §8.
 - Change log for this version: `docs/reviews/2026-09-29-research-03-review.md`.
 
 ---
@@ -110,9 +111,14 @@ For full detail, see:
 
 ## 4. Repository layout (target)
 
-Packages that exist today (M0): `cmd/frc-mcp`, `internal/{index,retrieve,router,render,vec,netguard,textutil,
-testfixture,mcpserver,mcpserver/surface,ingest/sanitize}`, `testdata/fixture`. Everything else below is planned; see
-`CONTRIBUTING.md` §2 for the status table.
+Packages that exist today (M1):
+- `cmd/frc-mcp`
+- `internal/{index,retrieve,router,render,vec,netguard,textutil,testfixture,mcpserver,project,apisym,eval,sources}`
+- `internal/embed/m2v`
+- `internal/ingest/{build,fetch,sanitize,source/sphinx,source/javadoc}`
+- `data/sources.yaml`, `eval/`, `testdata/fixture`
+
+Everything else below is planned; `CONTRIBUTING.md` §2 has the status table.
 
 ```
 cmd/frc-mcp/            main; subcommand wiring only (no logic)
@@ -302,7 +308,7 @@ There are 9 tools. All of them:
 | Milestone | Scope | Exit criteria |
 |---|---|---|
 | **M0: Skeleton & contracts** ✅ *(done 2026-09-29; open items: MCP conformance suite, goreleaser snapshot run in CI)* | go.mod; `serve` over stdio on a hand-built fixture shard; **render contract** (parity, fencing, truncation, cursors); static-surface golden tests; netguard; CI (lint, race, vuln, conformance); goreleaser snapshot | `frc_search` works end to end on the fixture; every golden test is green |
-| **M1: WPILib Java vertical slice** | frc-docs (stable + latest) and Java symbol tables (Javadoc search indexes / class files) for 2026 and 2027-alpha; BM25 plus exact symbol lookup, with potion as an experiment; `frc_context`, `frc_search`, `frc_fetch`, `frc_api`; qrels v0 (≥ 150, cross-season bucket, human holdout) | Recall@10 ≥ 0.75, nDCG@10 ≥ 0.55, **wrong-season@5 = 0**, p95 ≤ 50 ms; potion kept only if it adds ≥ 1 nDCG point |
+| **M1: WPILib Java vertical slice** ✅ *(done 2026-09-29: hybrid R@10 0.976 · nDCG@10 0.857 · wrong-season@5 0 · p95 5 ms; dense kept, +0.079 nDCG; open item: a human-written holdout)* | frc-docs (stable + latest) and Java symbol tables (Javadoc search indexes / class files) for 2026 and 2027-alpha; BM25 plus exact symbol lookup, with potion as an experiment; `frc_context`, `frc_search`, `frc_fetch`, `frc_api`; qrels v0 (≥ 150, cross-season bucket, human holdout) | Recall@10 ≥ 0.75, nDCG@10 ≥ 0.55, **wrong-season@5 = 0**, p95 ≤ 50 ms; potion kept only if it adds ≥ 1 nDCG point |
 | **M2: Distribution + verifier MVP** (target: before January 2027) | Fixed-cron ingestion; OCI + HTTPS mirror; cosign with a pinned identity; serial and expiry; `frc-mcp sync` with background first-run sync; fact tables; `frc_vendordep` (single mode and set mode); **`frc_verify_code` MVP** (Java imports and types, `wrong_season`) | Verifier false positives ≤ 1 per 1k LOC on clean public 2026 team repos; signed shards verified on all 3 operating systems |
 | **M3: Vendors & languages** | CTRE, REV, PhotonVision, PathPlanner, Choreo, AdvantageKit, YAGSL docs and APIs; C++ (Doxygen XML) and Python (`.pyi`) symbol tables; trust tiers, sanitizer, opt-in forum; `frc_whats_new`; `frc_hardware` | Injection corpus: suspect recall ≥ 0.95; per-(library, language) coverage published |
 | **M4: Migration & agent eval** | `frc_migrate` (≈ 50 curated rules plus a diff-generated 2027 move table); Java member-level verification; agent-level eval with a GradleRIO compile check | Agent compile-pass rate ≥ +20 pp over the same agent without MCP |

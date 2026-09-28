@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -19,9 +20,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/router"
 	"github.com/fikretyukselit/frc-mcp/internal/textutil"
+	"github.com/fikretyukselit/frc-mcp/internal/vec"
 )
 
 // Tunables. They are constants (not flags) so evaluation runs are reproducible;
@@ -56,6 +59,14 @@ type Engine struct {
 	defaultSeason string
 	digest        string
 	builtAt       time.Time
+
+	// Dense retrieval (optional): one vector layer + row metadata per shard.
+	model    *m2v.Model
+	layers   []*vec.Layer
+	metas    []*index.RowMeta
+	allowMu  sync.Mutex
+	allow    map[string][][]uint64 // filter key → per-shard bitsets
+	warnings []string
 }
 
 // Options configures an Engine.
@@ -63,6 +74,11 @@ type Options struct {
 	// DefaultSeason is used when neither the caller nor the query pins one.
 	// Empty selects the newest season that has a stable channel.
 	DefaultSeason string
+	// Model enables dense retrieval for shards that ship a matching vector
+	// layer (<shard>.<model>.vec). Nil runs BM25 + exact symbol only.
+	Model *m2v.Model
+	// DisableDense turns dense retrieval off even when available (eval A/B).
+	DisableDense bool
 }
 
 // New builds an engine over opened shards (which it does not own).
@@ -86,7 +102,76 @@ func New(shards []*index.Reader, opt Options) *Engine {
 	if e.defaultSeason == "" {
 		e.defaultSeason = best
 	}
+	if opt.Model != nil && !opt.DisableDense {
+		e.loadDense(opt.Model)
+	}
 	return e
+}
+
+// loadDense opens vector layers whose model id and row count match. A
+// mismatched or missing layer disables dense for that shard only (reported by
+// Warnings and per-result Degraded), never the whole engine.
+func (e *Engine) loadDense(m *m2v.Model) {
+	e.model = m
+	e.layers = make([]*vec.Layer, len(e.shards))
+	e.metas = make([]*index.RowMeta, len(e.shards))
+	e.allow = map[string][][]uint64{}
+	for i, s := range e.shards {
+		l, err := vec.Open(index.VectorPath(s.Path(), m.ID))
+		if err != nil {
+			e.warnings = append(e.warnings, "dense:"+s.Meta().Name+": no vector layer")
+			continue
+		}
+		meta, err := s.RowMeta(context.Background())
+		if err != nil || l.ModelID != m.ID || l.Dims != m.Dims || l.Rows != meta.Len() {
+			l.Close()
+			e.warnings = append(e.warnings, "dense:"+s.Meta().Name+": layer does not match shard/model")
+			continue
+		}
+		e.layers[i], e.metas[i] = l, meta
+	}
+}
+
+// Warnings lists degraded capabilities detected at load time.
+func (e *Engine) Warnings() []string { return e.warnings }
+
+// Dense reports whether any shard has dense retrieval.
+func (e *Engine) Dense() bool {
+	for _, l := range e.layers {
+		if l != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// Close releases vector layers (shards are owned by the caller).
+func (e *Engine) Close() {
+	for _, l := range e.layers {
+		if l != nil {
+			l.Close()
+		}
+	}
+}
+
+func (e *Engine) allowFor(f index.Filter) [][]uint64 {
+	key := f.Season + "|" + f.Language + "|" + strings.Join(f.Libraries, ",") + "|" + strings.Join(f.Kinds, ",") + "|" + fmt.Sprint(f.IncludeCommunity)
+	e.allowMu.Lock()
+	defer e.allowMu.Unlock()
+	if a, ok := e.allow[key]; ok {
+		return a
+	}
+	a := make([][]uint64, len(e.shards))
+	for i, m := range e.metas {
+		if m != nil {
+			a[i] = m.Allow(f)
+		}
+	}
+	if len(e.allow) > 256 { // bound the cache; filter combinations are few in practice
+		clear(e.allow)
+	}
+	e.allow[key] = a
+	return a
 }
 
 // Ready reports whether any shard is loaded.
@@ -144,6 +229,7 @@ type Result struct {
 	Hits        []Hit
 	OtherSeason []Hit          // version_mismatch: strongest hits from other seasons (hydrated)
 	Symbols     []index.Symbol // exact symbol matches
+	Degraded    []string       // retrievers unavailable for this call
 }
 
 // Search runs the full pipeline.
@@ -170,13 +256,15 @@ func (e *Engine) Search(ctx context.Context, q Query) (Result, error) {
 	f := index.Filter{Season: res.Season, Language: res.Language, Libraries: q.Libraries, Kinds: q.Kinds,
 		IncludeCommunity: includeCommunity}
 	terms := contentTerms(q.Text)
-	active := activeRetrievers(d)
 
-	hits, syms, err := e.rank(ctx, q, d, f)
+	hits, syms, active, err := e.rank(ctx, q, d, f)
 	if err != nil {
 		return res, err
 	}
 	res.Hits, res.Symbols = hits, syms
+	if e.model != nil && !e.Dense() {
+		res.Degraded = append(res.Degraded, "dense")
+	}
 	if len(hits) > 0 {
 		if err := e.hydrate(ctx, hits[:1]); err != nil {
 			return res, err
@@ -188,7 +276,7 @@ func (e *Engine) Search(ctx context.Context, q Query) (Result, error) {
 	// match, look across seasons and report where a strong answer lives.
 	if f.Season != "" && (len(hits) == 0 || res.Confidence < lowConfidence) {
 		f.Season = ""
-		other, osyms, err := e.rank(ctx, q, d, f)
+		other, osyms, _, err := e.rank(ctx, q, d, f)
 		if err != nil {
 			return res, err
 		}
@@ -222,14 +310,6 @@ func (e *Engine) Search(ctx context.Context, q Query) (Result, error) {
 	return res, e.hydrate(ctx, hits[lo:min(lo+q.Limit, len(hits))])
 }
 
-// activeRetrievers counts the ranked lists that can contribute for a query.
-func activeRetrievers(d router.Decision) int {
-	if len(d.Identifiers) > 0 {
-		return 2 // BM25 + exact symbol
-	}
-	return 1
-}
-
 // contentTerms are the lower-cased, non-stopword query tokens.
 func contentTerms(q string) []string {
 	var out []string
@@ -249,7 +329,7 @@ type key struct {
 
 // rank runs the retrievers on every shard concurrently, fuses them with RRF,
 // applies boosts and diversity. Candidates stay light (integers only).
-func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.Filter) ([]Hit, []index.Symbol, error) {
+func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.Filter) ([]Hit, []index.Symbol, int, error) {
 	match := textutil.FTSQuery(q.Text)
 	ids := d.Identifiers[:min(len(d.Identifiers), maxIdentifiers)]
 	b := index.Boost{Libraries: d.Libraries}
@@ -259,8 +339,21 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 
 	type shardOut struct {
 		fts       []index.Scored
+		dense     []vec.Hit
 		syms      []index.Symbol
 		symChunks []string // chunk ids referenced by matching symbols, in rank order
+	}
+	// Dense: one query embedding for all shards. Skipped for non-English
+	// queries (the lite model is English-centric) and when no layer exists.
+	var q8 []int8
+	var qs float32
+	useDense := e.Dense() && !d.NonEnglish && strings.TrimSpace(q.Text) != ""
+	var allow [][]uint64
+	if useDense {
+		qv := e.model.Encode(q.Text, nil)
+		q8, qs = vec.Quantize(qv, nil)
+		useDense = qs != 0
+		allow = e.allowFor(f)
 	}
 	outs := make([]shardOut, len(e.shards))
 	g, gctx := errgroup.WithContext(ctx)
@@ -270,6 +363,9 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 			var err error
 			if o.fts, err = sh.FTS(gctx, match, f, b, ftsDepth, scoredPool.get()); err != nil {
 				return err
+			}
+			if useDense && e.layers[i] != nil {
+				o.dense = e.layers[i].Search(q8, qs, allow[i], ftsDepth, nil)
 			}
 			for _, id := range ids {
 				syms, err := sh.Symbols(gctx, index.SymbolQuery{Name: id, Season: f.Season, Language: f.Language, Limit: 8})
@@ -287,7 +383,7 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 		})
 	}
 	if err := g.Wait(); err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 
 	// BM25: merge shards by score (comparable across shards of one schema).
@@ -319,6 +415,39 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 	for i := range outs {
 		scoredPool.put(outs[i].fts)
 	}
+	// Dense list: merge shards by cosine (comparable: same model everywhere).
+	active := 1
+	if len(ids) > 0 {
+		active++
+	}
+	if useDense {
+		active++
+		type dh struct {
+			shard int
+			h     vec.Hit
+		}
+		var dl []dh
+		for i, o := range outs {
+			for _, h := range o.dense {
+				dl = append(dl, dh{i, h})
+			}
+		}
+		slices.SortStableFunc(dl, func(a, b dh) int { return cmp.Compare(b.h.Score, a.h.Score) })
+		for r, x := range dl[:min(len(dl), ftsDepth)] {
+			row := int64(x.h.Row) + 1
+			k := key{x.shard, row}
+			h := cands[k]
+			if h == nil {
+				m := e.metas[x.shard]
+				i := int(x.h.Row)
+				h = &Hit{Shard: x.shard, Row: row, DocNum: m.DocNum[i], trust: m.Trust[i], kind: m.Kind[i],
+					alpha: m.Alpha[i], suspect: m.Suspect[i],
+					libMatch: slices.Contains(d.Libraries, m.Libraries[m.Library[i]])}
+				cands[k] = h
+			}
+			h.Score += 1 / float64(rrfK+r+1)
+		}
+	}
 	// Exact-symbol list. Chunks it references that BM25 missed are loaded.
 	seen := map[key]bool{}
 	for i, o := range outs {
@@ -346,7 +475,7 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 		hits = append(hits, *h)
 	}
 	boost(hits, d, q)
-	return diversify(hits), dedupeSymbols(syms), nil
+	return diversify(hits), dedupeSymbols(syms), active, nil
 }
 
 func lightFromChunk(shard int, row int64, c *index.Chunk, libs []string) *Hit {
@@ -579,6 +708,32 @@ func (p *pool[T]) get() []T {
 func (p *pool[T]) put(s []T) { s = s[:0]; p.p.Put(&s) }
 
 var scoredPool pool[index.Scored]
+
+// DocExists reports whether a document id (or chunk id "<doc>#<n>") exists.
+func (e *Engine) DocExists(ctx context.Context, id string) bool {
+	if strings.Contains(id, "#") {
+		_, err := e.Fetch(ctx, id)
+		return err == nil
+	}
+	for _, s := range e.shards {
+		if s.DocExists(ctx, id) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasSeason reports whether any shard contains the season.
+func (e *Engine) HasSeason(season string) bool {
+	for _, s := range e.shards {
+		for _, sc := range s.Meta().Seasons {
+			if sc.Season == season {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // Metas returns metadata of the loaded shards.
 func (e *Engine) Metas() []index.Meta {

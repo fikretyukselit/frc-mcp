@@ -20,8 +20,9 @@ var ErrNotFound = errors.New("index: not found")
 type Reader struct {
 	db   *sql.DB
 	meta Meta
+	path string
 
-	fts, chunks, byKey, symFQN, symSimple, symMember *sql.Stmt
+	fts, chunks, byKey, symFQN, symSimple, symMember, docExists *sql.Stmt
 }
 
 // Meta describes a shard.
@@ -56,7 +57,7 @@ func Open(ctx context.Context, path string) (*Reader, error) {
 	db.SetMaxOpenConns(n)
 	db.SetMaxIdleConns(n)
 	db.SetConnMaxIdleTime(0)
-	r := &Reader{db: db}
+	r := &Reader{db: db, path: path}
 	if err := r.loadMeta(ctx); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("index: open %s: %w", path, err)
@@ -71,6 +72,9 @@ func Open(ctx context.Context, path string) (*Reader, error) {
 	}
 	return r, nil
 }
+
+// Path is the shard file path (vector layers live next to it).
+func (r *Reader) Path() string { return r.path }
 
 // Close releases the shard.
 func (r *Reader) Close() error { return r.db.Close() }
@@ -157,6 +161,7 @@ func (r *Reader) prepare(ctx context.Context) error {
 			ORDER BY s LIMIT ?7`},
 		{&r.chunks, `SELECT ` + chunkCols + ` FROM chunk c WHERE c.id IN (SELECT value FROM json_each(?1))`},
 		{&r.byKey, `SELECT ` + chunkCols + ` FROM chunk c WHERE c.doc_id = ?1 AND c.ord = ?2`},
+		{&r.docExists, `SELECT 1 FROM chunk WHERE doc_id = ?1 LIMIT 1`},
 		{&r.symFQN, `SELECT ` + symbolCols + ` FROM symbol WHERE fqn = ?1 AND (?2 = '' OR season = ?2)
 			AND (?3 = '' OR ?3 = 'any' OR language = ?3) ORDER BY season DESC, fqn, signature LIMIT ?4`},
 		{&r.symSimple, `SELECT ` + symbolCols + ` FROM symbol WHERE simple = ?1 AND (?2 = '' OR season = ?2)
@@ -246,6 +251,12 @@ func (r *Reader) Chunks(ctx context.Context, ids []int64) (map[int64]*Chunk, err
 		out[id] = c
 	}
 	return out, rows.Err()
+}
+
+// DocExists reports whether any chunk belongs to docID.
+func (r *Reader) DocExists(ctx context.Context, docID string) bool {
+	var one int
+	return r.docExists.QueryRowContext(ctx, docID).Scan(&one) == nil
 }
 
 // ChunkByID resolves a public chunk id ("<doc_id>#<ord>").

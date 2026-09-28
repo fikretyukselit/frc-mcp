@@ -111,3 +111,23 @@ type APIOut struct {
 	Matches      []SymbolOut `json:"matches"`
 	OtherSeasons []SymbolOut `json:"other_seasons,omitempty" jsonschema:"the same symbol in other seasons (e.g. before/after a package move)"`
 }
+
+// VendordepOut is a detected vendordep.
+type VendordepOut struct {
+	File    string `json:"file"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	FRCYear string `json:"frc_year,omitempty"`
+}
+
+// ContextOut is frc_context's structured result.
+type ContextOut struct {
+	Envelope
+	Pin        string            `json:"pin" jsonschema:"opaque handle; pass as pin to frc_search / frc_api to apply this project's season, language and versions"`
+	Channel    string            `json:"channel,omitempty"`
+	WPILib     string            `json:"wpilib_version,omitempty"`
+	Libraries  map[string]string `json:"libraries,omitempty" jsonschema:"library name → version pinned by the project"`
+	Vendordeps []VendordepOut    `json:"vendordeps"`
+	Files      []string          `json:"files" jsonschema:"project files that were read"`
+	Warnings   []string          `json:"warnings,omitempty" jsonschema:"compatibility problems found (e.g. vendordep frcYear does not match the WPILib season)"`
+}

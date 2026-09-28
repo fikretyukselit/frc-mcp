@@ -5,7 +5,7 @@ SHARDS   := .shards
 PKGS     := ./...
 export CGO_ENABLED := 0
 
-.PHONY: all build test race bench lint vuln fuzz fixture serve doctor golden clean
+.PHONY: all build test race bench lint vuln fuzz fixture index eval serve doctor golden clean
 
 all: lint test build
 
@@ -37,14 +37,20 @@ fuzz: ## short fuzzing pass over parsers and normalizers
 golden: ## regenerate golden files (review the diff!)
 	$(GO) test ./internal/render ./internal/mcpserver -update
 
-fixture: build ## build the synthetic fixture shard
-	$(BIN) index build --chunks testdata/fixture/chunks.jsonl --symbols testdata/fixture/symbols.jsonl --out $(SHARDS)/fixture.sqlite
+index: build ## ingest data/sources.yaml (real WPILib docs + API) into $(SHARDS)
+	$(BIN) index run --out $(SHARDS)
 
-serve: fixture ## run the MCP server over stdio on the fixture shard
+eval: build ## retrieval metrics + regression gate (needs `make index`)
+	$(BIN) eval --index $(SHARDS) --ab --baseline eval/baseline.json
+
+fixture: build ## build the synthetic fixture shard (tests / offline demo)
+	$(BIN) index build --chunks testdata/fixture/chunks.jsonl --symbols testdata/fixture/symbols.jsonl --out .fixture/fixture.sqlite
+
+serve: build ## run the MCP server over stdio on $(SHARDS)
 	$(BIN) serve --index $(SHARDS)
 
-doctor: fixture
+doctor: build
 	$(BIN) doctor --index $(SHARDS)
 
 clean:
-	rm -rf bin dist $(SHARDS) bench.txt
+	rm -rf bin dist $(SHARDS) .fixture .cache bench.txt

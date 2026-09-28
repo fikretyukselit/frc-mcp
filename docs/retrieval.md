@@ -121,3 +121,28 @@ cross-encoder on every query breaks the lite p95 budget. Policy:
 - `content` is meaning-equivalent to `structuredContent` (same renderer); community snippets are fenced
   (`docs/security.md §2.1`); truncation is explicit (`truncated`, `omitted`, `next_cursor`).
 - Formats: Markdown for prose/code, compact JSON for data; no TOON (ADR-0004).
+
+## 8. Results (M1, 2026-09-29)
+
+The eval set is `eval/queries.jsonl`: 184 judged queries at document level, split into 148 train and 36 holdout. The
+buckets are how-to 94, symbol 35, cross-season 25, troubleshoot 15 and conceptual 15. The index is WPILib docs +
+Java API, 2026 and 2027-alpha. Regenerate with `make eval`; the gate compares against `eval/baseline.json`.
+
+| Arm | R@5 | R@10 | nDCG@10 | MRR@10 | wrong-season@5 | p95 |
+|---|---|---|---|---|---|---|
+| Lexical (BM25 + exact symbol) | 0.880 | 0.938 | 0.778 | 0.728 | **0** | 5.6 ms |
+| **Hybrid (+ potion-code-16M-v2 dense, RRF)** | **0.973** | **0.976** | **0.857** | **0.818** | **0** | 5.4 ms |
+
+- **M1 exit rule:** dense adds **+0.079 nDCG@10** (≥ 0.01 required), so it stays in the lite profile.
+- **All M1 targets are met:** Recall@10 ≥ 0.75, nDCG@10 ≥ 0.55, wrong-season@5 = 0, p95 ≤ 50 ms.
+- **Holdout vs train** nDCG@10 is 0.839 vs 0.861. Nothing was tuned on the holdout.
+- **Caveats (read before trusting the numbers):**
+  - The queries were written by the plan author, who could see page titles. This overstates lexical overlap
+    compared with real student phrasing.
+  - A human-written holdout (`"author": "human"`) is required before these numbers are quoted externally.
+  - Relevance is binary and judged per document, not per chunk.
+- **Remaining failure modes (hybrid):**
+  - Short conceptual queries ("what is NetworkTables", "FRC glossary terms"), where many pages match equally.
+  - Tutorial-step pages whose titles are generic ("Step 3: Creating a Drive Subsystem").
+  - Candidates for the fix, in M2: deterministic LLM-free contextual prefixes for tutorial steps, and a small title
+    boost for "what is X" intents.

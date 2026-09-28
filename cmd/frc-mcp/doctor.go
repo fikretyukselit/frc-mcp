@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"time"
@@ -18,16 +19,14 @@ func doctor(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	dir := fs.String("index", index.DefaultDir(), "directory containing *.sqlite shards")
 	n := fs.Int("n", 200, "benchmark iterations")
+	noDense := fs.Bool("no-dense", false, "disable dense retrieval")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	fmt.Printf("frc-mcp %s\nindex dir: %s\n", buildVersion(), *dir)
 	t0 := time.Now()
-	shards, errs := index.OpenDir(ctx, *dir)
+	e, shards := openEngine(ctx, slog.New(slog.NewTextHandler(os.Stderr, nil)), *dir, "", !*noDense)
 	open := time.Since(t0)
-	for _, err := range errs {
-		fmt.Println("  ✗", err)
-	}
 	if len(shards) == 0 {
 		fmt.Println("  no shards found — build one with `frc-mcp index build` (sync arrives in M2)")
 		return nil
@@ -42,8 +41,7 @@ func doctor(ctx context.Context, args []string) error {
 		fmt.Printf("  ✓ %-24s schema v%d · %d chunks · %d symbols · built %s · %v\n", m.Name, m.Schema, m.Chunks,
 			m.Symbols, m.BuiltAt.Format(time.RFC3339), m.Seasons)
 	}
-	e := retrieve.New(shards, retrieve.Options{})
-	fmt.Printf("default season: %s · open: %s\n", e.DefaultSeason(), open.Round(time.Microsecond))
+	fmt.Printf("default season: %s · dense: %v · open (shards + model + vector layers): %s\n", e.DefaultSeason(), e.Dense(), open.Round(time.Microsecond))
 
 	queries := []string{"How do I configure Motion Magic on a TalonFX?", "SwerveDriveKinematics",
 		"swerve odometry with vision measurements", "CANSparkMax current limit", "what changed in 2027"}

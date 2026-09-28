@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // OpenDir opens every *.sqlite shard in dir, sorted by file name. Shards that
@@ -33,6 +34,17 @@ func OpenDir(ctx context.Context, dir string) (shards []*Reader, errs []error) {
 	}
 	return shards, errs
 }
+
+// DefaultEmbedModel is the lite-profile embedding model (ADR-0002/0005).
+const DefaultEmbedModel = "potion-code-16M-v2"
+
+// VectorPath is where a shard's vector layer for a model lives.
+func VectorPath(shardPath, modelID string) string {
+	return strings.TrimSuffix(shardPath, ".sqlite") + "." + modelID + ".vec"
+}
+
+// ModelDir is where models are stored under a shard directory.
+func ModelDir(shardDir, modelID string) string { return filepath.Join(shardDir, "models", modelID) }
 
 // DefaultDir is the per-user shard directory:
 // $XDG_CACHE_HOME/frc-mcp/shards (Linux), ~/Library/Caches/frc-mcp/shards

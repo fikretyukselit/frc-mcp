@@ -19,12 +19,15 @@ var (
 	fetch string
 	//go:embed frc_api.md
 	api string
+	//go:embed frc_context.md
+	context string
 )
 
 // Instructions is the server-level instructions text.
 func Instructions() string { return strings.TrimSpace(instructions) }
 
 // Search, Fetch and API return tool descriptions.
-func Search() string { return strings.TrimSpace(search) }
-func Fetch() string  { return strings.TrimSpace(fetch) }
-func API() string    { return strings.TrimSpace(api) }
+func Search() string  { return strings.TrimSpace(search) }
+func Fetch() string   { return strings.TrimSpace(fetch) }
+func API() string     { return strings.TrimSpace(api) }
+func Context() string { return strings.TrimSpace(context) }

@@ -52,3 +52,27 @@ jobs:
           go-version-file: go.mod
       - name: Benchmarks (smoke)
         run: go test -run='^$' -bench=. -benchtime=200ms -benchmem ./internal/...
+  eval:
+    # Builds the real WPILib index (conditional GET, cached) and gates
+    # retrieval quality against eval/baseline.json (docs/retrieval.md §6).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/fetch
+          key: fetch-${{ hashFiles('data/sources.yaml') }}-${{ github.run_id }}
+          restore-keys: fetch-${{ hashFiles('data/sources.yaml') }}-
+      - name: Build index
+        env:
+          CGO_ENABLED: "0"
+        run: go run ./cmd/frc-mcp index run --out .shards
+      - name: model2vec golden test (needs the downloaded model)
+        env:
+          FRC_MCP_MODEL_DIR: ${{ github.workspace }}/.shards/models/potion-code-16M-v2
+        run: go test ./internal/embed/m2v/
+      - name: Eval gate
+        run: go run ./cmd/frc-mcp eval --index .shards --ab --baseline eval/baseline.json

@@ -1,5 +1,25 @@
 # Benchmarks
 
+## Real index (M1, 2026-09-29)
+
+The corpus is the WPILib docs and Java API for 2026 and 2027-alpha, built by `frc-mcp index run`:
+- 7,779 chunks and 35,350 symbols;
+- 4 shards (48 MB) plus potion-code-16M-v2 (32 MB);
+- Apple M2, Go 1.27.1.
+
+| Path | Result | Budget |
+|---|---|---|
+| `frc-mcp index run`, cold (downloads ≈ 195 MB) | ≈ 25 s | — |
+| `frc-mcp index run`, warm (all sources return 304 Not Modified) | ≈ 13–15 s (parse + embed + write) | — |
+| Javadoc parse, one season (≈ 1,100 types, 15–18k members) | 0.6–0.8 s | — |
+| model2vec query embedding (`m2v.Encode`) | 4.7 µs, 7 allocs | ≤ 1 ms |
+| Load shards + model + vector layers (in the background; `tools/list` does not wait) | ≈ 125 ms | — |
+| Warm process launch → first `tools/list` | 19 ms | ≤ 150 ms |
+| `frc_search`, hybrid, 184 eval queries | p50 2.2 ms · p95 5.4 ms | p95 ≤ 50 ms |
+| `frc-mcp doctor`, 200 mixed queries | p50 3.5 ms · p95 4.7 ms (lexical only: p95 4.4 ms) | p95 ≤ 50 ms |
+
+## Fixture corpus (M0)
+
 Measured on an Apple M2 (8 cores, macOS), Go 1.27.1, `CGO_ENABLED=0`. The numbers come from
 `go test -p 1 -bench=. -benchmem ./internal/...`. **Corpus: the synthetic fixture shard** (20 chunks, 15 symbols),
 except for the vector benchmarks, which use random unit vectors. Run-to-run noise on a laptop is about 15–30%.

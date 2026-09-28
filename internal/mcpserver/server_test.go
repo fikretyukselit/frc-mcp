@@ -99,7 +99,7 @@ func TestToolAnnotationsReadOnly(t *testing.T) {
 		}
 	}
 	// The SDK lists tools sorted by name: deterministic, as SEP-2549 asks.
-	if strings.Join(names, ",") != "frc_api,frc_fetch,frc_search" {
+	if strings.Join(names, ",") != "frc_api,frc_context,frc_fetch,frc_search" {
 		t.Fatalf("tool order = %v", names)
 	}
 }
@@ -218,6 +218,47 @@ func TestPaginationThroughProtocol(t *testing.T) {
 	second := sc["hits"].([]any)[0].(map[string]any)["id"]
 	if second == first {
 		t.Fatalf("page 2 repeated page 1: %v", first)
+	}
+}
+
+func TestContextPinFlow(t *testing.T) {
+	cs := connect(t, testfixture.Engine(t))
+	_, sc, text := call(t, cs, "frc_context", map[string]any{"project_root": "../project/testdata/java2026"})
+	pin, _ := sc["pin"].(string)
+	if sc["frc_season"] != "2026" || sc["language"] != "java" || pin == "" || !strings.Contains(text, "frcYear=2025") {
+		t.Fatalf("context: %v\n%s", sc, text)
+	}
+	// The pin drives search: season and language come from the handle.
+	_, sc, _ = call(t, cs, "frc_search", map[string]any{"query": "SwerveDriveKinematics", "pin": pin})
+	if sc["frc_season"] != "2026" || sc["pin_source"] != "handle" || sc["language"] != "java" {
+		t.Fatalf("pinned search: season=%v pin_source=%v lang=%v", sc["frc_season"], sc["pin_source"], sc["language"])
+	}
+	// An explicit argument still wins over the handle.
+	_, sc, _ = call(t, cs, "frc_search", map[string]any{"query": "SwerveDriveKinematics", "pin": pin, "frc_season": "2027"})
+	if sc["frc_season"] != "2027" || sc["pin_source"] != "arg" {
+		t.Fatalf("override: %v %v", sc["frc_season"], sc["pin_source"])
+	}
+	res, _, text := call(t, cs, "frc_search", map[string]any{"query": "x", "pin": "pin1.garbage"})
+	if !res.IsError || !strings.Contains(text, "frc_context") {
+		t.Fatalf("bad pin must be an instructive error: %s", text)
+	}
+}
+
+func TestContextNoFilesystemOnHostedServer(t *testing.T) {
+	srv := mcpserver.New(testfixture.Engine(t), mcpserver.Options{Version: "t", NoFilesystem: true})
+	ctx := context.Background()
+	ct, st := mcp.NewInMemoryTransports()
+	ss, _ := srv.MCP().Connect(ctx, st, nil)
+	cs, _ := mcp.NewClient(&mcp.Implementation{Name: "c", Version: "0"}, nil).Connect(ctx, ct, nil)
+	defer cs.Close()
+	defer ss.Close()
+	res, _, text := call(t, cs, "frc_context", map[string]any{"project_root": "/etc"})
+	if !res.IsError || !strings.Contains(text, "disabled") {
+		t.Fatalf("project_root must be refused on hosted servers: %s", text)
+	}
+	_, sc, _ := call(t, cs, "frc_context", map[string]any{"declare": map[string]any{"frc_season": "2027", "language": "java"}})
+	if sc["frc_season"] != "2027" || sc["pin"] == "" {
+		t.Fatalf("declare: %v", sc)
 	}
 }
 

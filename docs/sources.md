@@ -10,6 +10,26 @@ not embeddings.
 Legend — **Detect**: change-detection rung (`docs/ingestion.md §2`). **Floor**: minimum poll interval. **Prior**:
 expected changes/day in the off-season (scaled by the season multiplier). **Pri**: scheduler weight.
 
+## 0. Verified during M1 ingestion (2026-09-29)
+
+- **frc-docs has been renamed to `wpilibsuite/wpilib-docs`.** The license is **CC BY 4.0** (`license.txt`).
+  Redistribution with attribution is allowed; every chunk carries its citation.
+- **allwpilib is BSD-3-Clause.**
+- **Docs are ingested from the Read the Docs htmlzip** (`/_/downloads/en/{stable,latest}/htmlzip/`). One request per
+  version covers the whole site, and remote code includes are already resolved.
+  - The 2026 build uses `sphinx_rtd_theme`; the 2027 ("latest") build uses **Furo**.
+  - The adapter supports both. A theme change would otherwise have emptied a shard silently.
+- **`github.wpilib.org/robots.txt` disallows `/allwpilib/docs/beta/` and `/docs/development/`.** 2027 Javadoc
+  therefore comes from the versioned Maven artifact
+  `org/wpilib/wpilibj/documentation/<ver>/documentation-<ver>.zip`. The 2026 equivalent is
+  `edu/wpi/first/wpilibj/documentation/2026.2.2/`. github.wpilib.org is used for links only and is not on the
+  fetch allowlist.
+- **frcmaven.wpi.edu** has no robots.txt and redirects downloads to `storage.googleapis.com`. **huggingface.co**
+  redirects to `*.hf.co`. Both hosts are on the allowlist with the reason documented in `data/sources.yaml`.
+- **The 2027 renames seen in the docs** are: `ChassisSpeeds` → `ChassisVelocities`; the new OpMode framework and
+  Utility Mode; `commandbased/commands-v2/`; the FIRST Driver Station replacing the NI DS; Systemcore pages; and a
+  `yearly-overview/removed-features` page.
+
 ## 1. WPILib core
 
 | Source | Endpoint(s) | Detect | Floor | Prior | Pri |

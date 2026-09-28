@@ -17,7 +17,6 @@ import (
 
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/mcpserver"
-	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
 )
 
 func serve(ctx context.Context, log *slog.Logger, args []string) error {
@@ -26,28 +25,36 @@ func serve(ctx context.Context, log *slog.Logger, args []string) error {
 	dir := fs.String("index", index.DefaultDir(), "directory containing *.sqlite shards")
 	addr := fs.String("addr", "127.0.0.1:7424", "listen address for --transport http")
 	season := fs.String("default-season", "", "season used when nothing pins one (default: newest stable season in the index)")
+	noDense := fs.Bool("no-dense", false, "disable dense (vector) retrieval")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	start := time.Now()
-	shards, errs := index.OpenDir(ctx, *dir)
-	for _, err := range errs {
-		log.Warn("shard skipped", "err", err)
-	}
-	var engine *retrieve.Engine
-	if len(shards) > 0 {
-		engine = retrieve.New(shards, retrieve.Options{DefaultSeason: *season})
-		log.Info("index loaded", "dir", *dir, "shards", len(shards), "default_season", engine.DefaultSeason(),
-			"digest", engine.Digest(), "open_ms", time.Since(start).Milliseconds())
-	} else {
-		log.Warn("no index shards found; tools will report status=syncing", "dir", *dir)
-	}
+	// Answer tools/list immediately; load shards, model and vector layers in
+	// the background (tools report status=syncing until ready). This keeps
+	// cold start far below client startup timeouts on any index size.
+	cwd, _ := os.Getwd()
+	srv := mcpserver.New(nil, mcpserver.Options{Version: buildVersion(), ProjectRoot: cwd, NoFilesystem: *transport == "http"})
+	var shards []*index.Reader
+	loaded := make(chan struct{})
+	go func() {
+		defer close(loaded)
+		start := time.Now()
+		engine, sh := openEngine(ctx, log, *dir, *season, !*noDense)
+		if engine == nil {
+			log.Warn("no index shards found; tools will report status=syncing", "dir", *dir)
+			return
+		}
+		shards = sh
+		srv.SetEngine(engine)
+		log.Info("index loaded", "dir", *dir, "shards", len(sh), "default_season", engine.DefaultSeason(),
+			"dense", engine.Dense(), "digest", engine.Digest(), "load_ms", time.Since(start).Milliseconds())
+	}()
 	defer func() {
+		<-loaded
 		for _, s := range shards {
 			s.Close()
 		}
 	}()
-	srv := mcpserver.New(engine, mcpserver.Options{Version: buildVersion()})
 
 	switch *transport {
 	case "stdio":

@@ -32,6 +32,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "pin": {
+          "description": "pin handle from frc_context; supplies season and language unless given explicitly",
+          "type": "string"
+        },
         "symbol": {
           "description": "class, member or qualified name: TalonFX, SparkMax#configure, frc::DCMotor, edu.wpi.first.wpilibj.TimedRobot",
           "maxLength": 300,
@@ -348,6 +352,206 @@
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true,
+      "title": "Detect FRC project versions"
+    },
+    "description": "Detect (or declare) the robot project's FRC season, language, WPILib version and vendordep versions, and return a pin handle that makes every other frc_ tool answer for exactly that project.\n\nUse when: starting work in a robot project, or when results come back for the wrong season or language. Call it once and pass the returned pin to frc_search and frc_api.\nDon't use when: you only need a one-off lookup for a season you already know — pass frc_season directly.\n\nReads only build.gradle / build.gradle.kts, pyproject.toml and vendordeps/*.json under the project root. Warnings flag vendordeps whose frcYear does not match the WPILib season. Examples:\n{}\n{\"project_root\": \"/path/to/robot\"}\n{\"declare\": {\"frc_season\": \"2027\", \"language\": \"java\"}}",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "declare": {
+          "additionalProperties": false,
+          "description": "declare the pin set instead of (or on top of) detecting it",
+          "properties": {
+            "channel": {
+              "description": "stable, beta or alpha",
+              "enum": [
+                "stable",
+                "beta",
+                "alpha"
+              ],
+              "type": "string"
+            },
+            "frc_season": {
+              "description": "FRC season, e.g. 2026",
+              "pattern": "^20[2-3][0-9]$",
+              "type": "string"
+            },
+            "language": {
+              "description": "java, cpp or python",
+              "enum": [
+                "java",
+                "cpp",
+                "python"
+              ],
+              "type": "string"
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "project_root": {
+          "description": "robot project directory (default: the server's working directory); unavailable on hosted servers",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "frc_context",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "confidence": {
+          "description": "0..1 confidence in the top result",
+          "type": "number"
+        },
+        "degraded": {
+          "description": "retrievers that were unavailable for this call",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "files": {
+          "description": "project files that were read",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "frc_season": {
+          "description": "effective FRC season the results are pinned to",
+          "type": "string"
+        },
+        "freshness": {
+          "description": "shard (served from the local index) | live",
+          "type": "string"
+        },
+        "index_age": {
+          "description": "age of the newest loaded index shard",
+          "type": "string"
+        },
+        "index_stale": {
+          "description": "true when the index manifest is past its expiry",
+          "type": "boolean"
+        },
+        "language": {
+          "description": "effective language filter",
+          "type": "string"
+        },
+        "libraries": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "library name → version pinned by the project",
+          "type": "object"
+        },
+        "next": {
+          "description": "suggested next tool calls",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "next_cursor": {
+          "description": "pass back as cursor to get the next page",
+          "type": "string"
+        },
+        "omitted": {
+          "description": "number of results left out by truncation",
+          "type": "integer"
+        },
+        "pin": {
+          "description": "opaque handle; pass as pin to frc_search / frc_api to apply this project's season, language and versions",
+          "type": "string"
+        },
+        "pin_source": {
+          "description": "where the season came from: arg | query | default",
+          "type": "string"
+        },
+        "status": {
+          "description": "ok | low_confidence | no_match | version_mismatch | syncing",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "true when results were cut to fit the token budget",
+          "type": "boolean"
+        },
+        "vendordeps": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string"
+              },
+              "frc_year": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "file",
+              "name",
+              "version"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "warnings": {
+          "description": "compatibility problems found (e.g. vendordep frcYear does not match the WPILib season)",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "wpilib_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "freshness",
+        "truncated",
+        "pin",
+        "vendordeps",
+        "files"
+      ],
+      "type": "object"
+    },
+    "title": "Detect FRC project versions"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
       "title": "Fetch FRC doc section"
     },
     "description": "Fetch the full text of a documentation section by the id returned from frc_search (or a frc://chunk/\u003cid\u003e URI).\n\nUse when: a search snippet is not enough and you need the complete section, including all code samples.\nDon't use when: you have no id yet — call frc_search first. For API signatures call frc_api.\n\nLong sections are paged: pass next_cursor back as cursor. Example:\n{\"id\": \"phoenix6/2026/motion-magic#0\"}",
@@ -609,6 +813,10 @@
           "maximum": 20000,
           "minimum": 1,
           "type": "integer"
+        },
+        "pin": {
+          "description": "pin handle from frc_context; supplies season and language unless given explicitly",
+          "type": "string"
         },
         "query": {
           "description": "what you are looking for, in natural language or with exact class/method names",

@@ -1,0 +1,78 @@
+# frc-mcp source registry (docs/sources.md). The ONLY place endpoints live;
+# the ingestion egress allowlist is derived from these URLs + extra_hosts.
+# Every entry declares library/season/channel/version, license and trust.
+version: 1
+user_agent: "frc-mcp-indexer/{version} (+https://github.com/fikretyukselit/frc-mcp)"
+extra_hosts:
+  - storage.googleapis.com # frcmaven.wpi.edu (Artifactory) redirects artifact downloads here
+  - "*.hf.co"              # huggingface.co redirects model files to its CDN (us.aws.cdn.hf.co, cas-bridge.xethub.hf.co)
+
+sources:
+  # ---- WPILib documentation (frc-docs, now wpilibsuite/wpilib-docs; CC BY 4.0) ----
+  # One htmlzip per Read the Docs version: the Sphinx build with remote code
+  # includes already resolved, so a single polite request covers the site.
+  - id: wpilib-docs-2026
+    adapter: sphinx-htmlzip
+    url: https://docs.wpilib.org/_/downloads/en/stable/htmlzip/
+    zip_root: frc-docs/docs/
+    base_url: https://docs.wpilib.org/en/stable/docs/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: "2026"
+    license: CC-BY-4.0
+    trust: official
+    shard: wpilib-docs-2026
+    verified: true # probed 2026-09-29
+  - id: wpilib-docs-2027
+    adapter: sphinx-htmlzip
+    url: https://docs.wpilib.org/_/downloads/en/latest/htmlzip/
+    zip_root: frc-docs/docs/
+    base_url: https://docs.wpilib.org/en/latest/docs/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-7
+    license: CC-BY-4.0
+    trust: official
+    shard: wpilib-docs-2027
+    verified: true
+
+  # ---- WPILib Java API (allwpilib; BSD-3-Clause) ----
+  # Aggregate Javadoc zips from WPILib Maven. github.wpilib.org/robots.txt
+  # disallows crawling /docs/beta and /docs/development, so 2027 API data is
+  # taken from the versioned Maven artifact; base_url is used for links only.
+  - id: wpilib-java-2026
+    adapter: javadoc-zip
+    url: https://frcmaven.wpi.edu/artifactory/release/edu/wpi/first/wpilibj/documentation/2026.2.2/documentation-2026.2.2.zip
+    base_url: https://github.wpilib.org/allwpilib/docs/release/java/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: java
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-java-2026
+    verified: true
+  - id: wpilib-java-2027
+    adapter: javadoc-zip
+    url: https://frcmaven.wpi.edu/artifactory/release/org/wpilib/wpilibj/documentation/2027.0.0-alpha-7/documentation-2027.0.0-alpha-7.zip
+    base_url: https://github.wpilib.org/allwpilib/docs/beta/java/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-7
+    language: java
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-java-2027
+    verified: true
+
+models:
+  - id: potion-code-16M-v2 # MIT; query + document encoder for the lite profile
+    license: MIT
+    files:
+      tokenizer.json: https://huggingface.co/minishlab/potion-code-16M-v2/resolve/main/tokenizer.json
+      model.safetensors: https://huggingface.co/minishlab/potion-code-16M-v2/resolve/main/model.safetensors
+      config.json: https://huggingface.co/minishlab/potion-code-16M-v2/resolve/main/config.json

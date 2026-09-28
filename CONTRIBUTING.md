@@ -17,18 +17,21 @@ agents, and it lists what must stay true.
 
 ## 2. What exists today vs. what is planned
 
-The docs describe the **target** design. The code implements milestone **M0**:
+The docs describe the **target** design. The code implements milestones **M0 and M1**:
 
 | Area | Status |
 |---|---|
 | Shard format, FTS5 + symbol tables (`internal/index`) | ✅ implemented |
 | Retrieval engine, router, abstention (`internal/retrieve`, `internal/router`) | ✅ implemented (confidence coefficients are placeholders until the M1 eval) |
 | Render contract (`internal/render`) | ✅ implemented, golden-tested |
-| Vector layer (`internal/vec`) | ✅ implemented; not yet wired to an embedder (M1) |
+| Vector layer (`internal/vec`) + pure-Go model2vec (`internal/embed/m2v`, golden-tested against Python) | ✅ implemented, dense retrieval on by default |
+| Ingestion: `data/sources.yaml`, conditional-GET fetch, Sphinx + Javadoc adapters, cross-season symbol diff (`internal/ingest/*`, `internal/apisym`) | ✅ WPILib docs + Java API for 2026 and 2027-alpha |
+| Project detection + pin handles (`internal/project`) | ✅ implemented |
+| Eval harness + judged queries + CI gate (`internal/eval`, `eval/`) | ✅ 184 queries; a human-written holdout is still needed |
 | Egress guard, sanitizer (`internal/netguard`, `internal/ingest/sanitize`) | ✅ implemented |
-| Tools `frc_search`, `frc_fetch`, `frc_api` | ✅ implemented |
-| `frc_context`, `frc_vendordep`, `frc_verify_code`, `frc_migrate`, `frc_whats_new`, `frc_hardware` | ⏳ M1–M4 |
-| Real ingestion adapters, `data/`, `eval/`, shard sync/signing | ⏳ M1–M3 |
+| Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context` | ✅ implemented |
+| `frc_vendordep`, `frc_verify_code`, `frc_migrate`, `frc_whats_new`, `frc_hardware` | ⏳ M2–M4 |
+| Vendor sources, C++/Python symbol tables, shard sync/signing | ⏳ M2–M3 |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -39,9 +42,11 @@ The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat
 make test       # all tests, CGO disabled (as shipped)
 make race       # race detector
 make lint       # go vet, gofmt, golangci-lint v2
-make fixture    # build bin/frc-mcp and the fixture shard
+make index      # fetch + build the real WPILib index into .shards (≈15 s; conditional GET afterwards)
+make eval       # retrieval metrics + regression gate vs eval/baseline.json
 make doctor     # measure latency on your machine
-make serve      # run the MCP server over stdio on the fixture
+make serve      # run the MCP server over stdio on .shards
+make fixture    # synthetic fixture shard (offline tests/demo) into .fixture
 ```
 
 For an interactive check, point any MCP client (or a pinned, patched MCP Inspector) at
@@ -70,5 +75,7 @@ By contributing, you agree that your contributions are licensed under the projec
 ## 6. Good first contributions
 
 - Add adversarial cases to the router tests (`internal/router/router_test.go`) or the sanitizer corpus.
-- Write qrels for the M1 eval set: real student questions mapped to the doc section that answers them.
+- **Most wanted:** human-written eval queries (`eval/queries.jsonl`, `"author": "human"`, `"split": "holdout"`).
+  These should be real questions students asked, mapped to the WPILib page that answers them. The current 184
+  queries were written by the plan author and are biased toward the docs' own vocabulary.
 - Verify a `⚠`-marked endpoint in `docs/sources.md` and record the evidence.

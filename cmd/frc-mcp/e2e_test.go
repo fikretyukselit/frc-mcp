@@ -64,18 +64,27 @@ func TestStdioEndToEnd(t *testing.T) {
 		cold = max(cold, d)
 	}
 	cs, tools, _ := launch()
+	var err error
 	defer cs.Close()
 	t.Logf("first exec → tools/list: %s; subsequent launches (max of 3): %s", firstLat, cold)
-	if len(tools.Tools) != 3 {
+	if len(tools.Tools) != 4 {
 		t.Fatalf("tools = %d", len(tools.Tools))
 	}
 	if cold > time.Second { // generous for CI runners; laptop budget is 150 ms
 		t.Errorf("cold start %s", cold)
 	}
-	res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "frc_search",
-		Arguments: map[string]any{"query": "SwerveDriveKinematics", "frc_season": "2027"}})
-	if err != nil || res.IsError {
-		t.Fatalf("call: %v %+v", err, res)
+	// The index loads in the background; poll until it is ready.
+	var res *mcp.CallToolResult
+	for deadline := time.Now().Add(10 * time.Second); ; {
+		res, err = cs.CallTool(ctx, &mcp.CallToolParams{Name: "frc_search",
+			Arguments: map[string]any{"query": "SwerveDriveKinematics", "frc_season": "2027"}})
+		if err != nil || res.IsError {
+			t.Fatalf("call: %v %+v", err, res)
+		}
+		if !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "status: syncing") || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	text := res.Content[0].(*mcp.TextContent).Text
 	if !strings.Contains(text, "org.wpilib.math.kinematics") || strings.Contains(text, "season 2026") {

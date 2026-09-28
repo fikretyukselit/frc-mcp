@@ -64,7 +64,7 @@ func (c Context) indexAge() string {
 func Search(res retrieve.Result, rc Context) SearchOut {
 	out := SearchOut{Envelope: Envelope{
 		Status: res.Status, Confidence: round2(res.Confidence), Season: res.Season, PinSource: res.PinSource,
-		Language: res.Language, Freshness: "shard", IndexAge: rc.indexAge(),
+		Language: res.Language, Freshness: "shard", IndexAge: rc.indexAge(), Degraded: res.Degraded,
 	}, Hits: []SearchHit{}}
 	for _, s := range res.Symbols[:min(len(res.Symbols), 5)] {
 		out.Symbols = append(out.Symbols, SymbolRef{FQN: s.FQN, Kind: s.Kind, Signature: s.Signature, Library: s.Library,

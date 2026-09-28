@@ -24,6 +24,7 @@ linters:
         - (*database/sql.DB).Close
         - (*database/sql.Rows).Close
         - (*os.File).Close
+        - (*archive/zip.ReadCloser).Close
         - (*github.com/fikretyukselit/frc-mcp/internal/index.Reader).Close
         - (*github.com/fikretyukselit/frc-mcp/internal/vec.Layer).Close
         - (*github.com/modelcontextprotocol/go-sdk/mcp.ClientSession).Close

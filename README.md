@@ -7,8 +7,12 @@ knowledge, pinned to the versions your robot project actually uses. It covers:
 - vendor libraries such as CTRE Phoenix 6, REVLib, PhotonVision, Limelight, PathPlanner, Choreo, AdvantageKit and YAGSL;
 - vendordeps and release notes.
 
-> **Status:** M0 (skeleton and contracts) is done. The server runs end to end on a synthetic fixture index. Real WPILib
-> ingestion arrives in M1. See [`CLAUDE.md`](CLAUDE.md) §9 for the roadmap.
+> **Status:** M1 is done. The server indexes the real WPILib docs and Java API for 2026 and 2027-alpha:
+> - 7.8k chunks and 35k API symbols;
+> - retrieval quality of Recall@10 0.976 and nDCG@10 0.857, with **0 wrong-season results**;
+> - search p95 of about 5 ms.
+>
+> Vendor libraries arrive in M3. See [`CLAUDE.md`](CLAUDE.md) §9 for the roadmap.
 
 ## Why
 
@@ -17,11 +21,12 @@ seasons. When a confident answer exists only in another season (for example `CAN
 `edu.wpi.first` packages in 2027), it returns `version_mismatch` and points to where that answer lives. Every result
 carries a citation and a trust tier. Forum text is fenced off as untrusted data.
 
-## Quick start (fixture index)
+## Quick start
 
 ```sh
-make fixture          # builds bin/frc-mcp and .shards/fixture.sqlite
+make index            # fetch + build the WPILib index into .shards (~25 s cold, conditional GET afterwards)
 make doctor           # index status and search latency on this machine
+make eval             # retrieval metrics vs the committed baseline
 bin/frc-mcp serve --index .shards      # stdio MCP server
 ```
 
@@ -31,24 +36,25 @@ Client config (use a pinned path or version, never `@latest`):
 { "mcpServers": { "frc": { "command": "/path/to/frc-mcp", "args": ["serve", "--index", "/path/to/shards"] } } }
 ```
 
-## Tools (M0)
+## Tools (M1)
 
 | Tool | Purpose |
 |---|---|
-| `frc_search` | Hybrid search pinned to one season: BM25 plus exact symbol lookup, RRF, boosts, confidence and abstention |
-| `frc_fetch` | Full section by id (search → fetch progressive disclosure), paged by token budget |
-| `frc_api` | Exact API symbol lookup: signatures, deprecated/removed status, replacements, other-season locations |
+| `frc_context` | Detects the project's season, language, WPILib and vendordep versions (from `build.gradle`, `vendordeps/`, `pyproject.toml`) and returns a pin handle |
+| `frc_search` | Hybrid search pinned to one season: BM25, exact symbol lookup and dense (model2vec) results combined with RRF, then boosts, confidence and abstention |
+| `frc_fetch` | Returns a full section by id (search → fetch), paged by token budget |
+| `frc_api` | Exact lookup across 35k API symbols: signatures, deprecated/removed status, and replacements, including the generated `edu.wpi.first` → `org.wpilib` map |
 
-The v0.2 surface grows to 9 tools: `frc_context`, `frc_verify_code`, `frc_migrate`, `frc_vendordep`, `frc_whats_new`
-and `frc_hardware` are added. See [MCP surface](docs/mcp-surface.md).
+The v0.2 surface grows to 9 tools: `frc_verify_code`, `frc_migrate`, `frc_vendordep`, `frc_whats_new` and
+`frc_hardware` are added. See [MCP surface](docs/mcp-surface.md).
 
-## Performance (Apple M2, fixture corpus)
+## Performance (Apple M2, real WPILib index)
 
 | Measurement | Result |
 |---|---|
-| `frc_search` p95 | 0.43 ms |
-| Cold launch to first `tools/list` | 31 ms |
-| Exact vector scan of 100k vectors | 2 ms |
+| `frc_search` p95 (hybrid) | ~5 ms |
+| Warm launch to first `tools/list` | 19 ms |
+| Query embedding | 4.7 µs |
 
 More numbers are in [benchmarks](docs/benchmarks.md).
 
