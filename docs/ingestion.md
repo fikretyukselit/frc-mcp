@@ -1,6 +1,6 @@
 # Ingestion & change detection
 
-Status: Draft v0.1 (2026-09-28). Endpoint-level details: `docs/sources.md`. Raw findings: `docs/research/`.
+Status: Draft v0.2 (2026-09-29). Endpoint-level details: `docs/sources.md`. Raw findings: `docs/research/`.
 
 ## 1. Goals
 
@@ -38,6 +38,10 @@ Hints we record but never trust alone: sitemap `lastmod` (RTD sitemaps list vers
 
 ## 3. Scheduler — the decision model
 
+**Phasing:** M2–M4 run a **fixed-interval scheduler** (interval per source from `sources.yaml`, scaled by the season
+multiplier, bounded by floors). The Bayesian scheduler below lands in M5 and must keep the fixed path as fallback
+(feature flag), so ingestion never blocks on it.
+
 Each source `s` is modeled as a Poisson change process with unknown rate `λ_s` (changes/day).
 
 **Posterior:** `λ_s ~ Gamma(α_s, β_s)`.
@@ -73,6 +77,13 @@ Each source `s` is modeled as a Poisson change process with unknown rate `λ_s` 
 small SQLite `state.db` cached between runs (actions/cache + a copy attached to each index release for recovery).
 Rebuild of a shard is triggered only when ≥ 1 of its documents changed `norm_hash`.
 
+## 3a. Sanitization & trust (before normalization)
+
+Every fetched item passes `internal/ingest/sanitize` (`docs/security.md §2.1`): strip Unicode tag characters,
+bidi/zero-width controls, HTML comments and hidden elements; NFC; per-item size cap; assign `trust` from the source's
+registry entry (`official|vendor|community`; release-note bodies from non-vendor repos → `community`); run suspect
+detection and set `suspect`. Sanitization is deterministic and golden/fuzz-tested.
+
 ## 4. Fetcher contract
 
 - `http.Client` with per-request context deadline (default 20 s), `MaxIdleConnsPerHost` tuned, HTTP/2.
@@ -82,6 +93,9 @@ Rebuild of a shard is triggered only when ≥ 1 of its documents changed `norm_h
 - Retries: 429/502/503/504 and network errors; exponential backoff with full jitter, honoring `Retry-After`; max 4.
 - Body size cap per kind (HTML 5 MB, JSON 2 MB, PDF 50 MB); content-type checks.
 - `User-Agent: frc-mcp-indexer/<ver> (+https://github.com/fikretyukselit/frc-mcp)`.
+- All traffic goes through `internal/netguard`: https only, host allowlist derived from `sources.yaml`, redirects
+  re-checked, private/loopback/link-local IPs blocked at dial time.
+- CI job isolation: crawl/build jobs hold read-only tokens only; signing/publishing happens in a separate job.
 - Records per response: status, validators, `max-age`, bytes, latency — feeds `freshness.json` and alerting.
 
 ## 5. Probing unverified endpoints

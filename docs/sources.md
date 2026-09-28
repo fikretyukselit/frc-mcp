@@ -1,6 +1,10 @@
 # Source catalog
 
-Status: Draft v0.1 (2026-09-28). This document is the human-readable seed for `data/sources.yaml`.
+Status: Draft v0.2 (2026-09-29). This document is the human-readable seed for `data/sources.yaml`, which also
+derives the **egress allowlist** (`docs/security.md §2.3`). Every entry declares a `trust` tier:
+`official` (WPILib, FIRST), `vendor` (vendor docs/APIs), `community` (forums, Reddit, YouTube, non-vendor release-note
+bodies). Structured payloads (vendordep JSON, Maven metadata, release metadata, specs) land in relational fact tables,
+not embeddings.
 ⚠️ = not yet verified by a probe (see `docs/ingestion.md §5`). Primary research: `docs/research/02-*.md`.
 
 Legend — **Detect**: change-detection rung (`docs/ingestion.md §2`). **Floor**: minimum poll interval. **Prior**:
@@ -71,7 +75,7 @@ expected changes/day in the off-season (scaled by the season multiplier). **Pri*
 | r/FRC | `https://www.reddit.com/r/FRC/.rss` ⚠️ | GUID | 1 h | custom UA required |
 | Discord | — | — | — | out of scope (auth + ToS) |
 
-## 6. Hardware specs (reference data, human-reviewed)
+## 6. Hardware specs (reference data, human-reviewed → `hw_spec` table, served by `frc_hardware`)
 
 Motor constants are served **with both sources labeled** — never merged: WPILib `DCMotor` (pinned to a release tag,
 `wpimath/.../DCMotor.java`) and ReCalc / CTRE dyno data (`tervay/recalc` ⚠️ path). NEO and NEO Vortex differ

@@ -14,12 +14,12 @@ from matching docs and API symbol tables — with citations — and can check yo
 calls before you deploy.
 
 ## Highlights (planned)
-- `frc_search`, `frc_read`, `frc_api`, `frc_verify_code`, `frc_migrate`, `frc_vendordep`, `frc_whats_new`, `frc_context`
+- `frc_context`, `frc_search`, `frc_fetch`, `frc_api`, `frc_verify_code`, `frc_migrate`, `frc_vendordep`, `frc_whats_new`, `frc_hardware`
 - Hybrid retrieval (BM25 + static embeddings + exact symbol lookup), < 50 ms p95, fully offline after sync
 - Continuously refreshed, signed index shards; single static Go binary for macOS / Linux / Windows
 
 ## Docs
 - [Architecture](docs/architecture.md) · [Retrieval](docs/retrieval.md) · [Ingestion](docs/ingestion.md)
-- [MCP surface](docs/mcp-surface.md) · [Source catalog](docs/sources.md) · [ADRs](docs/adr/)
+- [MCP surface](docs/mcp-surface.md) · [Security](docs/security.md) · [Source catalog](docs/sources.md) · [ADRs](docs/adr/) · [Reviews](docs/reviews/)
 
 Maintained by the [Fikret Yüksel Foundation](https://github.com/fikretyukselit).
