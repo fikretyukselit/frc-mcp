@@ -18,6 +18,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/fikretyukselit/frc-mcp/internal/facts"
+	"github.com/fikretyukselit/frc-mcp/internal/hwdata"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/mcpserver/surface"
 	"github.com/fikretyukselit/frc-mcp/internal/migrate"
@@ -117,8 +118,8 @@ func (s *Server) register() {
 		Annotations: readOnly("Verify robot code against the season API"), InputSchema: verifySchema()}, s.verifyCode)
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_whats_new", Title: "FRC library release notes", Description: surface.WhatsNew(),
 		Annotations: readOnly("FRC library release notes"), InputSchema: whatsNewSchema()}, s.whatsNew)
-	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_hardware", Title: "FRC motor specs", Description: surface.Hardware(),
-		Annotations: readOnly("FRC motor specs"), InputSchema: hardwareSchema()}, s.hardware)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_hardware", Title: "FRC hardware specs", Description: surface.Hardware(),
+		Annotations: readOnly("FRC hardware specs"), InputSchema: hardwareSchema()}, s.hardware)
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_migrate", Title: "Map FRC APIs across seasons", Description: surface.Migrate(),
 		Annotations: readOnly("Map FRC APIs across seasons"), InputSchema: migrateSchema()}, s.migrate)
 	s.mcp.AddResource(&mcp.Resource{URI: "frc://index/manifest", Name: "index-manifest", Title: "Loaded index shards",
@@ -591,8 +592,8 @@ func (s *Server) whatsNew(_ context.Context, _ *mcp.CallToolRequest, in WhatsNew
 
 // HardwareIn is frc_hardware's input.
 type HardwareIn struct {
-	Parts    []string `json:"parts,omitempty" jsonschema:"part names or aliases, e.g. kraken x60, kraken x60 foc, neo vortex, falcon, neo550"`
-	Category string   `json:"category,omitempty" jsonschema:"list every part of a category instead (motor)"`
+	Parts    []string `json:"parts,omitempty" jsonschema:"part names or aliases, e.g. kraken x60, kraken x60 foc, neo vortex, neo550, mk4i, maxswerve, cancoder, pigeon 2"`
+	Category string   `json:"category,omitempty" jsonschema:"list every part of a category instead (motor, encoder, imu, swerve_module)"`
 	Season   string   `json:"frc_season,omitempty" jsonschema:"FRC season (default: pin, then the current stable season)"`
 	Pin      string   `json:"pin,omitempty" jsonschema:"pin handle from frc_context"`
 }
@@ -628,7 +629,7 @@ func (s *Server) hardware(ctx context.Context, _ *mcp.CallToolRequest, in Hardwa
 		po := render.HWPartOut{Part: p.Part, Name: p.Name, Category: p.Category}
 		for _, r := range p.Rows {
 			po.Sources = append(po.Sources, render.HWSourceRow{Source: r.Source, Season: r.Season, Fields: r.Fields,
-				Factory: r.Factory, Note: r.Note, Citation: render.Citation{SourceURL: r.SourceURL, Library: "wpilib",
+				Factory: r.Factory, Note: r.Note, Citation: render.Citation{SourceURL: r.SourceURL, Library: hwLibrary(r.Source),
 					Version: r.UpstreamRev, UpstreamRev: r.UpstreamRev, RetrievedAt: r.RetrievedAt.Format(time.RFC3339),
 					License: r.License, Trust: r.Trust}})
 			if r.Source == "wpilib-dcmotor" && po.Sim == nil {
@@ -651,6 +652,15 @@ func (s *Server) hardware(ctx context.Context, _ *mcp.CallToolRequest, in Hardwa
 		out.Known = e.HardwareParts()
 	}
 	return text(render.HardwareMarkdown(out)), out, nil
+}
+
+// hwLibrary is the citation library of a hardware row: WPILib for its DCMotor
+// constants, otherwise the source label itself (recalc, rev-docs, sds, …).
+func hwLibrary(source string) string {
+	if source == "wpilib-dcmotor" {
+		return "wpilib"
+	}
+	return source
 }
 
 // ---- frc_migrate ----
@@ -1052,7 +1062,7 @@ func hardwareSchema() *jsonschema.Schema {
 	s := infer[HardwareIn]()
 	s.Properties["frc_season"].Pattern = seasonRe.String()
 	s.Properties["parts"].MaxItems = ptr(20)
-	enum(s, "category", []string{"motor"})
+	enum(s, "category", hwdata.Categories)
 	return s
 }
 

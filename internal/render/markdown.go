@@ -359,6 +359,42 @@ var hwFieldOrder = []struct{ key, label string }{
 	{"free_speed_rpm", "Free speed (RPM)"}, {"free_current_a", "Free current (A)"}, {"nominal_voltage_v", "Nominal voltage (V)"},
 }
 
+// hwFields lists the field rows of one part: the motor fields above first (in
+// that order, when any source has them), then every other key any source
+// gives, sorted, labeled by the key itself (the unit is its suffix).
+func hwFields(rows []HWSourceRow) []struct{ key, label string } {
+	var out []struct{ key, label string }
+	known := map[string]bool{}
+	has := func(k string) bool {
+		for _, r := range rows {
+			if _, ok := r.Fields[k]; ok {
+				return true
+			}
+		}
+		return false
+	}
+	for _, f := range hwFieldOrder {
+		known[f.key] = true
+		if has(f.key) {
+			out = append(out, f)
+		}
+	}
+	var rest []string
+	for _, r := range rows {
+		for k := range r.Fields {
+			if !known[k] {
+				known[k] = true
+				rest = append(rest, k)
+			}
+		}
+	}
+	sort.Strings(rest)
+	for _, k := range rest {
+		out = append(out, struct{ key, label string }{k, k})
+	}
+	return out
+}
+
 // HardwareMarkdown renders frc_hardware: one table per part, one column per
 // (source, season). Sources are never averaged or merged.
 func HardwareMarkdown(o HardwareOut) string {
@@ -374,7 +410,7 @@ func HardwareMarkdown(o HardwareOut) string {
 			b.WriteString("---|")
 		}
 		b.WriteString("\n")
-		for _, f := range hwFieldOrder {
+		for _, f := range hwFields(p.Sources) {
 			fmt.Fprintf(&b, "| %s |", f.label)
 			for _, r := range p.Sources {
 				if v, ok := r.Fields[f.key]; ok {
