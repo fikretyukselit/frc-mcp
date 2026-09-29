@@ -31,6 +31,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/repomd"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/sphinx"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/vendordeps"
+	"github.com/fikretyukselit/frc-mcp/internal/migrate"
 	"github.com/fikretyukselit/frc-mcp/internal/sources"
 	"github.com/fikretyukselit/frc-mcp/internal/vec"
 )
@@ -42,8 +43,10 @@ type Options struct {
 	CacheDir  string // fetch cache
 	Version   string // binary version for the User-Agent
 	SourceIDs []string
-	Embed     bool // compute vector layers with the registry's first model
-	Log       *slog.Logger
+	// MigrationsDir holds the curated rules (data/migrations); "" skips them.
+	MigrationsDir string
+	Embed         bool // compute vector layers with the registry's first model
+	Log           *slog.Logger
 }
 
 // Report summarizes a run.
@@ -51,8 +54,12 @@ type Report struct {
 	Sources []SourceReport `json:"sources"`
 	Shards  []ShardReport  `json:"shards"`
 	Diffs   []DiffReport   `json:"diffs"`
-	Model   string         `json:"model,omitempty"`
-	Elapsed string         `json:"elapsed"`
+	// Migrations counts curated rules written; rules whose from-season table
+	// is not part of this run are skipped (that shard is not rebuilt).
+	Migrations        int    `json:"migrations"`
+	MigrationsSkipped int    `json:"migrations_skipped,omitempty"`
+	Model             string `json:"model,omitempty"`
+	Elapsed           string `json:"elapsed"`
 }
 
 type SourceReport struct {
@@ -88,6 +95,7 @@ type shardData struct {
 	vendordeps []index.Vendordep
 	releases   []index.Release
 	hwspecs    []index.HWSpec
+	migrations []index.Migration
 }
 
 // Run executes a build.
@@ -158,6 +166,15 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 	}
 
 	rep.Diffs = diffSeasons(shards, shardSrc)
+	if opt.MigrationsDir != "" {
+		rules, err := migrate.Load(opt.MigrationsDir)
+		if err != nil {
+			return nil, err
+		}
+		if rep.Migrations, rep.MigrationsSkipped, err = applyMigrations(shards, rules); err != nil {
+			return nil, err
+		}
+	}
 
 	var model *m2v.Model
 	if opt.Embed && len(reg.Models) > 0 {
@@ -244,6 +261,64 @@ func diffSeasons(shards map[string]*shardData, _ map[string]sources.Source) []Di
 	return out
 }
 
+// applyMigrations validates curated rules against the symbol tables of this
+// run and writes each into the shard holding its from-season table. Curated
+// replacements override upstream and generated ones. A rule naming a symbol
+// that the table lacks fails the build: rules must track upstream exactly.
+func applyMigrations(shards map[string]*shardData, rules []index.Migration) (written, skipped int, err error) {
+	type tkey struct{ lib, lang, season string }
+	type ref struct {
+		sd *shardData
+		i  int
+	}
+	tables := map[tkey]map[string][]ref{}
+	names := make([]string, 0, len(shards))
+	for n := range shards {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		sd := shards[n]
+		for i := range sd.symbols {
+			s := &sd.symbols[i]
+			k := tkey{s.Library, s.Language, s.Season}
+			if tables[k] == nil {
+				tables[k] = map[string][]ref{}
+			}
+			tables[k][s.FQN] = append(tables[k][s.FQN], ref{sd, i})
+		}
+	}
+	var bad []string
+	for _, m := range rules {
+		from := tables[tkey{m.Library, m.Language, m.FromSeason}]
+		if from == nil {
+			skipped++
+			continue
+		}
+		refs := from[m.From]
+		if len(refs) == 0 {
+			bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.From, m.FromSeason))
+			continue
+		}
+		if to := tables[tkey{m.Library, m.Language, m.ToSeason}]; to != nil && m.To != "" && len(to[m.To]) == 0 {
+			bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.To, m.ToSeason))
+			continue
+		}
+		if m.To != "" && m.To != m.From {
+			for _, r := range refs {
+				s := &r.sd.symbols[r.i]
+				s.Replacement, s.ReplacementSrc = m.To, "curated"
+			}
+		}
+		refs[0].sd.migrations = append(refs[0].sd.migrations, m)
+		written++
+	}
+	if len(bad) > 0 {
+		return 0, 0, fmt.Errorf("migrate: %d curated rule(s) do not match the symbol tables:\n  %s", len(bad), strings.Join(bad, "\n  "))
+	}
+	return written, skipped, nil
+}
+
 // writeShard writes <name>.sqlite and <name>.<model>.vec atomically (tmp +
 // rename) so a running server never sees a half-written shard.
 func writeShard(ctx context.Context, dir string, sd *shardData, model *m2v.Model) (*ShardReport, error) {
@@ -319,6 +394,11 @@ func writeShard(ctx context.Context, dir string, sd *shardData, model *m2v.Model
 			return nil, err
 		}
 		rep.HWSpecs++
+	}
+	for _, m := range sd.migrations {
+		if err := w.AddMigration(ctx, m); err != nil {
+			return nil, err
+		}
 	}
 	if err := w.Close(ctx); err != nil {
 		return nil, err

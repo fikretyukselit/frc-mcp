@@ -29,6 +29,8 @@ var (
 	whatsNew string
 	//go:embed frc_hardware.md
 	hardware string
+	//go:embed frc_migrate.md
+	migrate string
 )
 
 // Instructions is the server-level instructions text.
@@ -43,3 +45,4 @@ func Vendordep() string  { return strings.TrimSpace(vendordep) }
 func VerifyCode() string { return strings.TrimSpace(verifyCode) }
 func WhatsNew() string   { return strings.TrimSpace(whatsNew) }
 func Hardware() string   { return strings.TrimSpace(hardware) }
+func Migrate() string    { return strings.TrimSpace(migrate) }

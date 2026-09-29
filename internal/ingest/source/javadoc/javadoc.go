@@ -100,6 +100,9 @@ func Parse(zipPath string, src sources.Source, rev string, retrieved time.Time,
 					s.DeprecatedIn = m[1] // @Deprecated(since="2025") is the true origin
 				}
 				s.Replacement = dep.replacement
+				if s.Replacement != "" {
+					s.ReplacementSrc = "upstream"
+				}
 				if dep.forRemoval {
 					s.Summary = strings.TrimSpace("Deprecated for removal. " + dep.text + " " + s.Summary)
 				} else if dep.text != "" {

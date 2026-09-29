@@ -24,6 +24,7 @@ func indexRun(ctx context.Context, args []string) error {
 	cache := fs.String("cache", ".cache/fetch", "fetch cache directory (conditional GET state)")
 	only := fs.String("only", "", "comma-separated source ids (default: all)")
 	noEmbed := fs.Bool("no-embed", false, "skip vector layers")
+	migrations := fs.String("migrations", "data/migrations", "curated migration rules directory (\"\" to skip)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func indexRun(ctx context.Context, args []string) error {
 		ids = strings.Split(*only, ",")
 	}
 	rep, err := build.Run(ctx, build.Options{Registry: reg, OutDir: *out, CacheDir: *cache, Version: buildVersion(),
-		SourceIDs: ids, Embed: !*noEmbed, Log: slog.New(slog.NewTextHandler(os.Stderr, nil))})
+		SourceIDs: ids, MigrationsDir: *migrations, Embed: !*noEmbed, Log: slog.New(slog.NewTextHandler(os.Stderr, nil))})
 	if err != nil {
 		return err
 	}

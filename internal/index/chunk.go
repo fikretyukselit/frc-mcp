@@ -15,7 +15,7 @@ import (
 
 // SchemaVersion is the shard schema major version. Readers refuse shards whose
 // major version differs; any incompatible change to the DDL must bump it.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // Enumerated field values. They are stored as text so shards stay inspectable
 // with the sqlite3 CLI.
@@ -126,24 +126,28 @@ func (c *Chunk) Validate() error {
 // specific library version and language. Symbols are exact facts: they are
 // served by lookup, never by similarity search.
 type Symbol struct {
-	FQN          string    `json:"fqn"`
-	Library      string    `json:"library"`
-	Version      string    `json:"version"`
-	Season       string    `json:"season"`
-	Language     string    `json:"language"`
-	Kind         string    `json:"kind"` // class|interface|enum|method|constructor|field|function|namespace
-	Signature    string    `json:"signature"`
-	Summary      string    `json:"summary,omitempty"`
-	Since        string    `json:"since,omitempty"`
-	DeprecatedIn string    `json:"deprecated_in,omitempty"`
-	RemovedIn    string    `json:"removed_in,omitempty"`
-	Replacement  string    `json:"replacement,omitempty"`
-	ChunkID      string    `json:"chunk_id,omitempty"`
-	SourceURL    string    `json:"source_url"`
-	UpstreamRev  string    `json:"upstream_rev"`
-	RetrievedAt  time.Time `json:"retrieved_at"`
-	License      string    `json:"license"`
-	Trust        string    `json:"trust"`
+	FQN          string `json:"fqn"`
+	Library      string `json:"library"`
+	Version      string `json:"version"`
+	Season       string `json:"season"`
+	Language     string `json:"language"`
+	Kind         string `json:"kind"` // class|interface|enum|method|constructor|field|function|namespace
+	Signature    string `json:"signature"`
+	Summary      string `json:"summary,omitempty"`
+	Since        string `json:"since,omitempty"`
+	DeprecatedIn string `json:"deprecated_in,omitempty"`
+	RemovedIn    string `json:"removed_in,omitempty"`
+	Replacement  string `json:"replacement,omitempty"`
+	// ReplacementSrc says where Replacement came from: "upstream" (the
+	// library's own deprecation note), "generated" (apisym.Diff across
+	// seasons) or "curated" (data/migrations, with a citation).
+	ReplacementSrc string    `json:"replacement_src,omitempty"`
+	ChunkID        string    `json:"chunk_id,omitempty"`
+	SourceURL      string    `json:"source_url"`
+	UpstreamRev    string    `json:"upstream_rev"`
+	RetrievedAt    time.Time `json:"retrieved_at"`
+	License        string    `json:"license"`
+	Trust          string    `json:"trust"`
 }
 
 // SimpleName returns the last path element of an FQN: the member name for

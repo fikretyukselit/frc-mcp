@@ -126,7 +126,7 @@ func Parse(whlPath string, src sources.Source, rev string, retrieved time.Time,
 			for _, mem := range d.Class.Members {
 				sym := mk(fqn+"#"+mem.Name, mem.Kind, mem.Signature, mem.Doc, mem.Deprecated)
 				if mem.Use != "" && mem.Use != mem.Name && names[mem.Use] {
-					sym.Replacement = fqn + "#" + mem.Use
+					sym.Replacement, sym.ReplacementSrc = fqn+"#"+mem.Use, "upstream"
 				}
 				if err := emitSymbol(sym); err != nil {
 					return st, err

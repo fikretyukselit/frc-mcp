@@ -1,0 +1,41 @@
+# Curated migration rules. Every rule cites the upstream change.
+library: photonvision
+from_season: "2026"
+to_season: "2027"
+rules:
+  - id: photonposeestimator-update-removed
+    kind: removed
+    from:
+      java: org.photonvision.PhotonPoseEstimator#update
+    notes: The strategy-based update() methods (deprecated in 2026 with "Use individual estimation methods instead") were removed. Call a specific estimator, e.g. `estimateCoprocMultiTagPose(result)` with a fallback such as `estimateLowestAmbiguityPose(result)`.
+    citation: https://github.com/PhotonVision/photonvision/pull/2431
+
+  - id: photonposeestimator-constructor
+    kind: signature
+    from:
+      java: org.photonvision.PhotonPoseEstimator#PhotonPoseEstimator
+    to:
+      java: org.photonvision.PhotonPoseEstimator#PhotonPoseEstimator
+    notes: 'The constructor that took a PoseStrategy was removed. The only 2027 constructor is `public PhotonPoseEstimator(org.wpilib.vision.apriltag.AprilTagFieldLayout fieldTags, org.wpilib.math.geometry.Transform3d robotToCamera)`.'
+    citation: https://github.com/PhotonVision/photonvision/pull/2431
+
+  - id: photonposeestimator-setprimarystrategy-removed
+    kind: removed
+    from:
+      java: org.photonvision.PhotonPoseEstimator#setPrimaryStrategy
+    notes: Strategy setters (setPrimaryStrategy, setMultiTagFallbackStrategy, getPrimaryStrategy) were removed. Choose the strategy by calling the matching estimate*Pose method.
+    citation: https://github.com/PhotonVision/photonvision/pull/2431
+
+  - id: photonposeestimator-setmultitagfallbackstrategy-removed
+    kind: removed
+    from:
+      java: org.photonvision.PhotonPoseEstimator#setMultiTagFallbackStrategy
+    notes: Removed. Implement the fallback in user code, e.g. try estimateCoprocMultiTagPose and, if empty, estimateLowestAmbiguityPose.
+    citation: https://github.com/PhotonVision/photonvision/pull/2431
+
+  - id: photonposeestimator-setreferencepose-removed
+    kind: removed
+    from:
+      java: org.photonvision.PhotonPoseEstimator#setReferencePose
+    notes: Removed. Pass the reference pose directly to `estimateClosestToReferencePose(cameraResult, referencePose)`.
+    citation: https://github.com/PhotonVision/photonvision/pull/2431

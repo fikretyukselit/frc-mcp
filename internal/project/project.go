@@ -177,11 +177,25 @@ func Detect(root string) (*Project, error) {
 	return p, nil
 }
 
-// ReadSource reads a source file for verification: relative to root, must
-// stay inside it after symlink resolution, must be .java, size-capped.
+// SourceLanguage maps a robot source file extension to java, cpp or python
+// ("" for anything else).
+func SourceLanguage(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".java":
+		return "java"
+	case ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh":
+		return "cpp"
+	case ".py":
+		return "python"
+	}
+	return ""
+}
+
+// ReadSource reads a robot source file (.java, C++ or .py): relative to
+// root, must stay inside it after symlink resolution, size-capped.
 func ReadSource(root, rel string, maxBytes int64) ([]byte, error) {
-	if !strings.HasSuffix(rel, ".java") {
-		return nil, errors.New("only .java files can be verified")
+	if SourceLanguage(rel) == "" {
+		return nil, errors.New("only Java (.java), C++ (.cpp/.h/…) and Python (.py) source files can be read")
 	}
 	abs, err := filepath.Abs(root)
 	if err != nil {

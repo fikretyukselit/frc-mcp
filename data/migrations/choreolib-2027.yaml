@@ -1,0 +1,29 @@
+# Curated migration rules. Every rule cites the upstream change.
+library: choreolib
+from_season: "2026"
+to_season: "2027"
+rules:
+  - id: autochooser-tunable
+    kind: behavior
+    from:
+      java: choreo.auto.AutoChooser
+    to:
+      java: choreo.auto.AutoChooser
+    notes: AutoChooser now implements org.wpilib.tunable.ComplexTunable instead of Sendable. Publish it with `Tunables.publish("Choosers/Auto", chooser)` instead of `SmartDashboard.putData(chooser)`.
+    citation: https://github.com/SleipnirGroup/Choreo/pull/1514
+
+  - id: autochooser-initsendable-removed
+    kind: removed
+    from:
+      java: choreo.auto.AutoChooser#initSendable
+    notes: Replaced by publishTunable(TunableTable), which Tunables.publish calls. User code should not call either directly.
+    citation: https://github.com/SleipnirGroup/Choreo/pull/1514
+
+  - id: swervesample-getchassisspeeds-velocities
+    kind: signature
+    from:
+      java: choreo.trajectory.SwerveSample#getChassisSpeeds
+    to:
+      java: choreo.trajectory.SwerveSample#getChassisSpeeds
+    notes: The method keeps its name but now returns org.wpilib.math.kinematics.ChassisVelocities (`public ChassisVelocities getChassisSpeeds()`) instead of ChassisSpeeds. The same change applies to DifferentialSample and TrajectorySample.
+    citation: https://github.com/SleipnirGroup/Choreo/pull/1514

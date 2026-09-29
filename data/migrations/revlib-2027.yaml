@@ -1,0 +1,71 @@
+# Curated migration rules. Every rule cites the upstream change.
+library: revlib
+from_season: "2026"
+to_season: "2027"
+rules:
+  - id: sparkmax-constructor-canport
+    kind: signature
+    from:
+      java: com.revrobotics.spark.SparkMax#SparkMax
+      python: rev.SparkMax#SparkMax
+    to:
+      java: com.revrobotics.spark.SparkMax#SparkMax
+      python: rev.SparkMax#SparkMax
+    notes: 'Device constructors now take the WPILib CANPort enum for the CAN bus. 2027 signature: `public SparkMax(org.wpilib.hardware.bus.CANPort canPort, int deviceId, SparkLowLevel.MotorType type)` (Python `__init__(self, can_port: wpilib.CANPort, device_id, type)`). getBusId() was renamed to getCanPort().'
+    citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-7
+
+  - id: sparkflex-constructor-canport
+    kind: signature
+    from:
+      java: com.revrobotics.spark.SparkFlex#SparkFlex
+      python: rev.SparkFlex#SparkFlex
+    to:
+      java: com.revrobotics.spark.SparkFlex#SparkFlex
+      python: rev.SparkFlex#SparkFlex
+    notes: 'Device constructors now take the WPILib CANPort enum. 2027 signature: `public SparkFlex(org.wpilib.hardware.bus.CANPort canPort, int deviceId, SparkLowLevel.MotorType type)`.'
+    citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-7
+
+  - id: relativeencoder-getposition-signal
+    kind: signature
+    from:
+      java: com.revrobotics.RelativeEncoder#getPosition
+    to:
+      java: com.revrobotics.RelativeEncoder#getPosition
+    notes: 'Java/C++ getters now return a Signal wrapper (2027 `Signal<Double> getPosition()`). Call `.get()` / `.get(default)` (C++ `Get()`), and `.isValid()` to check whether the value is recent.'
+    citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-2
+
+  - id: relativeencoder-getvelocity-signal
+    kind: signature
+    from:
+      java: com.revrobotics.RelativeEncoder#getVelocity
+    to:
+      java: com.revrobotics.RelativeEncoder#getVelocity
+    notes: 2027 signature is `Signal<Double> getVelocity()`; unwrap with `.get()`.
+    citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-2
+
+  - id: sparkbase-getoutputcurrent-signal
+    kind: signature
+    from:
+      java: com.revrobotics.spark.SparkBase#getOutputCurrent
+    to:
+      java: com.revrobotics.spark.SparkBase#getOutputCurrent
+    notes: 2027 signature is `public Signal<Double> getOutputCurrent()`; unwrap with `.get()`.
+    citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-2
+
+  - id: sparkbase-getappliedoutput-signal
+    kind: signature
+    from:
+      java: com.revrobotics.spark.SparkBase#getAppliedOutput
+    to:
+      java: com.revrobotics.spark.SparkBase#getAppliedOutput
+    notes: 2027 signature is `public Signal<Double> getAppliedOutput()`; unwrap with `.get()`.
+    citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-2
+
+  - id: absoluteencoderconfig-zerocentered
+    kind: rename
+    from:
+      java: com.revrobotics.spark.config.AbsoluteEncoderConfig#zeroCentered
+    to:
+      java: com.revrobotics.spark.config.AbsoluteEncoderConfig#rangeOffset
+    notes: zeroCentered() is deprecated in 2027.0.0-alpha-7; the release notes say to use rangeOffset(double offset) instead.
+    citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-7

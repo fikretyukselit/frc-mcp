@@ -414,3 +414,47 @@ func HardwareMarkdown(o HardwareOut) string {
 	footer(&b, o.Envelope)
 	return b.String()
 }
+
+// MigrateMarkdown renders frc_migrate.
+func MigrateMarkdown(o MigrateOut) string {
+	var b strings.Builder
+	envelope(&b, "frc_migrate", o.Envelope)
+	fmt.Fprintf(&b, "\n%s → %s: %d reference(s) checked · %d mapping(s) · %d unresolved\n", o.FromSeason, o.ToSeason,
+		o.Checked, len(o.Mappings), len(o.Unresolved))
+	for _, m := range o.Mappings {
+		line := ""
+		if m.Line > 0 {
+			line = fmt.Sprintf("line %d: ", m.Line)
+		}
+		to := codeOrDash(m.To)
+		if m.Kind == "unchanged" {
+			to = "unchanged"
+		}
+		fmt.Fprintf(&b, "\n- %s`%s` → %s — %s · %s · %s", line, m.From, to, m.Kind, m.Source, m.Confidence)
+		if m.Notes != "" {
+			fmt.Fprintf(&b, "\n  %s", m.Notes)
+		}
+		if m.Citation != "" {
+			fmt.Fprintf(&b, "\n  source: %s", m.Citation)
+		}
+		b.WriteString("\n")
+	}
+	for _, u := range o.Unresolved {
+		line := ""
+		if u.Line > 0 {
+			line = fmt.Sprintf("line %d: ", u.Line)
+		}
+		fmt.Fprintf(&b, "\n- unresolved %s`%s` — %s\n", line, u.Symbol, u.Reason)
+		for _, p := range u.Pointers {
+			fmt.Fprintf(&b, "  see `%s` (%s %s): %s\n", p.ID, p.Library, p.Kind, p.Title)
+		}
+	}
+	if len(o.NotFound) > 0 {
+		fmt.Fprintf(&b, "\nNot %s symbols: %s\n", o.FromSeason, strings.Join(o.NotFound, ", "))
+	}
+	if len(o.AlreadyIn) > 0 {
+		fmt.Fprintf(&b, "\nAlready %s: %s\n", o.ToSeason, strings.Join(o.AlreadyIn, ", "))
+	}
+	footer(&b, o.Envelope)
+	return b.String()
+}
