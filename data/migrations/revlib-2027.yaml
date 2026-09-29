@@ -69,3 +69,13 @@ rules:
       java: com.revrobotics.spark.config.AbsoluteEncoderConfig#rangeOffset
     notes: zeroCentered() is deprecated in 2027.0.0-alpha-7; the release notes say to use rangeOffset(double offset) instead.
     citation: https://github.com/REVrobotics/REV-Software-Binaries/releases/tag/revlib-2027.0.0-alpha-7
+
+  - id: sparkbase-controltype-to-sparklowlevel
+    kind: move
+    from:
+      java: com.revrobotics.spark.SparkBase.ControlType
+    to:
+      java: com.revrobotics.spark.SparkLowLevel.ControlType
+    notes: >-
+      In REVLib 2027 the ControlType enum is nested in SparkLowLevel (the 2026 SparkBase.ControlType page no longer exists). The constants keep their names (kDutyCycle, kVelocity, kVoltage, kPosition, kCurrent, kMAXMotionPositionControl, kMAXMotionVelocityControl).
+    citation: https://codedocs.revrobotics.com/java/com/revrobotics/spark/SparkLowLevel.ControlType.html

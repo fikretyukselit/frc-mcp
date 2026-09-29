@@ -38,3 +38,11 @@ rules:
       java: org.littletonrobotics.junction.LogTable#getMeasure
     notes: The Measure overload of LogTable.get was renamed to getMeasure (`public <U extends Unit, M extends Measure<U>> M getMeasure(String key, M defaultValue)`), and the MutableMeasure overload was removed along with mutable units. Only the Measure overload of get is affected; other get overloads keep their name.
     citation: https://github.com/Mechanical-Advantage/AdvantageKit/pull/271
+
+  - id: loggeddashboardchooser-getsendablechooser-removed
+    kind: removed
+    from:
+      java: org.littletonrobotics.junction.networktables.LoggedDashboardChooser#getSendableChooser
+    notes: >-
+      LoggedNetworkChooser, which replaced LoggedDashboardChooser, has no accessor for the underlying chooser. Build your own org.wpilib.tunable.Selectable, pass it to LoggedNetworkChooser(String key, Selectable<V> selectable) and keep the reference.
+    citation: https://github.com/Mechanical-Advantage/AdvantageKit/pull/277

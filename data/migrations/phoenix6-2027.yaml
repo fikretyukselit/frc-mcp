@@ -200,3 +200,11 @@ rules:
       java: com.ctre.phoenix6.swerve.SwerveDrivetrainConstants#Network
     notes: SwerveDrivetrainConstants.CANBusName (String) was renamed to Network and now takes a CANBus object (26.70.0-alpha-2).
     citation: https://api.ctr-electronics.com/changelog
+
+  - id: canbus-roborio-removed
+    kind: removed
+    from:
+      java: com.ctre.phoenix6.CANBus#roboRIO
+    notes: >-
+      Phoenix 6 26.50/26.70 alphas target WPILib 2027 on Systemcore and do not support the roboRIO, so there is no roboRIO bus factory. Construct the bus with new CANBus(CANPort) (26.70.0-alpha-2), or new CANBus() for the default can_s1 bus.
+    citation: https://api.ctr-electronics.com/changelog
