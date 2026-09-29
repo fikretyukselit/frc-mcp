@@ -74,14 +74,14 @@ func TestParseEvent(t *testing.T) {
 	var o Outcome
 	o.ToolCalls = map[string]int{}
 	for _, l := range []string{
-		`{"type":"system","subtype":"init","mcp_servers":[{"name":"frc","status":"connected"}]}`,
+		`{"type":"system","subtype":"init","model":"claude-x","mcp_servers":[{"name":"frc","status":"connected"}]}`,
 		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__frc__frc_api"},{"type":"text"},{"type":"tool_use","name":"Write"}]}}`,
 		`{"type":"result","num_turns":7,"total_cost_usd":0.12,"is_error":false,"result":"done","usage":{"input_tokens":10,"cache_read_input_tokens":90,"output_tokens":5}}`,
 		`not json`,
 	} {
 		parseEvent([]byte(l), &o)
 	}
-	if o.FRCCalls != 1 || o.ToolCalls["Write"] != 1 || o.Turns != 7 || o.InputTok != 100 || o.MCPServers[0] != "frc:connected" || o.Final != "done" {
+	if o.FRCCalls != 1 || o.ToolCalls["Write"] != 1 || o.Turns != 7 || o.InputTok != 100 || o.MCPServers[0] != "frc:connected" || o.Final != "done" || o.Model != "claude-x" {
 		t.Fatalf("%+v", o)
 	}
 }

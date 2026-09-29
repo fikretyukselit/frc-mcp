@@ -34,7 +34,8 @@ type Agent struct {
 type Outcome struct {
 	ToolCalls  map[string]int `json:"tool_calls"`
 	FRCCalls   int            `json:"frc_calls"`
-	MCPServers []string       `json:"mcp_servers"` // from the session's init message: proves the condition
+	MCPServers []string       `json:"mcp_servers"`     // from the session's init message: proves the condition
+	Model      string         `json:"model,omitempty"` // resolved model id from the init message
 	Turns      int            `json:"turns"`
 	CostUSD    float64        `json:"cost_usd"`
 	InputTok   int            `json:"input_tokens"`
@@ -116,6 +117,7 @@ func parseEvent(line []byte, out *Outcome) {
 	var ev struct {
 		Type       string `json:"type"`
 		Subtype    string `json:"subtype"`
+		Model      string `json:"model"`
 		MCPServers []struct {
 			Name, Status string
 		} `json:"mcp_servers"`
@@ -142,6 +144,7 @@ func parseEvent(line []byte, out *Outcome) {
 	switch ev.Type {
 	case "system":
 		if ev.Subtype == "init" {
+			out.Model = ev.Model
 			for _, s := range ev.MCPServers {
 				out.MCPServers = append(out.MCPServers, s.Name+":"+s.Status)
 			}
