@@ -147,36 +147,43 @@ Java API, 2026 and 2027-alpha. Regenerate with `make eval`; the gate compares ag
   - Candidates for the fix, in M2: deterministic LLM-free contextual prefixes for tutorial steps, and a small title
     boost for "what is X" intents.
 
-## 8.1 Results (M3 vendor docs, 2026-09-29)
+## 8.1 Results (M3 vendors, 2026-09-29)
 
-The index grew from 8 to 23 shards. It now covers WPILib plus the docs of CTRE Phoenix 6, REVLib, PhotonVision,
-PathPlannerLib, Choreo, AdvantageKit and YAGSL, about 2.5k new chunks. The eval set gained 44 vendor queries
-(`q185`–`q228`, 7 libraries, 34 train and 10 holdout), for 228 in total.
+The index now covers WPILib plus 7 vendor libraries, for both docs and Java APIs:
+- CTRE Phoenix 6;
+- REVLib;
+- PhotonVision;
+- PathPlannerLib;
+- Choreo;
+- AdvantageKit;
+- YAGSL.
+
+It has 12 shards (`docs/benchmarks.md` §M3). The eval set gained 44 vendor queries (`q185`–`q228`, 34 train and 10
+holdout), for 228 in total.
 
 | Set | Arm | R@5 | R@10 | nDCG@10 | MRR@10 | wrong-season@5 | p95 |
 |---|---|---|---|---|---|---|---|
-| all 228 | lexical | 0.800 | 0.868 | 0.723 | 0.678 | **0** | 13.5 ms |
-| all 228 | **hybrid** | **0.954** | **0.961** | **0.836** | **0.799** | **0** | 12.4 ms |
-| vendor 44 | lexical | 0.534 | 0.636 | 0.526 | 0.491 | **0** | 18.6 ms |
-| vendor 44 | **hybrid** | **0.886** | **0.909** | **0.770** | **0.734** | **0** | 12.9 ms |
-| original 184 (unchanged qrels) | hybrid | 0.967 | 0.970 | 0.848 | 0.809 | **0** | 12.0 ms |
+| all 228 | lexical | 0.893 | 0.943 | 0.782 | 0.733 | **0** | 4.7 ms |
+| all 228 | **hybrid** | **0.930** | **0.963** | **0.827** | **0.786** | **0** | 5.4 ms |
+| vendor 44 (docs only, before the API shards) | lexical | 0.534 | 0.636 | 0.526 | 0.491 | **0** | 18.6 ms |
+| vendor 44 (docs only, before the API shards) | hybrid | 0.886 | 0.909 | 0.770 | 0.734 | **0** | 12.9 ms |
+| original 184 (unchanged qrels, docs only) | hybrid | 0.967 | 0.970 | 0.848 | 0.809 | **0** | 12.0 ms |
 
-- **Dense matters most on vendor docs:** +0.244 nDCG@10. Vendor pages use product vocabulary ("MAXMotion", "Motion
-  Magic®") that students rarely type verbatim.
-- **Two ranking changes made the vendor slice work:**
-  1. When the router detects a library, chunks of that library get ×1.6. Trust-tier boosts apply only when no library
-     is named. Before this, WPILib's status-light reference outranked the Phoenix 6 Motion Magic page for "configure
-     Motion Magic on a TalonFX".
-  2. A season after "from", "pre" or "before", or inside a migration question, is treated as the *source* season.
-     "Migrate REVLib 2024 code" no longer pins the query to season 2024 (which has no index) and returns
-     `version_mismatch`.
-- **Regression on the original 184 queries:** R@10 went from 0.976 to 0.970 and nDCG@10 from 0.857 to 0.848. The one
-  newly failing query, "Choreo trajectory path planning", now returns ChoreoLib's own trajectory page before WPILib's
-  Choreo overview, and both are correct answers.
-- **Latency:** p95 went from about 5 ms to about 12 ms because each query fans out over 23 shards instead of 8. That is
-  still well inside the 50 ms budget. If it matters, the fix is to pack small vendor shards into one shard per season;
-  the shard format already supports multiple libraries.
+**Ranking changes that made vendors work (all in `retrieve.boost` and `router`):**
+1. **Named library wins.** When the router detects a library, that library's chunks get ×1.6, and trust-tier boosts
+   apply only when no library is named. Before this, WPILib's status-light reference outranked the Phoenix 6 Motion
+   Magic page for "configure Motion Magic on a TalonFX".
+2. **Source seasons.** A season after "from", "pre" or "before", or inside a migration question, is the source season,
+   not the target. A season after "to" or "for" is always the target.
+3. **API reference pages are damped (×0.5) unless the intent is `symbol`.** The exact symbols are already listed above
+   the hits. Without this, the 1.7k vendor class pages pushed guide pages down: nDCG@10 fell from 0.836 to 0.789.
+4. **The router recognizes `Pose2d` and `Type.member` as identifiers.** Before, "Pose2d" and "Commands.sequence" were
+   classified `general` and lost their symbol hits once (3) applied.
+
+**Other notes:**
+- **Dense matters most on vendor docs:** +0.244 nDCG@10 on the vendor slice. Vendor pages use product vocabulary
+  ("MAXMotion", "Motion Magic®").
 - **Qrels edits after seeing results:** only three, each adding a page that answers the query as well as the original
-  target: q087 (ChoreoLib trajectory API), q189 (CANivore setup) and q221 (log replay comparison). Three failures stay
-  failing on purpose (q193, q224, q226).
+  target: q087 (ChoreoLib trajectory API), q189 (CANivore setup) and q221 (log replay comparison). The remaining
+  failures (q088, q175, q181, q193, q224, q226) stay failing on purpose.
 - **Same caveat as §8:** the vendor queries were written by the plan author, not by students.

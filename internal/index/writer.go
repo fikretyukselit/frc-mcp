@@ -168,7 +168,20 @@ func (w *Writer) Close(ctx context.Context) error {
 			return err
 		}
 	}
-	for _, s := range []string{`ANALYZE`, `VACUUM`} {
+	// sqlite_stat4 samples make the planner read bound parameter values, and
+	// SQLite then re-prepares a statement whenever those values change, i.e.
+	// on every search (measured: ~35% of search CPU). stat1 is enough for
+	// these small, immutable shards.
+	for _, s := range []string{`ANALYZE`, `DELETE FROM sqlite_stat4`, `VACUUM`} {
+		if s == `DELETE FROM sqlite_stat4` {
+			var n int
+			if err := w.db.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_stat4'`).Scan(&n); err != nil {
+				return fmt.Errorf("index: stat4: %w", err)
+			}
+			if n == 0 {
+				continue // SQLite built without STAT4
+			}
+		}
 		if _, err := w.db.ExecContext(ctx, s); err != nil {
 			return fmt.Errorf("index: %s: %w", strings.ToLower(s), err)
 		}

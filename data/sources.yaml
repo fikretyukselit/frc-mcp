@@ -7,6 +7,9 @@ extra_hosts:
   - storage.googleapis.com # frcmaven.wpi.edu (Artifactory) redirects artifact downloads here
   - "*.hf.co"              # huggingface.co redirects model files to its CDN (us.aws.cdn.hf.co, cas-bridge.xethub.hf.co)
   - raw.githubusercontent.com # vendordep JSON files listed by the GitHub contents API (download_url)
+  - github.com # maven.revrobotics.com redirects artifacts to REVrobotics/REV-Software-Binaries releases
+  - release-assets.githubusercontent.com # github.com release downloads redirect here
+  - objects.githubusercontent.com # older github.com release download redirect target
 
 sources:
   # ---- WPILib documentation (frc-docs, now wpilibsuite/wpilib-docs; CC BY 4.0) ----
@@ -105,8 +108,11 @@ sources:
   # branches already carry 2027-alpha code (org.wpilib / wpi::), so 2026 docs
   # are read at the last 2026 release tag and 2027 docs at the alpha tag.
   # Licenses: "LicenseRef-*" means the vendor publishes no license for its docs;
-  # `index publish` refuses those shards until permission is recorded (see
-  # docs/sources.md §4).
+  # `index publish` leaves those shards out until permission is recorded (see
+  # docs/sources.md §0.2).
+  # Shards: vendor sources are packed per season into vendor-docs-<season>,
+  # vendor-java-<season> and vendor-restricted-<season> (the LicenseRef ones),
+  # because every shard costs a query per search (docs/benchmarks.md).
 
   # CTRE Phoenix 6: Sphinx (Furo) on Read the Docs; CC BY-NC-ND 4.0 permits
   # sharing excerpts with attribution for non-commercial use.
@@ -121,7 +127,7 @@ sources:
     version: "2026"
     license: CC-BY-NC-ND-4.0
     trust: vendor
-    shard: phoenix6-docs-2026
+    shard: vendor-docs-2026
     verified: true # probed 2026-09-29 (127 MB htmlzip, 116 pages)
 
   # PhotonVision: MyST Markdown in docs/source (docs/LICENSE: CC BY 4.0).
@@ -138,7 +144,7 @@ sources:
     version: v2026.3.4
     license: CC-BY-4.0
     trust: vendor
-    shard: photonvision-docs-2026
+    shard: vendor-docs-2026
     verified: true
   - id: photonvision-docs-2027
     adapter: github-markdown
@@ -153,7 +159,7 @@ sources:
     version: v2027.0.0-alpha-2
     license: CC-BY-4.0
     trust: vendor
-    shard: photonvision-docs-2027
+    shard: vendor-docs-2027
     verified: true
 
   # AdvantageKit: Docusaurus in docs/docs (repo LICENSE: BSD-3-Clause).
@@ -170,7 +176,7 @@ sources:
     version: 26.0.2
     license: BSD-3-Clause
     trust: vendor
-    shard: advantagekit-docs-2026
+    shard: vendor-docs-2026
     verified: true
   - id: advantagekit-docs-2027
     adapter: github-markdown
@@ -185,7 +191,7 @@ sources:
     version: 27.0.0-alpha-6
     license: BSD-3-Clause
     trust: vendor
-    shard: advantagekit-docs-2027
+    shard: vendor-docs-2027
     verified: true
 
   # Choreo / ChoreoLib: MkDocs Material in docs/ (BSD-3-Clause).
@@ -202,7 +208,7 @@ sources:
     version: 2026.0.3
     license: BSD-3-Clause
     trust: vendor
-    shard: choreolib-docs-2026
+    shard: vendor-docs-2026
     verified: true
   - id: choreolib-docs-2027
     adapter: github-markdown
@@ -217,7 +223,7 @@ sources:
     version: 2027.0.0-alpha-3
     license: BSD-3-Clause
     trust: vendor
-    shard: choreolib-docs-2027
+    shard: vendor-docs-2027
     verified: true
 
   # PathPlanner / PathPlannerLib: Writerside topics (MIT). No 2027 release yet.
@@ -234,7 +240,7 @@ sources:
     version: 2026.1.2
     license: MIT
     trust: vendor
-    shard: pathplannerlib-docs-2026
+    shard: vendor-docs-2026
     verified: true
 
   # GitBook sites: llms.txt lists every page's Markdown rendition.
@@ -249,7 +255,7 @@ sources:
     version: "2026"
     license: LicenseRef-REV-Docs-NoLicense
     trust: vendor
-    shard: revlib-docs-2026
+    shard: vendor-restricted-2026
     verified: true
   - id: yagsl-docs-2026
     adapter: gitbook-llms
@@ -262,8 +268,198 @@ sources:
     version: "2026"
     license: LicenseRef-YAGSL-Docs-NoLicense
     trust: vendor
-    shard: yagsl-docs-2026
+    shard: vendor-restricted-2026
     verified: true
+
+  # ---- Vendor Java APIs (M3): Javadoc jars from each vendor's Maven repo ----
+  # Same javadoc-zip adapter as WPILib (JDK 17 doclet, type-search-index.js).
+  # Versions are the newest in the WPILib vendordep catalog for each season.
+  # The javadoc text comes from source comments, so the license is the
+  # library's code license. CTRE and REV publish no license for their Java
+  # libraries: LicenseRef-* keeps those shards local until permission is
+  # recorded (docs/sources.md §0.2).
+  - id: phoenix6-java-2026
+    adapter: javadoc-zip
+    url: https://maven.ctr-electronics.com/release/com/ctre/phoenix6/wpiapi-java/26.3.0/wpiapi-java-26.3.0-javadoc.jar
+    base_url: https://api.ctr-electronics.com/phoenix6/stable/java/
+    library: phoenix6
+    season: "2026"
+    channel: stable
+    version: 26.3.0
+    language: java
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-2026
+    verified: true # probed 2026-09-29
+  - id: phoenix6-java-2027
+    adapter: javadoc-zip
+    url: https://maven.ctr-electronics.com/release/com/ctre/phoenix6/wpiapi-java/26.70.0-alpha-2/wpiapi-java-26.70.0-alpha-2-javadoc.jar
+    base_url: https://api.ctr-electronics.com/phoenix6/latest/java/
+    library: phoenix6
+    season: "2027"
+    channel: alpha
+    version: 26.70.0-alpha-2
+    language: java
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-2027
+    verified: true # probed 2026-09-29
+  - id: revlib-java-2026
+    adapter: javadoc-zip
+    url: https://maven.revrobotics.com/com/revrobotics/frc/REVLib-java/2026.0.5/REVLib-java-2026.0.5-javadoc.jar
+    base_url: https://codedocs.revrobotics.com/java/
+    library: revlib
+    season: "2026"
+    channel: stable
+    version: 2026.0.5
+    language: java
+    license: LicenseRef-REVLib-API
+    trust: vendor
+    shard: vendor-restricted-2026
+    verified: true # probed 2026-09-29
+  - id: revlib-java-2027
+    adapter: javadoc-zip
+    url: https://maven.revrobotics.com/com/revrobotics/frc/REVLib-java/2027.0.0-alpha-7/REVLib-java-2027.0.0-alpha-7-javadoc.jar
+    base_url: https://codedocs.revrobotics.com/java/
+    library: revlib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-7
+    language: java
+    license: LicenseRef-REVLib-API
+    trust: vendor
+    shard: vendor-restricted-2027
+    verified: true # probed 2026-09-29
+  - id: photonlib-java-2026
+    adapter: javadoc-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photonlib-java/v2026.3.4/photonlib-java-v2026.3.4-javadoc.jar
+    base_url: https://javadocs.photonvision.org/release/
+    library: photonvision
+    season: "2026"
+    channel: stable
+    version: v2026.3.4
+    language: java
+    license: GPL-3.0
+    trust: vendor
+    shard: vendor-java-2026
+    verified: true # probed 2026-09-29
+  - id: photontargeting-java-2026
+    adapter: javadoc-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photontargeting-java/v2026.3.4/photontargeting-java-v2026.3.4-javadoc.jar
+    base_url: https://javadocs.photonvision.org/release/
+    library: photonvision
+    season: "2026"
+    channel: stable
+    version: v2026.3.4
+    language: java
+    license: GPL-3.0
+    trust: vendor
+    shard: vendor-java-2026
+    verified: true # probed 2026-09-29
+  - id: photonlib-java-2027
+    adapter: javadoc-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photonlib-java/v2027.0.0-alpha-2/photonlib-java-v2027.0.0-alpha-2-javadoc.jar
+    base_url: https://javadocs.photonvision.org/
+    library: photonvision
+    season: "2027"
+    channel: alpha
+    version: v2027.0.0-alpha-2
+    language: java
+    license: GPL-3.0
+    trust: vendor
+    shard: vendor-java-2027
+    verified: true # probed 2026-09-29
+  - id: photontargeting-java-2027
+    adapter: javadoc-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photontargeting-java/v2027.0.0-alpha-2/photontargeting-java-v2027.0.0-alpha-2-javadoc.jar
+    base_url: https://javadocs.photonvision.org/
+    library: photonvision
+    season: "2027"
+    channel: alpha
+    version: v2027.0.0-alpha-2
+    language: java
+    license: GPL-3.0
+    trust: vendor
+    shard: vendor-java-2027
+    verified: true # probed 2026-09-29
+  - id: pathplannerlib-java-2026
+    adapter: javadoc-zip
+    url: https://3015rangerrobotics.github.io/pathplannerlib/repo/com/pathplanner/lib/PathplannerLib-java/2026.1.2/PathplannerLib-java-2026.1.2-javadoc.jar
+    base_url: https://pathplanner.dev/api/java/
+    library: pathplannerlib
+    season: "2026"
+    channel: stable
+    version: 2026.1.2
+    language: java
+    license: MIT
+    trust: vendor
+    shard: vendor-java-2026
+    verified: true # probed 2026-09-29
+  - id: choreolib-java-2026
+    adapter: javadoc-zip
+    url: https://frcmaven.wpi.edu/artifactory/sleipnirgroup-mvn-release/choreo/ChoreoLib-java/2026.0.3/ChoreoLib-java-2026.0.3-javadoc.jar
+    base_url: https://choreo.autos/api/choreolib/java/
+    library: choreolib
+    season: "2026"
+    channel: stable
+    version: 2026.0.3
+    language: java
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-java-2026
+    verified: true # probed 2026-09-29
+  - id: choreolib-java-2027
+    adapter: javadoc-zip
+    url: https://frcmaven.wpi.edu/artifactory/sleipnirgroup-mvn-release/choreo/ChoreoLib-java/2027.0.0-alpha-3/ChoreoLib-java-2027.0.0-alpha-3-javadoc.jar
+    base_url: https://choreo.autos/api/choreolib/java/
+    library: choreolib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-3
+    language: java
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-java-2027
+    verified: true # probed 2026-09-29
+  - id: advantagekit-java-2026
+    adapter: javadoc-zip
+    url: https://frcmaven.wpi.edu/artifactory/littletonrobotics-mvn-release/org/littletonrobotics/akit/akit-java/26.0.2/akit-java-26.0.2-javadoc.jar
+    base_url: https://docs.advantagekit.org/javadoc/
+    library: advantagekit
+    season: "2026"
+    channel: stable
+    version: 26.0.2
+    language: java
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-java-2026
+    verified: true # probed 2026-09-29
+  - id: advantagekit-java-2027
+    adapter: javadoc-zip
+    url: https://frcmaven.wpi.edu/artifactory/littletonrobotics-mvn-release/org/littletonrobotics/akit/akit-java/27.0.0-alpha-6/akit-java-27.0.0-alpha-6-javadoc.jar
+    base_url: https://docs.advantagekit.org/javadoc/
+    library: advantagekit
+    season: "2027"
+    channel: alpha
+    version: 27.0.0-alpha-6
+    language: java
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-java-2027
+    verified: true # probed 2026-09-29
+  - id: yagsl-java-2026
+    adapter: javadoc-zip
+    url: https://yet-another-software-suite.github.io/YAGSL/releases/swervelib/YAGSL-java/2026.9.27/YAGSL-java-2026.9.27-javadoc.jar
+    base_url: https://yet-another-software-suite.github.io/YAGSL/javadocs/
+    library: yagsl
+    season: "2026"
+    channel: stable
+    version: 2026.9.27
+    language: java
+    license: LGPL-2.1
+    trust: vendor
+    shard: vendor-java-2026
+    verified: true # probed 2026-09-29
 
 models:
   - id: potion-code-16M-v2 # MIT; query + document encoder for the lite profile

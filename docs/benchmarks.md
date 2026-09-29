@@ -1,5 +1,36 @@
 # Benchmarks
 
+## Real index with vendors (M3, 2026-09-29)
+
+The M3 index has 12 shards: per season it holds WPILib docs, the WPILib Java API, the vendordep catalog, vendor docs,
+vendor Java APIs, and vendor-restricted (`LicenseRef-*`) content. That is about 3× the M1 content: roughly 13k chunks
+and 58k symbols.
+
+| Measurement | Result | Budget |
+|---|---|---|
+| `frc-mcp doctor`, 200 mixed queries | p50 2.1 ms · p95 10.1 ms (includes cross-season fallback queries) | p95 ≤ 50 ms |
+| eval harness, 228 queries | p50 2.2 ms · p95 5.4 ms | p95 ≤ 50 ms |
+| `BenchmarkSearchRealIndex` (`cmd/frc-mcp`, needs `.shards`) | 3.5 ms/op with 28 shards → about 2 ms/op with 12 | — |
+
+**Three driver-level findings** (CPU profiles of `BenchmarkSearchRealIndex`):
+
+1. **STAT4 forces re-preparation on every search.** With `sqlite_stat4` samples, the planner reads bound parameter
+   values, and SQLite re-prepares the statement whenever a value changes. The FTS text changes every search, so
+   `_sqlite3Reprepare` took 35–49% of search CPU. The writer now deletes the stat4 samples after `ANALYZE` and keeps
+   stat1. `TestNoStat4Samples` guards this.
+2. **The pure-Go driver's allocator is behind one global mutex.** With unlimited shard fan-out, around 80% of samples
+   were in `pthread_cond_wait`/`usleep` under `libc.Xmalloc`. The shard fan-out is capped at `min(4, GOMAXPROCS)`.
+   On 28 shards that measured 4.9 ms/op unlimited, 3.5 ms/op at 4 and 6.6 ms/op at 1.
+3. **Every shard costs a query.**
+   - Season-pinned searches skip shards without that season.
+   - Symbol lookups skip shards without symbol tables.
+   - Vendor sources are packed into three shards per season instead of one shard per library and source.
+
+   Together with (1) and (2), p50 went from 11.3 ms to 2.1 ms at the same content.
+
+**Note on packing:** BM25 statistics are per shard, so packing changes scores slightly. On the 228-query eval,
+nDCG@10 moved from 0.831 to 0.827 and R@10 from 0.967 to 0.963.
+
 ## Real index (M1, 2026-09-29)
 
 The corpus is the WPILib docs and Java API for 2026 and 2027-alpha, built by `frc-mcp index run`:

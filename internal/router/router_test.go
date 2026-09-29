@@ -39,6 +39,10 @@ func TestDecide(t *testing.T) {
 			Decision{Intent: IntentGeneral, Identifiers: []string{"REVLib"}, Libraries: []string{"revlib"}}},
 		{"migrate from 2026 to 2027",
 			Decision{Intent: IntentGeneral, Season: "2027"}},
+		{"Pose2d",
+			Decision{Intent: IntentSymbol, Identifiers: []string{"Pose2d"}}},
+		{"Commands.sequence",
+			Decision{Intent: IntentSymbol, Identifiers: []string{"Commands.sequence"}}},
 		{"closed loop on a spark max",
 			Decision{Intent: IntentGeneral, Libraries: []string{"revlib"}}},
 	} {

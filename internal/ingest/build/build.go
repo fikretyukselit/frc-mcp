@@ -167,24 +167,57 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 
 // diffSeasons runs apisym.Diff over consecutive seasons of each
 // (library, language) symbol table.
-func diffSeasons(shards map[string]*shardData, srcs map[string]sources.Source) []DiffReport {
+func diffSeasons(shards map[string]*shardData, _ map[string]sources.Source) []DiffReport {
+	// Group symbols by (library, language, season) across shards: one shard
+	// may hold several libraries (vendor-java-2026), and one library-season
+	// may span several sources (photonlib + photontargeting).
 	type key struct{ lib, lang string }
-	groups := map[key][]string{}
-	for name, sd := range shards {
-		if len(sd.symbols) == 0 {
-			continue
+	type ref struct {
+		sd *shardData
+		i  int
+	}
+	groups := map[key]map[string][]ref{}
+	names := make([]string, 0, len(shards))
+	for name := range shards {
+		names = append(names, name)
+	}
+	sort.Strings(names) // deterministic grouping order
+	for _, name := range names {
+		sd := shards[name]
+		for i := range sd.symbols {
+			s := &sd.symbols[i]
+			k := key{s.Library, s.Language}
+			if groups[k] == nil {
+				groups[k] = map[string][]ref{}
+			}
+			groups[k][s.Season] = append(groups[k][s.Season], ref{sd, i})
 		}
-		s := srcs[name]
-		groups[key{s.Library, s.Language}] = append(groups[key{s.Library, s.Language}], name)
 	}
 	var out []DiffReport
-	for k, names := range groups {
-		sort.Slice(names, func(i, j int) bool { return srcs[names[i]].Season < srcs[names[j]].Season })
-		for i := 1; i < len(names); i++ {
-			old, nu := shards[names[i-1]], shards[names[i]]
-			r, a, m := apisym.Diff(old.symbols, nu.symbols, srcs[names[i]].Version)
-			out = append(out, DiffReport{Library: k.lib, Language: k.lang, From: srcs[names[i-1]].Version,
-				To: srcs[names[i]].Version, Removed: r, Added: a, Mapped: m})
+	for k, bySeason := range groups {
+		seasons := make([]string, 0, len(bySeason))
+		for se := range bySeason {
+			seasons = append(seasons, se)
+		}
+		sort.Strings(seasons)
+		for i := 1; i < len(seasons); i++ {
+			oldRefs, newRefs := bySeason[seasons[i-1]], bySeason[seasons[i]]
+			old, nu := make([]index.Symbol, len(oldRefs)), make([]index.Symbol, len(newRefs))
+			for j, r := range oldRefs {
+				old[j] = r.sd.symbols[r.i]
+			}
+			for j, r := range newRefs {
+				nu[j] = r.sd.symbols[r.i]
+			}
+			from, to := old[0].Version, nu[0].Version
+			r, a, m := apisym.Diff(old, nu, to)
+			for j, rf := range oldRefs {
+				rf.sd.symbols[rf.i] = old[j]
+			}
+			for j, rf := range newRefs {
+				rf.sd.symbols[rf.i] = nu[j]
+			}
+			out = append(out, DiffReport{Library: k.lib, Language: k.lang, From: from, To: to, Removed: r, Added: a, Mapped: m})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Library+out[i].To < out[j].Library+out[j].To })

@@ -210,3 +210,24 @@ func BenchmarkSymbol(b *testing.B) {
 		_, _ = r.Symbols(ctx, SymbolQuery{Name: "SwerveDriveKinematics", Season: "2026", Language: "java"})
 	}
 }
+
+// STAT4 samples make SQLite re-prepare statements whenever a bound value
+// changes (every search); shards must ship stat1 only.
+func TestNoStat4Samples(t *testing.T) {
+	r := openFixture(t)
+	var n int
+	if err := r.db.QueryRowContext(context.Background(), `SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_stat4'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n == 1 {
+		if err := r.db.QueryRowContext(context.Background(), `SELECT count(*) FROM sqlite_stat4`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Fatalf("sqlite_stat4 has %d rows", n)
+		}
+	}
+	if err := r.db.QueryRowContext(context.Background(), `SELECT count(*) FROM sqlite_stat1`).Scan(&n); err != nil || n == 0 {
+		t.Fatalf("stat1 rows %d err %v", n, err)
+	}
+}

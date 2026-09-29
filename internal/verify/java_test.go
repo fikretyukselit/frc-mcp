@@ -94,3 +94,54 @@ func FuzzJavaNeverPanics(f *testing.F) {
 		}
 	})
 }
+
+func TestVendorTablesChecked(t *testing.T) {
+	// REVLib 2024's CANSparkMax is a known move (upstream replacement) → error in 2026.
+	code := "package frc.robot;\nimport com.revrobotics.CANSparkMax;\nimport com.ctre.phoenix6.hardware.TalonFX;\nclass R {}\n"
+	r := findings(t, code, "2026")
+	if r.Errors != 1 || !has(r, "error", "wrong_season", "com.revrobotics.CANSparkMax") {
+		t.Fatalf("%+v", r)
+	}
+	if !strings.HasPrefix(r.Coverage["revlib"], "partial") || !strings.HasPrefix(r.Coverage["phoenix6"], "partial") {
+		t.Errorf("coverage %v", r.Coverage)
+	}
+	for _, f := range r.Findings {
+		if f.Symbol == "com.revrobotics.CANSparkMax" && (f.Fix != "use com.revrobotics.spark.SparkMax" || !strings.Contains(f.Message, "REVLib 2024.2.4")) {
+			t.Errorf("finding %+v", f)
+		}
+	}
+}
+
+func TestVendorWithoutSeasonTableNotChecked(t *testing.T) {
+	// No 2027 REVLib table and no Phoenix 5 table in the fixture: never guess.
+	code := "package frc.robot;\nimport com.revrobotics.spark.SparkMax;\nimport com.ctre.phoenix.motorcontrol.can.TalonSRX;\nclass R {}\n"
+	r := findings(t, code, "2027")
+	if len(r.Findings) != 0 || !strings.HasPrefix(r.Coverage["revlib"], "none") || !strings.HasPrefix(r.Coverage["phoenix5"], "none") {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestVersionSkewCapsVendorFindings(t *testing.T) {
+	code := "package frc.robot;\nimport com.revrobotics.CANSparkMax;\nclass R {}\n"
+	r := verify.JavaWith(context.Background(), testfixture.Engine(t), code, "2026",
+		verify.Options{Installed: map[string]string{"revlib": "2026.0.3"}})
+	if r.Errors != 0 || r.Warnings != 1 || !strings.Contains(r.Coverage["revlib"], "project has 2026.0.3") ||
+		!strings.Contains(r.Findings[0].Message, "indexed REVLib 2026.0.0; project has 2026.0.3") {
+		t.Fatalf("%+v", r)
+	}
+	// Matching versions keep the error.
+	r = verify.JavaWith(context.Background(), testfixture.Engine(t), code, "2026",
+		verify.Options{Installed: map[string]string{"revlib": "2026.0.0"}})
+	if r.Errors != 1 {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestLibraryOfVendordep(t *testing.T) {
+	for in, want := range map[string]string{"CTRE-Phoenix (v6)": "phoenix6", "REVLib": "revlib", "photonlib": "photonvision",
+		"PathplannerLib": "pathplannerlib", "CTRE-Phoenix (v5)": "", "Studica": ""} {
+		if got := verify.LibraryOfVendordep(in); got != want {
+			t.Errorf("%s: %q want %q", in, got, want)
+		}
+	}
+}

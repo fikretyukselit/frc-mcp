@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -71,6 +72,12 @@ type Engine struct {
 
 	catalog *facts.Catalog // vendordep facts from every shard
 	expires time.Time
+
+	// Per-shard pruning facts from shard metadata: a season-pinned query
+	// never touches shards without that season, and symbol lookups skip
+	// shards without symbol tables (28 shards → typically 8–10 queried).
+	seasons    []map[string]bool
+	hasSymbols []bool
 }
 
 // Options configures an Engine.
@@ -94,6 +101,12 @@ func New(shards []*index.Reader, opt Options) *Engine {
 	best := ""
 	for _, s := range shards {
 		m := s.Meta()
+		ss := map[string]bool{}
+		for _, sc := range m.Seasons {
+			ss[sc.Season] = true
+		}
+		e.seasons = append(e.seasons, ss)
+		e.hasSymbols = append(e.hasSymbols, m.Symbols > 0)
 		h.Write([]byte(m.BuildID))
 		if m.BuiltAt.After(e.builtAt) {
 			e.builtAt = m.BuiltAt
@@ -380,7 +393,14 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 	}
 	outs := make([]shardOut, len(e.shards))
 	g, gctx := errgroup.WithContext(ctx)
+	// The pure-Go SQLite driver serializes its allocator behind one mutex;
+	// beyond ~4 concurrent shard queries the goroutines mostly wait on it
+	// (measured on 28 shards: unlimited 4.9 ms/op, 4 → 3.5 ms/op, 1 → 6.6).
+	g.SetLimit(min(4, max(1, runtime.GOMAXPROCS(0))))
 	for i, sh := range e.shards {
+		if f.Season != "" && !e.seasons[i][f.Season] {
+			continue
+		}
 		g.Go(func() error {
 			o := &outs[i]
 			var err error
@@ -389,6 +409,9 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 			}
 			if useDense && e.layers[i] != nil {
 				o.dense = e.layers[i].Search(q8, qs, allow[i], ftsDepth, nil)
+			}
+			if !e.hasSymbols[i] {
+				return nil
 			}
 			for _, id := range ids {
 				syms, err := sh.Symbols(gctx, index.SymbolQuery{Name: id, Season: f.Season, Language: f.Language, Limit: 8})
@@ -589,6 +612,12 @@ func boost(hits []Hit, d router.Decision, q Query) {
 		if h.kind == index.KindCode && d.Intent == router.IntentHowTo {
 			m *= 1.2
 		}
+		// Class reference pages answer symbol questions; the exact symbols are
+		// already listed above the hits. For every other intent the guide
+		// pages should lead.
+		if h.kind == index.KindAPI && d.Intent != router.IntentSymbol {
+			m *= 0.5
+		}
 		if h.kind == index.KindForum && d.Intent != router.IntentTroubleshoot {
 			m *= 0.7
 		}
@@ -758,6 +787,16 @@ func (e *Engine) PackageExists(ctx context.Context, pkg, season, language string
 		}
 	}
 	return false
+}
+
+// LibraryVersion is the indexed symbol-table version of a library, or "".
+func (e *Engine) LibraryVersion(ctx context.Context, library, season, language string) string {
+	for _, s := range e.shards {
+		if v := s.LibraryVersion(ctx, library, season, language); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // SymbolsReplacedBy is the reverse migration lookup across shards.

@@ -285,6 +285,15 @@ func (r *Reader) SymbolsReplacedBy(ctx context.Context, fqn, season string) ([]S
 	return out, rows.Err()
 }
 
+// LibraryVersion returns the version of a library's symbol table for a season
+// and language, or "" when the shard has none.
+func (r *Reader) LibraryVersion(ctx context.Context, library, season, language string) string {
+	var v string
+	_ = r.db.QueryRowContext(ctx, `SELECT version FROM symbol WHERE library = ? AND season = ? AND language = ? LIMIT 1`,
+		library, season, language).Scan(&v)
+	return v
+}
+
 // Licenses lists the distinct chunk licenses in the shard (publish policy).
 func (r *Reader) Licenses(ctx context.Context) ([]string, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT license FROM chunk ORDER BY license`)

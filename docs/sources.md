@@ -80,12 +80,26 @@ code license):
 | PathPlanner docs | MIT | yes |
 | REVLib docs | none published | **no** (`LicenseRef-REV-Docs-NoLicense`) |
 | YAGSL docs | none published (`YAGSL-Gitbook` has no license; the library itself is LGPL-2.1) | **no** (`LicenseRef-YAGSL-Docs-NoLicense`) |
+| Phoenix 6 Java API (Javadoc from source comments) | none found in `wpiapi-java` jars (the javadoc jar's `legal/` is the JDK doclet's own license) | **no** (`LicenseRef-CTRE-Phoenix-API`) |
+| REVLib Java API | none found in `REVLib-java` jars | **no** (`LicenseRef-REVLib-API`) |
+| PhotonLib / PhotonTargeting Java API | GPL-3.0 (repository) | yes |
+| PathPlannerLib Java API | MIT | yes |
+| ChoreoLib Java API | BSD-3-Clause | yes |
+| AdvantageKit Java API | BSD-3-Clause | yes |
+| YAGSL Java API | LGPL-2.1 | yes |
 
 `LicenseRef-*` marks documentation without a redistribution grant. Those shards are built and can be used from a
 local index, but `frc-mcp index publish` leaves them out of the signed manifest unless `--include-unlicensed` is
 passed. Pass that flag only after the vendor's permission is recorded here (link to the written grant).
 
-**Open:** ask REV Robotics and the YAGSL maintainers for permission to redistribute excerpts with attribution.
+**Open:** ask CTRE (Phoenix 6 API), REV Robotics (REVLib docs and API) and the YAGSL maintainers (docs) for permission
+to redistribute excerpts with attribution. Until then the public index has no Phoenix 6 or REVLib symbol tables, so
+`frc_verify_code` on a machine with only the public index reports those libraries as `coverage: none`. A locally built
+index (`make index`) has them.
+
+Vendor Java APIs come from each vendor's Maven repository: the `-javadoc.jar` of the newest catalog version per
+season, all JDK 17 doclet output with `type-search-index.js`. `maven.revrobotics.com` redirects artifacts to GitHub
+release assets (`github.com` → `release-assets.githubusercontent.com`), and both hosts are on the allowlist.
 
 ## 1. WPILib core
 

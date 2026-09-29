@@ -251,10 +251,14 @@ func isIdentifier(s string) bool {
 		}
 		return true
 	}
+	// Type.member / Outer.Inner: "Commands.sequence", "TrapezoidProfile.Constraints".
+	if a, b, ok := strings.Cut(s, "."); ok && !strings.Contains(b, ".") {
+		return isWord(a) && isWord(b) && len(b) >= 2 && a[0] >= 'A' && a[0] <= 'Z' && strings.ContainsAny(a[1:], "abcdefghijklmnopqrstuvwxyz")
+	}
 	if !isWord(s) {
 		return false
 	}
-	upper, lower := 0, 0
+	upper, lower, digit := 0, 0, false
 	for i := 0; i < len(s); i++ {
 		switch c := s[i]; {
 		case c >= 'A' && c <= 'Z':
@@ -263,9 +267,13 @@ func isIdentifier(s string) bool {
 			}
 		case c >= 'a' && c <= 'z':
 			lower++
+		case c >= '0' && c <= '9':
+			digit = true
 		}
 	}
-	return (upper > 0 && lower > 0) || (strings.Contains(s, "_") && len(s) > 3)
+	// Pose2d, Rotation3d: capitalized word with a digit (plain words have none).
+	capDigit := s[0] >= 'A' && s[0] <= 'Z' && lower > 0 && digit
+	return (upper > 0 && lower > 0) || capDigit || (strings.Contains(s, "_") && len(s) > 3)
 }
 
 func isWord(s string) bool {

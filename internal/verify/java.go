@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/fikretyukselit/frc-mcp/internal/facts"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 )
 
@@ -54,13 +55,17 @@ type Result struct {
 	Warnings int               `json:"warnings"`
 }
 
-// covered are the package roots the index has symbol tables for.
+// covered are WPILib's package roots, always checked.
 var covered = []string{"edu.wpi.first.", "org.wpilib."}
 
-// vendorRoots map vendor packages to library names for coverage reporting.
+// vendorRoots map vendor packages to library names. A vendor root is checked
+// only when the index has that library's symbol table for the pinned season
+// (a missing table must not turn every import into a wrong-season error).
+// Phoenix 5 (com.ctre.phoenix.) and Phoenix 6 (com.ctre.phoenix6.) are
+// different libraries; the prefixes do not overlap.
 var vendorRoots = map[string]string{
-	"com.ctre.": "phoenix6", "com.revrobotics.": "revlib", "org.photonvision.": "photonvision",
-	"com.pathplanner.": "pathplannerlib", "choreo.": "choreolib", "org.littletonrobotics.": "advantagekit",
+	"com.ctre.phoenix6.": "phoenix6", "com.ctre.phoenix.": "phoenix5", "com.revrobotics.": "revlib", "org.photonvision.": "photonvision",
+	"com.pathplanner.lib.": "pathplannerlib", "choreo.": "choreolib", "org.littletonrobotics.junction.": "advantagekit",
 	"swervelib.": "yagsl", "com.studica.": "studica", "com.reduxrobotics.": "reduxlib", "au.grapplerobotics.": "grapple",
 	"com.thethriftybot.": "thriftylib", "org.ironmaple.": "maple-sim", "yams.": "yams", "dev.doglog.": "doglog",
 	"frc.robot.": "", "limelight.": "limelight",
@@ -74,10 +79,94 @@ var (
 	packageRe = regexp.MustCompile(`(?m)^[ \t]*package[ \t]+([\w.]+)[ \t]*;`)
 )
 
+// Options tunes a verification run.
+type Options struct {
+	// Installed maps library ids (phoenix6, revlib, …) to the versions the
+	// project declares (from vendordeps/*.json). When a version differs from
+	// the indexed symbol table, that library's findings are capped at
+	// warning: vendors break APIs within a season (YAGSL moved SwerveDrive to
+	// YAMS in 2026.9), so the table may not describe the project's jar.
+	Installed map[string]string
+}
+
+// versioner is implemented by resolvers that know table versions
+// (retrieve.Engine).
+type versioner interface {
+	LibraryVersion(ctx context.Context, library, season, language string) string
+}
+
 // Java verifies Java source against the pinned season.
 func Java(ctx context.Context, r Resolver, code, season string) Result {
+	return JavaWith(ctx, r, code, season, Options{})
+}
+
+// JavaWith is Java with options.
+func JavaWith(ctx context.Context, r Resolver, code, season string, opt Options) Result {
+	res := javaCheck(ctx, r, code, season)
+	vr, ok := r.(versioner)
+	if !ok || len(opt.Installed) == 0 {
+		return res
+	}
+	skew := map[string]string{} // lib → note
+	for lib, c := range res.Coverage {
+		inst := opt.Installed[lib]
+		if inst == "" || !strings.HasPrefix(c, "partial") {
+			continue
+		}
+		if tv := vr.LibraryVersion(ctx, lib, season, "java"); tv != "" && facts.CompareVersions(inst, tv) != 0 {
+			skew[lib] = fmt.Sprintf("indexed %s %s; project has %s", libName(lib), tv, inst)
+			res.Coverage[lib] = "partial (" + skew[lib] + "; findings capped at warning)"
+		}
+	}
+	if len(skew) == 0 {
+		return res
+	}
+	res.Errors, res.Warnings = 0, 0
+	for i := range res.Findings {
+		f := &res.Findings[i]
+		_, lib := vendorRoot(f.Symbol)
+		if note := skew[lib]; note != "" {
+			if f.Severity == "error" {
+				f.Severity = "warning"
+			}
+			f.Message += " (" + note + ")"
+		}
+		switch f.Severity {
+		case "error":
+			res.Errors++
+		case "warning":
+			res.Warnings++
+		}
+	}
+	return res
+}
+
+// LibraryOfVendordep maps a vendordep "name" to the library id used by the
+// index, or "" for libraries without symbol tables.
+func LibraryOfVendordep(name string) string {
+	switch strings.ToLower(name) {
+	case "ctre-phoenix (v6)", "phoenix6":
+		return "phoenix6"
+	case "revlib":
+		return "revlib"
+	case "photonlib":
+		return "photonvision"
+	case "pathplannerlib":
+		return "pathplannerlib"
+	case "choreolib":
+		return "choreolib"
+	case "advantagekit":
+		return "advantagekit"
+	case "yagsl":
+		return "yagsl"
+	}
+	return ""
+}
+
+func javaCheck(ctx context.Context, r Resolver, code, season string) Result {
 	src := stripJava(code)
-	res := Result{Coverage: map[string]string{"wpilib": "partial (imports, types, members on declared/imported receivers)"}}
+	res := Result{Coverage: map[string]string{"wpilib": partial}}
+	vendorIndexed := map[string]bool{} // vendor root → symbol table present for season
 	lines := lineIndex(src)
 	seen := map[string]bool{}
 	imported := map[string]string{} // simple name → FQN (covered types only)
@@ -96,10 +185,26 @@ func Java(ctx context.Context, r Resolver, code, season string) Result {
 		name := src[m[4]:m[5]]
 		wildcard := m[6] >= 0
 		if !isCovered(name) {
-			if lib := vendorLib(name); lib != "" && res.Coverage[lib] == "" {
-				res.Coverage[lib] = "none (not indexed yet)"
+			root, lib := vendorRoot(name)
+			if lib == "" {
+				continue
 			}
-			continue
+			ok, known := vendorIndexed[root]
+			if !known && !checkable[lib] {
+				ok, known = false, true
+				vendorIndexed[root] = false
+			}
+			if !known {
+				ok = r.PackageExists(ctx, strings.TrimSuffix(root, "."), season, "java")
+				vendorIndexed[root] = ok
+			}
+			if !ok {
+				if res.Coverage[lib] == "" {
+					res.Coverage[lib] = "none (no " + season + " API indexed)"
+				}
+				continue
+			}
+			res.Coverage[lib] = partial
 		}
 		res.Checked++
 		switch {
@@ -200,7 +305,7 @@ func checkType(ctx context.Context, r Resolver, fqn, season string, emit func(Fi
 	if len(other) > 0 {
 		s := other[0]
 		f := Finding{Symbol: fqn, Kind: "wrong_season", SourceURL: s.SourceURL,
-			Message: fmt.Sprintf("%s does not exist in the %s API; it is from the %s API (WPILib %s)", fqn, season, s.Season, s.Version)}
+			Message: fmt.Sprintf("%s does not exist in the %s API; it is from the %s API (%s %s)", fqn, season, s.Season, libName(s.Library), s.Version)}
 		// Only a known move (a pinned-season counterpart) is certain enough
 		// for an error. Without one, the class may legitimately come from
 		// another library sharing the namespace (e.g. SleipnirJava ships
@@ -210,7 +315,7 @@ func checkType(ctx context.Context, r Resolver, fqn, season string, emit func(Fi
 			f.Message += fmt.Sprintf("; in %s use %s", season, repl)
 		} else {
 			f.Severity = "warning"
-			f.Message += fmt.Sprintf("; there is no %s equivalent in WPILib (ignore if it comes from another library)", season)
+			f.Message += fmt.Sprintf("; there is no %s equivalent in %s (ignore if it comes from another library)", season, libName(s.Library))
 		}
 		emit(f)
 		return false
@@ -222,7 +327,7 @@ func checkType(ctx context.Context, r Resolver, fqn, season string, emit func(Fi
 		return false
 	}
 	emit(Finding{Symbol: fqn, Severity: "info", Kind: "unknown",
-		Message: fmt.Sprintf("%s was not found in the indexed WPILib %s API (typo, generated class, or not indexed)", fqn, season)})
+		Message: fmt.Sprintf("%s was not found in the indexed %s API (typo, generated class, removed in an older season, or not indexed)", fqn, season)})
 	return false
 }
 
@@ -408,6 +513,16 @@ func replacementFor(ctx context.Context, r Resolver, s index.Symbol, fqn, season
 	return ""
 }
 
+var libNames = map[string]string{"wpilib": "WPILib", "phoenix6": "Phoenix 6", "revlib": "REVLib", "photonvision": "PhotonLib",
+	"pathplannerlib": "PathPlannerLib", "choreolib": "ChoreoLib", "advantagekit": "AdvantageKit", "yagsl": "YAGSL"}
+
+func libName(lib string) string {
+	if n := libNames[lib]; n != "" {
+		return n
+	}
+	return lib
+}
+
 // packageSeverity: edu.wpi.first.* is WPILib's own namespace, so using it in
 // a 2027+ project is certainly wrong. org.wpilib.* in an older project may be
 // a third-party library (SleipnirJava), so it is only a warning.
@@ -518,14 +633,23 @@ func isCovered(name string) bool {
 	return false
 }
 
-func vendorLib(name string) string {
-	for p, lib := range vendorRoots {
-		if strings.HasPrefix(name+".", p) {
-			return lib
+func vendorRoot(name string) (root, lib string) {
+	for p, l := range vendorRoots {
+		if l != "" && strings.HasPrefix(name+".", p) {
+			return p, l
 		}
 	}
-	return ""
+	return "", ""
 }
+
+const partial = "partial (imports, types, members on declared/imported receivers)"
+
+// checkable are the vendor libraries ingested with their own symbol tables
+// (data/sources.yaml *-java-*). Other roots only report coverage "none", even
+// if a checkable library's Javadoc happens to include a few of their classes
+// (YAGSL ships part of yams.*).
+var checkable = map[string]bool{"phoenix6": true, "revlib": true, "photonvision": true, "pathplannerlib": true,
+	"choreolib": true, "advantagekit": true, "yagsl": true}
 
 // trimToType drops trailing lower-case segments (members/fields) from a
 // qualified reference: a.b.C.D.member → a.b.C.D.

@@ -494,7 +494,24 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 		out.Next = []string{"only Java is verified today; use frc_api to check individual " + in.Language + " symbols"}
 		return text(render.VerifyMarkdown(out)), out, nil
 	}
-	r := verify.Java(ctx, e, code, in.Season)
+	// A file under the project root: use the project's vendordep versions so
+	// version skew within a season caps vendor findings (verify.Options).
+	opt := verify.Options{}
+	if file != "" {
+		root := s.opt.ProjectRoot
+		if root == "" {
+			root = "."
+		}
+		if p, err := project.Detect(root); err == nil {
+			opt.Installed = map[string]string{}
+			for _, v := range p.Vendordeps {
+				if lib := verify.LibraryOfVendordep(v.Name); lib != "" {
+					opt.Installed[lib] = v.Version
+				}
+			}
+		}
+	}
+	r := verify.JavaWith(ctx, e, code, in.Season, opt)
 	out.Coverage, out.Checked, out.Errors, out.Warnings = r.Coverage, r.Checked, r.Errors, r.Warnings
 	for _, f := range r.Findings {
 		out.Findings = append(out.Findings, render.VerifyFinding(f))
