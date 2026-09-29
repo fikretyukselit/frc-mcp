@@ -49,6 +49,13 @@ Hints we record but never trust alone: sitemap `lastmod` (RTD sitemaps list vers
 | `doxygen-zip` | `internal/ingest/source/doxygen` | Doxygen HTML zip (WPILib Maven `wpilibc/documentation`) | class pages → symbols + API chunks; bases from "inherited from" headers; deprecations from `deprecated.html`; `include` = namespace roots (drops vendored fmt/Eigen/LLVM/Sleipnir) |
 | `discourse-rss` | `internal/ingest/source/discourse` | a Discourse site's `latest.rss` (+ `posts_url`: `posts.rss`) | one `forum` chunk per post, trust `community`; `categories` allowlist (replies kept only for listed topics in allowed categories); dedupe by GUID; season = the post's year; cited by the canonical permalink (`/t/<slug>/<topic>[/<n>]`, `?page=N` dropped); HTML → Markdown through the Sphinx converter after a DOM pass that drops hidden elements, quotes of other posts and link previews; `sources.Validate` enforces trust, a `LicenseRef-*-UserContent` license and site-level feeds only |
 | `pypi-wheel` | `internal/ingest/source/pypi` + `pystub` | version-pinned PyPI JSON | picks one wheel (pure-Python, else manylinux x86_64; sha256-checked); `.pyi` stubs or typed `.py`; private `_segments` dropped and package `__init__` re-exports resolved, so FQNs are the import paths users write (`phoenix6.hardware.TalonFX`, `commands2.Command`) |
+| `wpilib-dcmotor` | `internal/ingest/source/dcmotor` | `DCMotor.java` at a release tag | one `hw_spec` row per `getX(int numMotors)` factory (source `wpilib-dcmotor`) |
+| `recalc-motors` | `internal/ingest/source/recalc` | ReCalc `Motor.ts` at a pinned commit | one `hw_spec` row per FRC motor in `ALL_MOTORS` (source `recalc`, season `all`); units checked, nothing derived |
+| `gitbook-spec-table` | `internal/ingest/source/specpage` | one GitBook page's `.md` rendition | the page's parameter table → `hw_spec` rows labeled by the entry's `hardware: {source, part, name}`; a trapezoidal and an FOC tab become the part and its `-foc` variant; listed parameters only, units checked |
+
+Curated hardware rows (`data/hardware/*.yaml`, package `internal/hwdata`) are loaded by `index run --hardware`
+(default `data/hardware`) like the migration rules: validated, then added to their shard when that shard is built
+in the run; a (part, source, season) produced twice fails the build.
 
 Both Markdown adapters share `internal/ingest/source/markdown`. It normalizes five dialects into CommonMark before
 sectioning:

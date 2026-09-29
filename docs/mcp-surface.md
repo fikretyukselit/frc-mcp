@@ -232,20 +232,34 @@ Detects or declares the project's pin set.
 
 ### `frc_hardware` (implemented M3)
 - **In:**
-  - `parts[]`: names or aliases such as "kraken x60 foc", "vortex" or "neo550". A unique prefix is accepted;
-  - or `category`: `motor` today; controller, encoder, imu and swerve_module arrive with their sources;
+  - `parts[]`: names or aliases such as "kraken x60 foc", "vortex", "neo550", "mk4i", "maxswerve", "cancoder",
+    "through bore" or "pigeon 2". A unique prefix is accepted, then a unique suffix (so a name without the vendor,
+    "mk4i", finds `sdsmk4i`);
+  - or `category`: `motor`, `encoder`, `imu` or `swerve_module`;
   - `frc_season` or `pin`.
 - **Out:** rows from the `hw_spec` table, grouped per part in the order asked:
-  - one column per (source, season) with unit-suffixed fields;
-  - the source's own provenance note (e.g. "From <vendor page>");
-  - a citation;
+  - one column per (source, season) with unit-suffixed fields: motors `stall_torque_nm`, `free_speed_rpm`,
+    `stall_current_a`, `free_current_a`, `nominal_voltage_v` first, then whatever else a source gives
+    (`kv_rpm_per_v`, `peak_power_w`, `motor_weight_lb`, `steer_ratio`, `wheel_diameter_in`, `quadrature_cpr`,
+    `absolute_resolution_bits`, `yaw_drift_no_motion_deg_per_hour`, …); ratios are dimensionless;
+  - `frc_season: all` for sources that do not depend on the season; they are returned for every season next to
+    that season's own rows;
+  - the source's own provenance note (e.g. ReCalc's data source, or what a curated number means);
+  - a citation (`library` is `wpilib` for DCMotor rows, otherwise the source label);
   - the WPILib `DCMotor` factory in Java, C++ and Python, resolved from the indexed API tables of that season (for
     example 2026 `frc::DCMotor::KrakenX60FOC(numMotors)`, 2027 `wpi::math::DCMotor::…`).
 
-  **Every source is returned labeled and never merged.** WPILib `DCMotor` and CTRE-dyno/ReCalc values for NEO differ by
-  about 60% in stall torque.
-- **Sources today:** `wpilib-dcmotor`, WPILib's simulation constants parsed from `DCMotor.java` at the release tag, for
-  20 motors. Vendor dyno data and ReCalc are planned as additional labeled sources.
+  **Every source is returned labeled and never merged.** WPILib `DCMotor` and ReCalc (CTRE dyno) values for NEO
+  differ by about 60% in stall torque.
+- **Sources** (`docs/sources.md` §6):
+  - `wpilib-dcmotor`: WPILib's simulation constants parsed from `DCMotor.java` at the release tag, 19 motors per
+    season;
+  - `recalc`: ReCalc's motor table at a pinned commit (MIT), 21 FRC motors, mostly vendor dyno data;
+  - `rev-docs`, `wcp-docs`: REV and WCP motor spec pages (GitBook `.md`); no docs license, so these rows are in the
+    `hardware-restricted` shard, which is not published;
+  - `sds`, `rev`, `wcp`, `ctre`, `redux`: curated rows from `data/hardware/*.yaml`, each number copied from the
+    cited vendor page (swerve modules, encoders, IMUs, the CTRE Minion's stated specs).
+- Swerve drive ratios are not included: the vendors publish them only as images.
 
 ### Optional toolset (HTTP only): `--toolset openai`
 Registers literal `search` and `fetch` tools with the output shapes expected by OpenAI connectors and deep research.

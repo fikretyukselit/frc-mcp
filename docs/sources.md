@@ -114,6 +114,8 @@ code license):
 | Choreo docs | BSD-3-Clause | yes |
 | PathPlanner docs | MIT | yes |
 | REVLib docs | none published | **no** (`LicenseRef-REV-Docs-NoLicense`) |
+| REV and WCP motor spec pages (`frc_hardware` rows `rev-docs`, `wcp-docs`) | none published | **no** (`LicenseRef-REV-Docs-NoLicense`, `LicenseRef-WCP-Docs-NoLicense`; shard `hardware-restricted`) |
+| ReCalc motor table (`recalc`) | MIT (`tervay/recalc` `LICENSE.txt`) | yes |
 | YAGSL docs | none published (`YAGSL-Gitbook` has no license; the library itself is LGPL-2.1) | **no** (`LicenseRef-YAGSL-Docs-NoLicense`) |
 | Phoenix 6 Java API (Javadoc from source comments) | none found in `wpiapi-java` jars (the javadoc jar's `legal/` is the JDK doclet's own license) | **no** (`LicenseRef-CTRE-Phoenix-API`) |
 | REVLib Java API | none found in `REVLib-java` jars | **no** (`LicenseRef-REVLib-API`) |
@@ -207,10 +209,54 @@ release assets (`github.com` → `release-assets.githubusercontent.com`), and bo
 
 ## 6. Hardware specs (reference data, human-reviewed → `hw_spec` table, served by `frc_hardware`)
 
-Motor constants are served **with both sources labeled** — never merged: WPILib `DCMotor` (pinned to a release tag,
-`wpimath/.../DCMotor.java`) and ReCalc / CTRE dyno data (`tervay/recalc` ⚠️ path). NEO and NEO Vortex differ
-materially between sources (e.g. NEO stall torque 2.6 Nm vs 4.20 Nm). Spec pages (SDS, WCP, AndyMark, REV, CTRE)
-are polled weekly by norm hash; changes open a review PR rather than auto-publishing.
+Every source is its own labeled row per part, **never merged or averaged**: NEO stall torque is 2.6 N·m in WPILib's
+`DCMotor`, 4.201 N·m in ReCalc (CTRE dyno) and 3.75 N·m on REV's NEO 2.0 page. Part ids are shared across sources
+(`krakenx60`, `krakenx60-foc`, `neo`, `neovortex`, `neo550`, …) so one query returns every column. Rows that do not
+depend on the FRC season have `season: all` and answer every season. Probed 2026-09-29.
+
+| Source label | Adapter / file | Upstream (pinned) | License → shard | Rows |
+|---|---|---|---|---|
+| `wpilib-dcmotor` | `wpilib-dcmotor` | `DCMotor.java` at `v2026.2.2` and `v2027.0.0-alpha-7` | BSD-3-Clause → `hardware` | 19 motors × 2 seasons |
+| `recalc` | `recalc-motors` | `tervay/recalc` `app/lib/models/Motor.ts` (`ALL_MOTORS`) at commit `8702a80eb61300b3cbfd7b800ea8d4b0e7614ab9`; `LICENSE.txt` is MIT | MIT → `hardware` | 21 FRC motors (the 7 FTC/VEX V5 motors are skipped); 5 are new parts: `neo2`, `minionadvhall`, `thriftypulsar`, `775redline`, `snowblower` |
+| `rev-docs` | `gitbook-spec-table` | REV GitBook `.md` pages: `brushless/neo/v1.1`, `/2.0`, `/vortex`, `/550` (unversioned; ETag is the revision) | none published (`LicenseRef-REV-Docs-NoLicense`) → `hardware-restricted` | 4 motors |
+| `wcp-docs` | `gitbook-spec-table` | WCP GitBook `.md` motor-performance pages for Kraken X60 and X44 (a trapezoidal and an FOC tab each) | none published (`LicenseRef-WCP-Docs-NoLicense`) → `hardware-restricted` | 4 rows (X60, X60 FOC, X44, X44 FOC) |
+| `sds`, `rev`, `wcp`, `ctre`, `redux` | `data/hardware/*.yaml` (curated) | the vendor page in each row's `citation` (plus `see_also`), read on `checked` | the file is our MIT compilation of cited facts → `hardware` | swerve modules, encoders, IMUs |
+
+- **ReCalc** stores five DCMotor numbers per motor plus motor and controller weight; resistance, kV and kT are
+  computed at runtime in ReCalc and are not upstream data, so they are not stored. The row note carries ReCalc's own
+  `dataSource` (whose dyno the numbers come from), type and vendors. A unit other than the expected one (`N*m`, `A`,
+  `rpm`, `V`, `lb`) fails the build.
+- **Vendor spec pages** are read only when machine-readable: GitBook publishes a `.md` rendition of every page (see
+  `llms.txt`), and both robots.txt files allow everything. Only listed parameters are read (free speed, free/stall
+  current, stall torque, Kv, peak power, max efficiency, kT) and each must carry the expected unit. The REV/WCP
+  docs carry no license, so these rows are in `hardware-restricted`, which `index publish` leaves out until
+  permission is recorded (§0.2). `Reader.Licenses` now covers `hw_spec`, `symbol` and `release` rows too, so a shard
+  without chunks is still held back.
+- **Curated data** (`data/hardware/`): one row per part and vendor with unit-suffixed numeric fields, a citation and
+  a note (interfaces and conditions go in the note). Validated at build and by `go test ./internal/hwdata`: unknown
+  keys, keys without a unit suffix (ratios excepted), non-https citations, duplicate (part, source) and categories
+  other than motor/encoder/imu/swerve_module are rejected. Contents: CTRE Minion (store tech specs); SDS MK4, MK4i, MK4n, MK5i, MK5n; REV MAXSwerve;
+  WCP Swerve X, X2, X2S, XS; CTRE CANcoder; REV Through Bore V1 and V2; Redux Canandmag; CTRE Pigeon 2.0; Redux
+  Boron Canandgyro.
+
+**Looked at and skipped (2026-09-29):**
+
+- **Swerve drive ratios** (SDS L1–L4 / L1+–L3+ / MK5, WCP X1–X4, REV MAXSwerve low/mid/high): published only as a
+  table image (SDS product pages, REV product page) or an SVG (WCP ratio pages). Not transcribed; the curated rows
+  hold the steering ratio, which every vendor states in text.
+- **CTRE motor data**: the Phoenix 6 hardware-reference pages carry no performance table, and the CTRE store's
+  Minion page states only stall torque, peak power and weight in prose (curated as the `ctre` row for `minion`).
+  Kraken X60/X44 tables are on WCP's pages (`wcp-docs`), and ReCalc's `recalc` rows carry CTRE's dyno values
+  (`dataSource: CTRE`).
+- **CANcoder resolution**: the store page states supply range and current only; the resolution is in the user's guide
+  PDF, which is not scraped.
+- **Studica navX2-MXP**: specs are in a PDF user guide and the store pages return 403 to non-browser clients.
+- **SDS `swerve-lib`** (`SdsModuleConfigurations.java`, gear constants in code): the repository is named
+  "Do not use … unmaintained" and has no license.
+- **Motor controllers** (`controller` category): no machine-readable, citable spec table was found; not added.
+
+Spec pages change without notice: re-run `make index` and review the `hw_spec` diff; curated rows are re-checked by
+hand (update `checked`).
 
 ## 7. Optional event-data adapters (off by default)
 
