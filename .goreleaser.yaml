@@ -1,5 +1,9 @@
-# goreleaser v2 — snapshot-ready in M0; signing/publishing is wired in M2
-# (cosign keyless with pinned identity, SLSA attestations, notarization).
+# goreleaser v2: release binaries for the three OSes with checksums, a Syft
+# SBOM per archive and a cosign keyless signature on the checksums (identity:
+# this repository's release workflow). SLSA provenance and the container image
+# are produced by .github/workflows/release.yml. Package-manager publishing is
+# skipped unless PACKAGING_TOKEN (a token that can push to the tap/bucket and
+# open the winget-pkgs PR) is set.
 version: 2
 project_name: frc-mcp
 before:
@@ -31,3 +35,53 @@ changelog:
   use: github
   filters:
     exclude: ["^docs:", "^test:", "^chore:"]
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args: ["sign-blob", "--yes", "--output-signature=${signature}", "--output-certificate=${certificate}", "${artifact}"]
+release:
+  prerelease: auto
+  footer: |
+    Verify: `cosign verify-blob --certificate checksums.txt.pem --signature checksums.txt.sig --certificate-identity-regexp '^https://github.com/fikretyukselit/frc-mcp/.github/workflows/release.yml@refs/tags/v' --certificate-oidc-issuer https://token.actions.githubusercontent.com checksums.txt`
+homebrew_casks:
+  - name: frc-mcp
+    repository:
+      owner: fikretyukselit
+      name: homebrew-tap
+      token: "{{ .Env.PACKAGING_TOKEN }}"
+    skip_upload: '{{ if isEnvSet "PACKAGING_TOKEN" }}false{{ else }}true{{ end }}'
+    homepage: https://github.com/fikretyukselit/frc-mcp
+    description: Version-correct FRC robotics software knowledge for coding agents (MCP server)
+    license: MIT
+    binaries: [frc-mcp]
+scoops:
+  - name: frc-mcp
+    repository:
+      owner: fikretyukselit
+      name: scoop-bucket
+      token: "{{ .Env.PACKAGING_TOKEN }}"
+    skip_upload: '{{ if isEnvSet "PACKAGING_TOKEN" }}false{{ else }}true{{ end }}'
+    homepage: https://github.com/fikretyukselit/frc-mcp
+    description: Version-correct FRC robotics software knowledge for coding agents (MCP server)
+    license: MIT
+winget:
+  - name: frc-mcp
+    publisher: Fikret Yuksel Foundation
+    short_description: Version-correct FRC robotics software knowledge for coding agents (MCP server)
+    license: MIT
+    homepage: https://github.com/fikretyukselit/frc-mcp
+    package_identifier: FikretYukselFoundation.frc-mcp
+    repository:
+      owner: fikretyukselit
+      name: winget-pkgs
+      branch: "frc-mcp-{{ .Version }}"
+      token: "{{ .Env.PACKAGING_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+    skip_upload: '{{ if isEnvSet "PACKAGING_TOKEN" }}false{{ else }}true{{ end }}'
