@@ -74,6 +74,12 @@ The verifier gate ran after the M4 additions (C++, Python, Java call shapes) and
 had marked the classes of a deprecated member's *parameter types* deprecated (`frc::Rotation2d`, because
 `EllipticalRegionConstraint`'s old constructor takes one), which produced 11 of the 30 warnings before the fix.
 
+With the vendor C++ tables (Phoenix 6, REVLib and PhotonLib headers, M3), the same run still gives **0 errors and
+19 warnings**: 6328's C++ references to `ctre::phoenix6::…` and `rev::spark::…` are now checked (coverage was
+`none` before) and all resolve in the 2026 tables. Pinned to 2027, the vendor C++ tables add no finding on that code,
+while a control file gets the expected errors (`ctre::phoenix::unmanaged::FeedEnable` → `ctre::phoenix6::unmanaged`,
+nested `CANBus::CANBusStatus` gone in 2027).
+
 ## Real index with vendors (M3, 2026-09-29)
 
 The M3 index has 12 shards: per season it holds WPILib docs, the WPILib Java API, the vendordep catalog, vendor docs,

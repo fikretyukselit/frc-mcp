@@ -496,6 +496,169 @@ sources:
     shard: vendor-api-2026
     verified: true # probed 2026-09-29
 
+  # ---- Vendor C++ APIs (M3): public headers from each vendor's Maven repo ----
+  # The "headers" classifier artifact every C++ vendordep lists
+  # (cppDependencies[].headerClassifier). No vendor publishes a Doxygen zip or
+  # tag file; their Doxygen sites track one release and are used for links
+  # only (page names derive from the FQN). Versions are the newest in the
+  # WPILib vendordep catalog for each season, like the Java tables.
+  # CTRE's headers ship CTRE_LICENSE.txt, an EULA that forbids distributing
+  # or making the Software (which includes documentation) available to third
+  # parties: LicenseRef-* keeps those tables local (docs/sources.md §0.2).
+  # REVLib's headers carry a BSD-3-Clause notice (LICENSE.txt and every
+  # file), recorded as their license. By project policy the table still goes
+  # to the restricted shard next to REVLib Java (LicenseRef, no license
+  # found), so nothing REV-authored is published until REV confirms (§0.2).
+  # skip: headers CTRE leaves out of its own API reference (compound
+  # differential controls, raw signal ids), checked against annotated.html.
+  - id: phoenix6-cpp-2026
+    adapter: cpp-headers-zip
+    url: https://maven.ctr-electronics.com/release/com/ctre/phoenix6/wpiapi-cpp/26.3.0/wpiapi-cpp-26.3.0-headers.zip
+    include: "ctre::"
+    skip: [ctre/phoenix6/controls/compound/]
+    base_url: https://api.ctr-electronics.com/phoenix6/stable/cpp/
+    library: phoenix6
+    season: "2026"
+    channel: stable
+    version: 26.3.0
+    language: cpp
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-api-2026
+    verified: true # probed 2026-09-29 (573 KB, 223 headers)
+  - id: phoenix6-tools-cpp-2026
+    adapter: cpp-headers-zip
+    url: https://maven.ctr-electronics.com/release/com/ctre/phoenix6/tools/26.3.0/tools-26.3.0-headers.zip
+    include: "ctre::"
+    skip: [ctre/phoenix6/spns/]
+    base_url: https://api.ctr-electronics.com/phoenix6/stable/cpp/
+    library: phoenix6
+    season: "2026"
+    channel: stable
+    version: 26.3.0
+    language: cpp
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-api-2026
+    verified: true # probed 2026-09-29 (93 KB; signals::*Value, ctre::phoenix::StatusCode)
+  - id: phoenix6-cpp-2027
+    adapter: cpp-headers-zip
+    url: https://maven.ctr-electronics.com/release/com/ctre/phoenix6/wpiapi-cpp/26.70.0-alpha-2/wpiapi-cpp-26.70.0-alpha-2-headers.zip
+    include: "ctre::"
+    skip: [ctre/phoenix6/controls/compound/]
+    base_url: https://api.ctr-electronics.com/phoenix6/latest/cpp/
+    library: phoenix6
+    season: "2027"
+    channel: alpha
+    version: 26.70.0-alpha-2
+    language: cpp
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-api-2027
+    verified: true # probed 2026-09-29 (578 KB)
+  - id: phoenix6-tools-cpp-2027
+    adapter: cpp-headers-zip
+    url: https://maven.ctr-electronics.com/release/com/ctre/phoenix6/tools/26.70.0-alpha-2/tools-26.70.0-alpha-2-headers.zip
+    include: "ctre::"
+    skip: [ctre/phoenix6/spns/]
+    base_url: https://api.ctr-electronics.com/phoenix6/latest/cpp/
+    library: phoenix6
+    season: "2027"
+    channel: alpha
+    version: 26.70.0-alpha-2
+    language: cpp
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-api-2027
+    verified: true # probed 2026-09-29 (92 KB)
+  - id: revlib-cpp-2026
+    adapter: cpp-headers-zip
+    url: https://maven.revrobotics.com/com/revrobotics/frc/REVLib-cpp/2026.0.5/REVLib-cpp-2026.0.5-headers.zip
+    include: "rev::"
+    base_url: https://codedocs.revrobotics.com/cpp/
+    library: revlib
+    season: "2026"
+    channel: stable
+    version: 2026.0.5
+    language: cpp
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-restricted-api-2026
+    verified: true # probed 2026-09-29 (142 KB; redirects to REV-Software-Binaries release assets)
+  - id: revlib-cpp-2027
+    adapter: cpp-headers-zip
+    url: https://maven.revrobotics.com/com/revrobotics/frc/REVLib-cpp/2027.0.0-alpha-7/REVLib-cpp-2027.0.0-alpha-7-headers.zip
+    include: "rev::"
+    base_url: https://codedocs.revrobotics.com/cpp/
+    library: revlib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-7
+    language: cpp
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-restricted-api-2027
+    verified: true # probed 2026-09-29 (145 KB)
+  # PhotonVision serves one C++ Doxygen build (javadocs.photonvision.org/cpp/,
+  # currently the 2027 alpha); /release/cpp/ does not exist, so both seasons
+  # link there. photonlib-cpp ships an MIT LICENSE, photontargeting-cpp GPL-3.0.
+  - id: photonlib-cpp-2026
+    adapter: cpp-headers-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photonlib-cpp/v2026.3.4/photonlib-cpp-v2026.3.4-headers.zip
+    include: "photon::"
+    base_url: https://javadocs.photonvision.org/cpp/
+    library: photonvision
+    season: "2026"
+    channel: stable
+    version: v2026.3.4
+    language: cpp
+    license: MIT
+    trust: vendor
+    shard: vendor-api-2026
+    verified: true # probed 2026-09-29 (34 KB)
+  - id: photontargeting-cpp-2026
+    adapter: cpp-headers-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photontargeting-cpp/v2026.3.4/photontargeting-cpp-v2026.3.4-headers.zip
+    include: "photon::"
+    base_url: https://javadocs.photonvision.org/cpp/
+    library: photonvision
+    season: "2026"
+    channel: stable
+    version: v2026.3.4
+    language: cpp
+    license: GPL-3.0
+    trust: vendor
+    shard: vendor-api-2026
+    verified: true # probed 2026-09-29 (50 KB)
+  - id: photonlib-cpp-2027
+    adapter: cpp-headers-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photonlib-cpp/v2027.0.0-alpha-2/photonlib-cpp-v2027.0.0-alpha-2-headers.zip
+    include: "photon::"
+    base_url: https://javadocs.photonvision.org/cpp/
+    library: photonvision
+    season: "2027"
+    channel: alpha
+    version: v2027.0.0-alpha-2
+    language: cpp
+    license: MIT
+    trust: vendor
+    shard: vendor-api-2027
+    verified: true # probed 2026-09-29 (33 KB)
+  - id: photontargeting-cpp-2027
+    adapter: cpp-headers-zip
+    url: https://maven.photonvision.org/repository/internal/org/photonvision/photontargeting-cpp/v2027.0.0-alpha-2/photontargeting-cpp-v2027.0.0-alpha-2-headers.zip
+    include: "photon::"
+    base_url: https://javadocs.photonvision.org/cpp/
+    library: photonvision
+    season: "2027"
+    channel: alpha
+    version: v2027.0.0-alpha-2
+    language: cpp
+    license: GPL-3.0
+    trust: vendor
+    shard: vendor-api-2027
+    verified: true # probed 2026-09-29 (50 KB)
+
   # ---- Release notes (M3, frc_whats_new): GitHub releases of each project ----
   # One REST listing per repository (ETag, GITHUB_TOKEN when set). Seasons
   # come from each release's own version (facts.SeasonFor), so one shard holds

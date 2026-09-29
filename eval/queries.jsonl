@@ -242,3 +242,10 @@
 {"id": "q240", "bucket": "howto", "query": "C++ SwerveDriveKinematics ToSwerveModuleStates frc::", "relevant": ["wpilib-cpp/2026/frc::SwerveDriveKinematics"], "language": "cpp", "split": "train", "author": "llm"}
 {"id": "q241", "bucket": "symbol", "query": "frc::XboxController GetLeftBumperButton cpp", "relevant": ["wpilib-cpp/2026/frc::XboxController"], "language": "cpp", "split": "holdout", "author": "llm"}
 {"id": "q242", "bucket": "howto", "query": "frc::PIDController Calculate in C++", "relevant": ["wpilib-cpp/2026/frc::PIDController"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q243", "bucket": "symbol", "query": "ctre::phoenix6::hardware::TalonFX constructor CANBus C++", "relevant": ["phoenix6-cpp/2026/ctre::phoenix6::hardware::TalonFX"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q244", "bucket": "symbol", "query": "rev::spark::SparkMax C++", "relevant": ["revlib-cpp/2026/rev::spark::SparkMax"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q245", "bucket": "howto", "query": "SparkBaseConfig SetIdleMode kBrake in C++", "relevant": ["revlib-cpp/2026/rev::spark::SparkBaseConfig"], "language": "cpp", "split": "holdout", "author": "llm"}
+{"id": "q246", "bucket": "symbol", "query": "photon::PhotonCamera GetAllUnreadResults C++", "relevant": ["photonvision-cpp/2026/photon::PhotonCamera"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q247", "bucket": "symbol", "query": "ctre::phoenix6::controls::VelocityVoltage cpp", "relevant": ["phoenix6-cpp/2026/ctre::phoenix6::controls::VelocityVoltage"], "language": "cpp", "split": "holdout", "author": "llm"}
+{"id": "q248", "bucket": "howto", "query": "BaseStatusSignal RefreshAll status signals C++", "relevant": ["phoenix6-cpp/2026/ctre::phoenix6::BaseStatusSignal"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q249", "bucket": "cross-season", "query": "rev::spark::SparkMax", "relevant": ["revlib-cpp/2027/rev::spark::SparkMax"], "frc_season": "2027", "language": "cpp", "split": "train", "author": "llm"}

@@ -187,3 +187,7 @@ holdout), for 228 in total.
   target: q087 (ChoreoLib trajectory API), q189 (CANivore setup) and q221 (log replay comparison). The remaining
   failures (q088, q175, q181, q193, q224, q226) stay failing on purpose.
 - **Same caveat as §8:** the vendor queries were written by the plan author, not by students.
+- **Vendor C++ tables (M3):** 7 C++ queries (`q243`–`q249`: Phoenix 6, REVLib, PhotonLib, one 2027 cross-season)
+  bring the set to 249, and all 7 are found in the top 10. On the 242 earlier queries the new shards cost nothing
+  (R@10 0.961 → 0.961, nDCG@10 0.815 → 0.817). All 249: R@5 0.922 · R@10 0.962 · nDCG@10 0.822 · MRR@10 0.780 ·
+  wrong-season@5 0.

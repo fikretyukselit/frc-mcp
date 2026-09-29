@@ -1,12 +1,12 @@
 {
-  "n": 242,
-  "recall_at_5": 0.919,
-  "recall_at_10": 0.961,
-  "ndcg_at_10": 0.815,
-  "mrr_at_10": 0.771,
+  "n": 249,
+  "recall_at_5": 0.922,
+  "recall_at_10": 0.962,
+  "ndcg_at_10": 0.822,
+  "mrr_at_10": 0.78,
   "wrong_season_at_5": 0,
   "no_match_rate": 0,
-  "low_confidence_rate": 0.041,
-  "p50_ms": 2.931,
-  "p95_ms": 6.804
+  "low_confidence_rate": 0.04,
+  "p50_ms": 3.736,
+  "p95_ms": 8.415
 }

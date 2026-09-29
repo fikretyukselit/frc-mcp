@@ -100,6 +100,43 @@ Chief Delphi (`www.chiefdelphi.com`, Discourse behind Cloudflare), probed by han
   detector check (`TestRealIndexNotSuspect`) stays at 0 flags over 17,298 chunks. Forum recall is therefore limited
   to what is active at build time; an archive would need its own policy for moderator removals.
 
+### 0.1.2 Vendor C++ APIs (probed 2026-09-29)
+
+**Decision: the C++ tables come from each vendor's Maven `headers.zip`, not from their Doxygen sites.** Every C++
+vendordep in the catalog lists a `headerClassifier: headers` artifact next to its binaries. That zip is the public
+API the compiler sees, pinned to the exact vendordep version, and it is one small download per release. The Doxygen
+sites are crawled HTML that track a single release, so they are used for links only. The `cpp-headers-zip` adapter
+(`internal/ingest/source/cppheader`) scans declarations; `docs/ingestion.md` §2.2 describes it.
+
+What the probe found (HEAD/GET with the indexer User-Agent):
+
+| Library | Artifacts (Maven) | Size | License shipped in the zip | Doxygen site (links) |
+|---|---|---|---|---|
+| CTRE Phoenix 6 | `com/ctre/phoenix6/wpiapi-cpp/{26.3.0,26.70.0-alpha-2}/…-headers.zip` and `…/tools/…-headers.zip` (`signals::*Value`, `ctre::phoenix::StatusCode`) | 573 / 578 KB + 93 / 92 KB | `CTRE_LICENSE.txt`: CTRE EULA | `api.ctr-electronics.com/phoenix6/{stable,latest}/cpp/` (banners read 26.3.0 and 26.70.0-alpha-2) |
+| REVLib | `com/revrobotics/frc/REVLib-cpp/{2026.0.5,2027.0.0-alpha-7}/…-headers.zip` (redirects to REV-Software-Binaries release assets) | 142 / 145 KB | `LICENSE.txt` and every header: BSD-3-Clause | `codedocs.revrobotics.com/cpp/` (one version) |
+| PhotonLib | `org/photonvision/{photonlib-cpp,photontargeting-cpp}/{v2026.3.4,v2027.0.0-alpha-2}/…-headers.zip` | 34 + 50 KB | photonlib-cpp: MIT; photontargeting-cpp: GPL-3.0 | `javadocs.photonvision.org/cpp/` (the 2027 alpha; `/release/cpp/` is 404) |
+
+- **No bulk Doxygen artifact exists.** `…-docs.zip`, `…-doxygen.zip`, `…-documentation.zip` and a `.tag` file all
+  return 404 on the three Maven repos and sites. Crawling the sites would take hundreds of pages per release
+  (CTRE's `TalonFX` page alone is 373 KB) and would still give only the current release.
+- **Robots:** the three Maven hosts, `api.ctr-electronics.com` and `codedocs.revrobotics.com` serve no robots.txt
+  (404); `javadocs.photonvision.org/robots.txt` is empty. The build fetches one zip per artifact and no site page.
+- **Links:** Doxygen names pages from the FQN (`classctre_1_1phoenix6_1_1hardware_1_1_talon_f_x.html`), so links are
+  computed. 268 of CTRE's 278 documented 2026 class pages (274 of 288 for 2027) match a computed page name exactly;
+  the rest are `impl` classes, which frc-mcp drops by design, and `std::hash`/`wpi::Struct` specializations. A
+  random sample of 35 computed REV, PhotonVision and CTRE pages, plus namespace pages, all returned 200.
+- **Left out on purpose:** CTRE's `controls/compound/` headers (compound differential requests) and `spns/` (raw
+  signal ids) are not in CTRE's own API reference for either season, so `skip` drops them.
+- **Namespaces:** `ctre::phoenix6::…` (plus `ctre::phoenix::StatusCode` and, in 2026, `ctre::phoenix::unmanaged`),
+  `rev::`, `rev::spark::`, `photon::`. These match the verifier's C++ namespace map (`internal/verify/refcheck.go`).
+- **Built tables** (`frc-mcp index run`, 2026-09-29):
+
+  | Library | 2026 symbols (types) | 2027 symbols (types) | C++ moves mapped by the season diff |
+  |---|---|---|---|
+  | Phoenix 6 | 6,064 (287) — 26.3.0 | 6,077 (294) — 26.70.0-alpha-2 | 7 (`ctre::phoenix::unmanaged::*` → `ctre::phoenix6::unmanaged::*`) |
+  | REVLib | 1,652 (148) — 2026.0.5 | 1,591 (149) — 2027.0.0-alpha-7 | 0 (84 symbols removed, e.g. `SparkBase#Get/Set`, `SparkClosedLoopController#SetReference`) |
+  | PhotonLib | 428 (36) — v2026.3.4 | 423 (36) — v2027.0.0-alpha-2 | 0 |
+
 ## 0.2 Licensing and redistribution
 
 Shards redistribute text, so every source records the license of its **documentation** (which can differ from the
@@ -120,6 +157,9 @@ code license):
 | Phoenix 6 Java API (Javadoc from source comments) | none found in `wpiapi-java` jars (the javadoc jar's `legal/` is the JDK doclet's own license) | **no** (`LicenseRef-CTRE-Phoenix-API`) |
 | REVLib Java API | none found in `REVLib-java` jars | **no** (`LicenseRef-REVLib-API`) |
 | PhotonLib / PhotonTargeting Java API | GPL-3.0 (repository) | yes |
+| Phoenix 6 C++ API (headers) | CTRE EULA (`CTRE_LICENSE.txt` in the zip): the Software, "including … documentation", may not be distributed or made available to any third party | **no** (`LicenseRef-CTRE-Phoenix-API`, shard `vendor-restricted-api-*`) |
+| REVLib C++ API (headers) | BSD-3-Clause (`LICENSE.txt` and each header) | **not yet**: the table is recorded as BSD-3-Clause but kept in `vendor-restricted-api-*` next to REVLib Java by project policy, so that shard stays unpublished until REV confirms. It could move to `vendor-api-*` on that confirmation. |
+| PhotonLib C++ API (headers) | photonlib-cpp: MIT; photontargeting-cpp: GPL-3.0 (the `LICENSE` in each zip) | yes |
 | PathPlannerLib Java API | MIT | yes |
 | ChoreoLib Java API | BSD-3-Clause | yes |
 | AdvantageKit Java API | BSD-3-Clause | yes |
@@ -133,13 +173,15 @@ local index, but `frc-mcp index publish` leaves them out of the signed manifest 
 passed. Pass that flag only after the vendor's permission is recorded here (link to the written grant).
 
 **Open:** ask CTRE (Phoenix 6 API), REV Robotics (REVLib docs and API) and the YAGSL maintainers (docs) for permission
-to redistribute excerpts with attribution. Until then the public index has no Phoenix 6 or REVLib symbol tables, so
-`frc_verify_code` on a machine with only the public index reports those libraries as `coverage: none`. A locally built
-index (`make index`) has them.
+to redistribute excerpts with attribution. Until then the public index has no Phoenix 6 or REVLib symbol tables (Java,
+C++ or Python), so `frc_verify_code` on a machine with only the public index reports those libraries as
+`coverage: none`. A locally built index (`make index`) has them. CTRE's header EULA also forbids "derivative works";
+whether a locally built symbol table is acceptable to CTRE belongs in the same request.
 
 Vendor Java APIs come from each vendor's Maven repository: the `-javadoc.jar` of the newest catalog version per
 season, all JDK 17 doclet output with `type-search-index.js`. `maven.revrobotics.com` redirects artifacts to GitHub
 release assets (`github.com` → `release-assets.githubusercontent.com`), and both hosts are on the allowlist.
+Vendor C++ APIs come from the same repositories: the `-headers.zip` of the same versions (§0.1.2).
 
 ## 1. WPILib core
 
