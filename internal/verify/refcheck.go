@@ -18,7 +18,7 @@ func Check(ctx context.Context, r Resolver, code, language, season string, opt O
 	case "java":
 		return JavaWith(ctx, r, code, season, opt)
 	case "cpp", "python":
-		return refCheck(ctx, r, code, language, season)
+		return capSkew(ctx, r, refCheck(ctx, r, code, language, season), language, season, opt)
 	}
 	return Result{Findings: []Finding{}, Coverage: map[string]string{}}
 }
@@ -43,10 +43,11 @@ func LibraryOf(fqn, language string) string {
 		root, _, _ := strings.Cut(fqn, "::")
 		return cppLibs[root]
 	}
-	if _, lib := vendorRoot(fqn); lib != "" {
+	name, _, _ := strings.Cut(fqn, "#")
+	if _, lib := vendorRoot(name); lib != "" {
 		return lib
 	}
-	if isCovered(fqn) {
+	if isCovered(name) {
 		return "wpilib"
 	}
 	return ""

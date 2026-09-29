@@ -1855,9 +1855,9 @@ rules:
     from:
       java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickAxisCount
     to:
-      java: org.wpilib.simulation.DriverStationSim#setJoystickAxesAvailable
+      java: org.wpilib.simulation.DriverStationSim#setJoystickAxesMaximumIndex
     notes: >-
-      #8302 replaced max counts with availability masks, since future DS versions may leave holes in the available axes, buttons and POVs. Indices also start at 0 instead of 1.
+      setJoystickAxesMaximumIndex(stick, n) keeps the old meaning (the first n axes available). #8302 replaced counts with availability bitmasks because future DS versions may leave holes: the low-level setJoystickAxesAvailable(stick, mask) takes a bitmask, so an old count n is (1 << n) - 1 there, not n. Indices also start at 0 instead of 1.
     citation: https://github.com/wpilibsuite/allwpilib/pull/8302
 
   - id: driverstationsim-setjoystickbuttoncount
@@ -1865,9 +1865,9 @@ rules:
     from:
       java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickButtonCount
     to:
-      java: org.wpilib.simulation.DriverStationSim#setJoystickButtonsAvailable
+      java: org.wpilib.simulation.DriverStationSim#setJoystickButtonsMaximumIndex
     notes: >-
-      #8302 replaced max counts with availability masks, since future DS versions may leave holes in the available axes, buttons and POVs. Indices also start at 0 instead of 1.
+      setJoystickButtonsMaximumIndex(stick, n) keeps the old meaning (the first n buttons available). #8302 replaced counts with availability bitmasks because future DS versions may leave holes: the low-level setJoystickButtonsAvailable(stick, mask) takes a bitmask, so an old count n is (1 << n) - 1 there, not n. Indices also start at 0 instead of 1.
     citation: https://github.com/wpilibsuite/allwpilib/pull/8302
 
   - id: driverstationsim-setjoystickpovcount
@@ -1875,9 +1875,9 @@ rules:
     from:
       java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickPOVCount
     to:
-      java: org.wpilib.simulation.DriverStationSim#setJoystickPOVsAvailable
+      java: org.wpilib.simulation.DriverStationSim#setJoystickPOVsMaximumIndex
     notes: >-
-      #8302 replaced max counts with availability masks, since future DS versions may leave holes in the available axes, buttons and POVs. Indices also start at 0 instead of 1.
+      setJoystickPOVsMaximumIndex(stick, n) keeps the old meaning (the first n POVs available). #8302 replaced counts with availability bitmasks because future DS versions may leave holes: the low-level setJoystickPOVsAvailable(stick, mask) takes a bitmask, so an old count n is (1 << n) - 1 there, not n. Indices also start at 0 instead of 1.
     citation: https://github.com/wpilibsuite/allwpilib/pull/8302
 
   - id: driverstationsim-setjoystickbuttons-removed

@@ -102,7 +102,13 @@ func Java(ctx context.Context, r Resolver, code, season string) Result {
 
 // JavaWith is Java with options.
 func JavaWith(ctx context.Context, r Resolver, code, season string, opt Options) Result {
-	res := javaCheck(ctx, r, code, season)
+	return capSkew(ctx, r, javaCheck(ctx, r, code, season), "java", season, opt)
+}
+
+// capSkew caps a library's findings at warning when the project's installed
+// version differs from the indexed table (Options.Installed), for any
+// language.
+func capSkew(ctx context.Context, r Resolver, res Result, lang, season string, opt Options) Result {
 	vr, ok := r.(versioner)
 	if !ok || len(opt.Installed) == 0 {
 		return res
@@ -113,7 +119,7 @@ func JavaWith(ctx context.Context, r Resolver, code, season string, opt Options)
 		if inst == "" || !strings.HasPrefix(c, "partial") {
 			continue
 		}
-		if tv := vr.LibraryVersion(ctx, lib, season, "java"); tv != "" && facts.CompareVersions(inst, tv) != 0 {
+		if tv := vr.LibraryVersion(ctx, lib, season, lang); tv != "" && facts.CompareVersions(inst, tv) != 0 {
 			skew[lib] = fmt.Sprintf("indexed %s %s; project has %s", libName(lib), tv, inst)
 			res.Coverage[lib] = "partial (" + skew[lib] + "; findings capped at warning)"
 		}
@@ -124,8 +130,7 @@ func JavaWith(ctx context.Context, r Resolver, code, season string, opt Options)
 	res.Errors, res.Warnings = 0, 0
 	for i := range res.Findings {
 		f := &res.Findings[i]
-		_, lib := vendorRoot(f.Symbol)
-		if note := skew[lib]; note != "" {
+		if note := skew[LibraryOf(f.Symbol, lang)]; note != "" {
 			if f.Severity == "error" {
 				f.Severity = "warning"
 			}
@@ -418,6 +423,34 @@ func checkMember(ctx context.Context, r Resolver, typeFQN, member, season, lang 
 			Fix:     "look up " + simple(typeFQN) + " with frc_api for the " + season + " method"})
 		return
 	}
+}
+
+// DeclaringType returns the type in typeFQN's resolved supertype hierarchy
+// (typeFQN itself first) that declares member in season, or "".
+func DeclaringType(ctx context.Context, r Resolver, typeFQN, member, season, lang string) string {
+	return declaring(ctx, r, typeFQN, member, season, lang, 0, map[string]bool{})
+}
+
+func declaring(ctx context.Context, r Resolver, typeFQN, member, season, lang string, depth int, seen map[string]bool) string {
+	if depth > 8 || seen[typeFQN] {
+		return ""
+	}
+	seen[typeFQN] = true
+	if len(exact(ctx, r, typeFQN+"#"+member, season, lang)) > 0 {
+		return typeFQN
+	}
+	ts := exact(ctx, r, typeFQN, season, lang)
+	if len(ts) == 0 {
+		return ""
+	}
+	for _, sup := range supertypesOf(ts[0].Signature, lang) {
+		if supFQN := resolveType(ctx, r, sup, packageOf(typeFQN), season, lang); supFQN != "" {
+			if d := declaring(ctx, r, supFQN, member, season, lang, depth+1, seen); d != "" {
+				return d
+			}
+		}
+	}
+	return ""
 }
 
 // HasMember reports whether typeFQN declares or inherits member in season

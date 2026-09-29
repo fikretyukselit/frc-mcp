@@ -3,6 +3,7 @@ package verify_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -174,5 +175,23 @@ func TestPythonSubmoduleImportIsNotAWarning(t *testing.T) {
 	r = verify.Check(ctx, e, "from wpimath.geometry import Pose2d\n", "python", "2027", verify.Options{})
 	if r.Warnings != 1 || r.Findings[0].Fix != "from wpimath import Pose2d" {
 		t.Fatalf("2026 path in a 2027 project: %+v", r.Findings)
+	}
+}
+
+func TestVersionSkewCapsPythonFindings(t *testing.T) {
+	e := engineOf(t, []row{
+		{"phoenix6.hardware.TalonFX", "phoenix6", "2027", "python", "class", "class TalonFX", ""},
+		{"phoenix6.hardware.TalonFX#set_control", "phoenix6", "2027", "python", "method", "def set_control(self, r)", ""},
+		{"phoenix6.hardware.TalonFX", "phoenix6", "2026", "python", "class", "class TalonFX", ""},
+		{"phoenix6.hardware.TalonFX#setControl", "phoenix6", "2026", "python", "method", "def setControl(self, r)", ""},
+	})
+	code := "from phoenix6.hardware import TalonFX\nm = TalonFX(1)\nm.setControl(x)\n"
+	r := verify.Check(context.Background(), e, code, "python", "2027", verify.Options{})
+	if r.Errors != 1 {
+		t.Fatalf("without skew: %+v", r.Findings)
+	}
+	r = verify.Check(context.Background(), e, code, "python", "2027", verify.Options{Installed: map[string]string{"phoenix6": "26.3.0"}})
+	if r.Errors != 0 || r.Warnings != 1 || !strings.Contains(r.Coverage["phoenix6"], "capped at warning") {
+		t.Fatalf("with skew: %+v %v", r.Findings, r.Coverage)
 	}
 }
