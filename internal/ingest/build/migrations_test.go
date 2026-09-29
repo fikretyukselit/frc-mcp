@@ -54,6 +54,13 @@ func TestApplyMigrations(t *testing.T) {
 		t.Fatalf("partial: written=%d skipped=%d err=%v shard=%v", w, skipped, err, sh[MigrationsShard] != nil)
 	}
 
+	// Partial run of the 2026 table only: the rule's declared 2027 target is
+	// not checked, so nothing is written either.
+	sh = map[string]*shardData{"vendor-restricted-api-2026": t26()}
+	if w, skipped, err := applyMigrations(sh, []index.Migration{ctor}, reg); err != nil || w != 0 || skipped != 1 || sh[MigrationsShard] != nil {
+		t.Fatalf("partial 2026: written=%d skipped=%d err=%v", w, skipped, err)
+	}
+
 	// A rule no declared table can check, and a historical rule that does
 	// not describe a real change, fail the build.
 	for _, bad := range []index.Migration{

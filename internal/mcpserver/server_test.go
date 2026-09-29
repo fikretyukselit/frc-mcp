@@ -477,3 +477,61 @@ func TestMigrateTool(t *testing.T) {
 		t.Errorf("C++ not detected: %v", sc)
 	}
 }
+
+// frc_api on a published index, where REVLib's Java table is left out: a
+// rename from an earlier season is certain, one in the pinned season is
+// advice (the old name may linger deprecated), and a type of the library
+// says why there is no table.
+func TestAPICuratedWithoutTables(t *testing.T) {
+	ctx := context.Background()
+	p := filepath.Join(t.TempDir(), "migrations.sqlite")
+	w, err := index.Create(ctx, p, "migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []index.Symbol{
+		{FQN: "edu.wpi.first.wpilibj.TimedRobot", Library: "wpilib", Season: "2026", Language: "java", Kind: "class"},
+		{FQN: "org.wpilib.framework.TimedRobot", Library: "wpilib", Season: "2027", Language: "java", Kind: "class"},
+		{FQN: "swervelib.motors.MotorType#SPARKMAX", Library: "yagsl", Season: "2026", Language: "java", Kind: "field"},
+	} {
+		s.Version, s.Signature, s.SourceURL, s.UpstreamRev, s.RetrievedAt, s.License, s.Trust = "1", "s", "https://x", "r", time.Unix(1, 0), "MIT", "official"
+		if err := w.AddSymbol(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, m := range []index.Migration{
+		{RuleID: "old", Library: "revlib", Language: "java", FromSeason: "2024", ToSeason: "2025", Kind: "rename",
+			From: "com.revrobotics.CANSparkMax", To: "com.revrobotics.spark.SparkMax", Citation: "https://example.org/a", Verified: true},
+		{RuleID: "zero", Library: "revlib", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "rename",
+			From: "com.revrobotics.spark.config.AbsoluteEncoderConfig#zeroCentered", To: "com.revrobotics.spark.config.AbsoluteEncoderConfig#centered",
+			Citation: "https://example.org/b", Verified: true},
+		{RuleID: "ctor", Library: "revlib", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "signature",
+			From: "com.revrobotics.spark.SparkMax#SparkMax", To: "com.revrobotics.spark.SparkMax#SparkMax", Notes: "n", Citation: "https://example.org/c", Verified: true},
+	} {
+		if err := w.AddMigration(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := index.Open(ctx, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	cs := connect(t, retrieve.New([]*index.Reader{r}, retrieve.Options{DefaultSeason: "2026"}))
+
+	_, sc, _ := call(t, cs, "frc_api", map[string]any{"symbol": "CANSparkMax", "language": "java"})
+	if sc["status"] != "version_mismatch" || len(sc["curated"].([]any)) != 1 {
+		t.Errorf("earlier-season rename: %v", sc)
+	}
+	_, sc, _ = call(t, cs, "frc_api", map[string]any{"symbol": "AbsoluteEncoderConfig#zeroCentered", "language": "java", "frc_season": "2027"})
+	if sc["status"] == "version_mismatch" || len(sc["curated"].([]any)) != 1 || !strings.Contains(sc["next"].([]any)[0].(string), "may still exist") {
+		t.Errorf("same-season rename must stay advice: %v", sc)
+	}
+	_, sc, _ = call(t, cs, "frc_api", map[string]any{"symbol": "SparkMax", "language": "java"})
+	if sc["status"] != "low_confidence" || !strings.Contains(sc["next"].([]any)[0].(string), "REV Robotics grants no redistribution license") {
+		t.Errorf("restricted library: %v", sc)
+	}
+}

@@ -394,7 +394,12 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration, reg 
 			bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.From, m.FromSeason))
 			continue
 		}
-		if to := tables[tkey{m.Library, m.Language, m.ToSeason}]; to != nil && m.To != "" && len(to[m.To]) == 0 {
+		to := tables[tkey{m.Library, m.Language, m.ToSeason}]
+		if to == nil && m.To != "" && slices.Contains(ss, m.ToSeason) {
+			skipped++ // the to-season table is declared but not built in this run
+			continue
+		}
+		if to != nil && m.To != "" && len(to[m.To]) == 0 {
 			bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.To, m.ToSeason))
 			continue
 		}

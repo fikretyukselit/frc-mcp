@@ -386,14 +386,30 @@ func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, nam
 	noExact := len(out.Matches) == 0 || out.Matches[0].Match != ""
 	if len(out.Curated) > 0 && noExact {
 		c := out.Curated[0]
-		out.Status, out.Confidence = retrieve.StatusVersionMismatch, 0
+		lib := verify.LibraryName(c.Library)
+		// A rule alone proves absence only for a change from an earlier
+		// season (as frc_verify_code's error rule) or when the season's
+		// table is indexed and lacks the name; in the season of a rename
+		// the old name may linger deprecated.
+		tabled := e.LibraryVersion(ctx, c.Library, season, c.Language) != ""
+		oldName := migrate.NameIs(c.From, name)
+		certain := tabled || oldName && c.ToSeason < season
+		if certain {
+			out.Status, out.Confidence = retrieve.StatusVersionMismatch, 0
+		}
 		switch {
-		case c.To == "":
-			out.Next = []string{fmt.Sprintf("%s was removed in %s %s; read curated[0].notes for what replaces it", name, verify.LibraryName(c.Library), c.ToSeason)}
-		case migrate.NameIs(c.From, name):
-			out.Next = []string{fmt.Sprintf("%s is not a %s name: it became %s in %s %s (see curated); use that", name, season, c.To, verify.LibraryName(c.Library), c.ToSeason)}
-		default:
+		case oldName && c.To == "" && certain:
+			out.Next = []string{fmt.Sprintf("%s was removed in %s %s; read curated[0].notes for what replaces it", name, lib, c.ToSeason)}
+		case oldName && c.To == "":
+			out.Next = []string{fmt.Sprintf("a curated rule removes %s in %s %s (it may still exist, deprecated); read curated[0].notes for what replaces it", name, lib, c.ToSeason)}
+		case oldName && certain:
+			out.Next = []string{fmt.Sprintf("%s is not a %s name: it became %s in %s %s (see curated); use that", name, season, c.To, lib, c.ToSeason)}
+		case oldName:
+			out.Next = []string{fmt.Sprintf("a curated rule renames %s to %s in %s %s (the old name may still exist, deprecated); prefer %s", name, c.To, lib, c.ToSeason, c.To)}
+		case certain:
 			out.Next = []string{fmt.Sprintf("%s is the %s name; season %s uses %s", name, c.ToSeason, season, c.From)}
+		default:
+			out.Next = []string{fmt.Sprintf("%s is the %s %s name (curated rule); season %s used %s, and may not have %s yet", name, lib, c.ToSeason, season, c.From, name)}
 		}
 	}
 	if restricted != "" && noExact {
