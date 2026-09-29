@@ -147,8 +147,11 @@ Detects or declares the project's pin set.
   - Java call shapes (M4): `new T(…)` and method calls on those receivers, when the literal arguments (`"x"`, `1`,
     `1.0`, `true`, `null`, `'c'`) fit no overload of the pinned season. Any other expression matches every parameter
     type, so a finding means the call cannot compile. Methods are checked only when the whole hierarchy resolves.
-  - C++ (M4): qualified names in the indexed namespaces (`frc::`, `frc2::`, `wpi::`, `ctre::`, `rev::`, …) and
-    `ns::Type::Member`, with nested types tried before members.
+  - C++ (M4): qualified names in the indexed namespaces (`frc::`, `frc2::`, `wpi::`, `ctre::`, `rev::`, `photon::`, …)
+    and `ns::Type::Member`, with nested types tried before members. WPILib's tables come from its Doxygen bundle;
+    Phoenix 6, REVLib and PhotonLib tables come from the vendors' public headers (M3), which also record nested types
+    as members (`rev::spark::SparkBase::IdleMode`, `ctre::phoenix6::CANBus::CANBusStatus`) and enumerators
+    (`rev::REVLibError::kOk`, `ctre::phoenix6::signals::NeutralModeValue::Brake`).
   - Python (M4): `from x import y` (with aliases), `import x[.y] [as z]` attribute chains, and members on variables
     assigned from an imported class, including `self.` attributes.
 - **Severity rule:**

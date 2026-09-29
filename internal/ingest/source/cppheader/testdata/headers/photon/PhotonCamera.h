@@ -1,0 +1,264 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) PhotonVision
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#pragma once
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <frc/Alert.h>
+#include <networktables/BooleanTopic.h>
+#include <networktables/DoubleArrayTopic.h>
+#include <networktables/IntegerTopic.h>
+#include <networktables/MultiSubscriber.h>
+#include <networktables/NetworkTable.h>
+#include <networktables/NetworkTableInstance.h>
+#include <networktables/RawTopic.h>
+#include <networktables/StringTopic.h>
+#include <units/time.h>
+
+#include "photon/targeting/PhotonPipelineResult.h"
+
+namespace cv {
+class Mat;
+}  // namespace cv
+
+namespace photon {
+
+enum LEDMode : int { kDefault = -1, kOff = 0, kOn = 1, kBlink = 2 };
+
+/**
+ * Represents a camera that is connected to PhotonVision.ß
+ */
+class PhotonCamera {
+ public:
+  /**
+   * Constructs a PhotonCamera from a root table.
+   *
+   * @param instance The NetworkTableInstance to pull data from. This can be a
+   * custom instance in simulation, but should *usually* be the default
+   * NTInstance from {@link NetworkTableInstance::getDefault}
+   * @param cameraName The name of the camera, as seen in the UI.
+   * over.
+   */
+  explicit PhotonCamera(nt::NetworkTableInstance instance,
+                        const std::string_view cameraName);
+
+  /**
+   * Constructs a PhotonCamera from the name of the camera.
+   * @param cameraName The nickname of the camera (found in the PhotonVision
+   * UI).
+   */
+  explicit PhotonCamera(const std::string_view cameraName);
+
+  PhotonCamera(PhotonCamera&&) = default;
+
+  ~PhotonCamera() = default;
+
+  /**
+   * The list of pipeline results sent by PhotonVision since the last call to
+   * GetAllUnreadResults(). Calling this function clears the internal FIFO
+   * queue, and multiple calls to GetAllUnreadResults() will return different
+   * (potentially empty) result arrays. Be careful to call this exactly ONCE per
+   * loop of your robot code! FIFO depth is limited to 20 changes, so make sure
+   * to call this frequently enough to avoid old results being discarded, too!
+   */
+  std::vector<PhotonPipelineResult> GetAllUnreadResults();
+
+  [[deprecated("Replace with GetAllUnreadResults")]] PhotonPipelineResult
+  GetLatestResult();
+
+  /**
+   * Toggles driver mode.
+   * @param driverMode Whether to set driver mode.
+   */
+  void SetDriverMode(bool driverMode);
+
+  /**
+   * Returns whether the camera is in driver mode.
+   * @return Whether the camera is in driver mode.
+   */
+  bool GetDriverMode() const;
+
+  /**
+   * @param fpsLimit The FPS limit to set. Use -1 for unlimited FPS.
+   */
+  void SetFPSLimit(int fpsLimit);
+
+  /**
+   * @return The FPS limit set on the camera, or -1 if no limit is set.
+   */
+  int GetFPSLimit() const;
+
+  /**
+   * Request the camera to save a new image file from the input
+   * camera stream with overlays.
+   * Images take up space in the filesystem of the PhotonCamera.
+   * Calling it frequently will fill up disk space and eventually
+   * cause the system to stop working.
+   * Clear out images in /opt/photonvision/photonvision_config/imgSaves
+   * frequently to prevent issues.
+   */
+  void TakeInputSnapshot(void);
+
+  /**
+   * Request the camera to save a new image file from the output
+   * stream with overlays.
+   * Images take up space in the filesystem of the PhotonCamera.
+   * Calling it frequently will fill up disk space and eventually
+   * cause the system to stop working.
+   * Clear out images in /opt/photonvision/photonvision_config/imgSaves
+   * frequently to prevent issues.
+   */
+  void TakeOutputSnapshot(void);
+
+  /**
+   * Allows the user to select the active pipeline index.
+   * @param index The active pipeline index.
+   */
+  void SetPipelineIndex(int index);
+
+  /**
+   * Returns the active pipeline index.
+   * @return The active pipeline index.
+   */
+  int GetPipelineIndex() const;
+
+  /**
+   * Returns the current LED mode.
+   * @return The current LED mode.
+   */
+  LEDMode GetLEDMode() const;
+
+  /**
+   * Sets the LED mode.
+   * @param led The mode to set to.
+   */
+  void SetLEDMode(LEDMode led);
+
+  /**
+   * Returns the name of the camera.
+   * This will return the same value that was given to the constructor as
+   * cameraName.
+   * @return The name of the camera.
+   */
+  const std::string_view GetCameraName() const;
+
+  /**
+   * Returns whether the camera is connected and actively returning new data.
+   * Connection status is debounced.
+   *
+   * @return True if the camera is actively sending frame data, false otherwise.
+   */
+  bool IsConnected();
+
+  using CameraMatrix = Eigen::Matrix<double, 3, 3>;
+  using DistortionMatrix = Eigen::Matrix<double, 8, 1>;
+
+  /**
+   * Get the camera calibration matrix, in standard OpenCV form
+   *
+   * @return std::optional<cv::Mat>
+   */
+  std::optional<CameraMatrix> GetCameraMatrix();
+
+  /**
+   * Returns the camera calibration's distortion coefficients, in OPENCV8 form.
+   * Higher-order terms are set to 0
+   *
+   * @return The distortion coefficients in a 8x1 matrix, if they are published
+   * by the camera. Empty otherwise.
+   */
+  std::optional<DistortionMatrix> GetDistCoeffs();
+
+  /**
+   * Sets whether or not coprocessor version checks will occur. Setting this to
+   * true will silence all console warnings about coproccessor connection, so be
+   * careful when enabling this and ensure all your coprocessors are
+   * communicating to the robot properly and everything has matching versions.
+   *
+   * @param enabled Whether or not to enable coprocessor version checks
+   */
+  static void SetVersionCheckEnabled(bool enabled);
+
+  std::shared_ptr<nt::NetworkTable> GetCameraTable() const { return rootTable; }
+
+  // For use in tests
+  bool test = false;
+  std::vector<PhotonPipelineResult> testResult;
+
+ protected:
+  std::shared_ptr<nt::NetworkTable> mainTable;
+  std::shared_ptr<nt::NetworkTable> rootTable;
+  nt::RawSubscriber rawBytesEntry;
+  nt::IntegerPublisher inputSaveImgEntry;
+  nt::IntegerSubscriber inputSaveImgSubscriber;
+  nt::IntegerPublisher outputSaveImgEntry;
+  nt::IntegerSubscriber outputSaveImgSubscriber;
+  nt::IntegerPublisher pipelineIndexPub;
+  nt::IntegerSubscriber pipelineIndexSub;
+  nt::IntegerPublisher ledModePub;
+  nt::IntegerSubscriber ledModeSub;
+  nt::StringSubscriber versionEntry;
+
+  nt::DoubleArraySubscriber cameraIntrinsicsSubscriber;
+  nt::DoubleArraySubscriber cameraDistortionSubscriber;
+
+  nt::BooleanSubscriber driverModeSubscriber;
+  nt::BooleanPublisher driverModePublisher;
+  nt::IntegerSubscriber fpsLimitSubscriber;
+  nt::IntegerPublisher fpsLimitPublisher;
+
+  nt::IntegerSubscriber ledModeSubscriber;
+
+  nt::IntegerSubscriber heartbeatSubscriber;
+
+  nt::MultiSubscriber topicNameSubscriber;
+
+  std::string path;
+  std::string cameraName;
+
+  frc::Alert disconnectAlert;
+  frc::Alert timesyncAlert;
+
+ private:
+  units::second_t lastVersionCheckTime = 0_s;
+  static bool VERSION_CHECK_ENABLED;
+  inline static int InstanceCount = 1;
+
+  units::second_t prevTimeSyncWarnTime = 0_s;
+
+  int prevHeartbeatValue = -1;
+  units::second_t prevHeartbeatChangeTime = 0_s;
+
+  void VerifyVersion();
+
+  void UpdateDisconnectAlert();
+  void CheckTimeSyncOrWarn(photon::PhotonPipelineResult& result);
+
+  std::vector<std::string> tablesThatLookLikePhotonCameras();
+};
+
+}  // namespace photon

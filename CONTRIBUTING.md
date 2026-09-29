@@ -42,7 +42,7 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
 | WPILib C++ API (`doxygen-zip`) | ✅ 2026 + 2027-alpha, ~20k symbols; 5,962 `frc::`→`wpi::` moves mapped automatically |
 | Opt-in forum (`discourse-rss`: Chief Delphi `latest.rss` + `posts.rss`, shard `forum`) | ✅ trust `community`, searched only with `kinds: ["forum"]` or troubleshooting intent, fenced as untrusted data; built locally, never published (user content, `docs/sources.md` §0.1.1) |
-| Vendor C++ APIs | ⏳ M3 leftover |
+| Vendor C++ APIs (`cpp-headers-zip`: public headers from the vendors' Maven `-headers.zip`) | ✅ Phoenix 6, REVLib, PhotonLib (2026 + 2027-alpha), ~16k symbols; covered by `frc_api`, `frc_verify_code` and `frc_migrate` |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -105,6 +105,9 @@ Most M3 work is "teach the indexer a new upstream". The steps:
 3. **Reuse an adapter if you can.**
    - `sphinx-htmlzip` handles any Sphinx site (RTD and Furo themes).
    - `javadoc-zip` handles any Javadoc zip. Vendor Java APIs are published this way on their Maven repos.
+   - `cpp-headers-zip` handles a vendor's C++ `-headers.zip` (the `headerClassifier` artifact of a C++ vendordep);
+     `include` lists the namespace roots, `skip` header paths the vendor leaves out of its API reference.
+     `doxygen-zip` handles a Doxygen HTML zip (only WPILib publishes one).
    - `github-markdown` handles Markdown docs in a GitHub repository (MyST, Docusaurus, MkDocs Material, Writerside).
      Pin a release tag, never `main`.
    - `gitbook-llms` handles GitBook sites that publish `llms.txt`.
@@ -176,7 +179,6 @@ Machine-readable upstreams get an adapter (§7). Everything else goes in `data/h
 | Run `frc-mcp verify` on your team's code, report false errors | S | issues |
 | More vendor docs: ReduxLib, Studica, Limelight, maple-sim; CTRE 2027 docs | S–M each | §7, `data/sources.yaml` |
 | Ask CTRE, REV and YAGSL for permission to redistribute doc/API excerpts (`docs/sources.md` §0.2) | S, no code | email |
-| Vendor C++ APIs (Phoenix 6, REVLib, PhotonLib Doxygen bundles) with `doxygen-zip` | M each | `data/sources.yaml` |
 | Migration rules for the few references still unresolved, and for PathPlannerLib / YAGSL / PhotonLib once their 2027 tables exist | S each | §8, `data/migrations/` |
 | More agent-eval tasks (C++ and Python tasks need a compile step per language) | M | `eval/tasks/`, `internal/agenteval` |
 | Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |
