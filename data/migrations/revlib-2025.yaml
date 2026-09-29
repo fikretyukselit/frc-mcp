@@ -1,0 +1,68 @@
+# Curated migration rules. Every rule cites the upstream change.
+# Historical: no 2024/2025 REVLib tables are indexed, so the build checks
+# these against the oldest newer table (the old name gone, the new present).
+# They let frc_verify_code catch pre-2025 names in current code even where
+# the REVLib API table is not served.
+library: revlib
+from_season: "2024"
+to_season: "2025"
+rules:
+  - id: cansparkmax-to-sparkmax
+    kind: rename
+    from:
+      java: com.revrobotics.CANSparkMax
+      python: rev.CANSparkMax
+    to:
+      java: com.revrobotics.spark.SparkMax
+      python: rev.SparkMax
+    notes: >-
+      REVLib 2025 moved every SPARK class into the spark package (Java) and dropped the CAN prefix. Configuration moved to
+      SparkMaxConfig objects applied with configure(); see the migration guide.
+    citation: https://docs.revrobotics.com/revlib/archive/24-to-present
+
+  - id: cansparkflex-to-sparkflex
+    kind: rename
+    from:
+      java: com.revrobotics.CANSparkFlex
+      python: rev.CANSparkFlex
+    to:
+      java: com.revrobotics.spark.SparkFlex
+      python: rev.SparkFlex
+    notes: >-
+      Renamed and moved into the spark package in REVLib 2025; configure it with SparkFlexConfig.
+    citation: https://docs.revrobotics.com/revlib/archive/24-to-present
+
+  - id: cansparklowlevel-to-sparklowlevel
+    kind: rename
+    from:
+      java: com.revrobotics.CANSparkLowLevel
+      python: rev.CANSparkLowLevel
+    to:
+      java: com.revrobotics.spark.SparkLowLevel
+      python: rev.SparkLowLevel
+    notes: >-
+      Renamed and moved into the spark package in REVLib 2025.
+    citation: https://docs.revrobotics.com/revlib/archive/24-to-present
+
+  - id: motortype-moved
+    kind: move
+    from:
+      java: com.revrobotics.CANSparkLowLevel.MotorType
+    to:
+      java: com.revrobotics.spark.SparkLowLevel.MotorType
+    notes: >-
+      Import com.revrobotics.spark.SparkLowLevel.MotorType.
+    citation: https://docs.revrobotics.com/revlib/archive/24-to-present
+
+  - id: sparkpidcontroller-to-closedloop
+    kind: rename
+    from:
+      java: com.revrobotics.SparkPIDController
+      python: rev.SparkPIDController
+    to:
+      java: com.revrobotics.spark.SparkClosedLoopController
+      python: rev.SparkClosedLoopController
+    notes: >-
+      Get it with getClosedLoopController(); gains are set through the closedLoop section of the SPARK config, not on the
+      controller.
+    citation: https://docs.revrobotics.com/revlib/archive/24-to-present

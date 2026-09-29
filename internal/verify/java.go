@@ -206,7 +206,17 @@ func javaCheck(ctx context.Context, r Resolver, code, season string) Result {
 			}
 			if !ok {
 				if res.Coverage[lib] == "" {
-					res.Coverage[lib] = "none (no " + season + " API indexed)"
+					res.Coverage[lib] = noTable(lib, lang, season)
+				}
+				owner := name
+				if static && !wildcard {
+					if i := strings.LastIndexByte(name, '.'); i > 0 {
+						owner = name[:i]
+					}
+				}
+				if !wildcard || static {
+					res.Checked++
+					curatedCheck(r, owner, lang, season, func(f Finding) { add(m[4], f) })
 				}
 				continue
 			}

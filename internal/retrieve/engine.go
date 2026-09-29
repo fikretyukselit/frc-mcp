@@ -733,6 +733,9 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 				if err != nil {
 					return err
 				}
+				// A name that matches only case-insensitively (TalonFX vs
+				// YAGSL's TALONFX constant) is not an exact-symbol hit.
+				syms = slices.DeleteFunc(syms, func(s index.Symbol) bool { return s.CaseMismatch })
 				o.syms = append(o.syms, syms...)
 				for _, s := range syms {
 					if s.ChunkID != "" {
@@ -1063,6 +1066,11 @@ func (e *Engine) Symbols(ctx context.Context, q index.SymbolQuery) ([]index.Symb
 			return nil, err
 		}
 		out = append(out, r...)
+	}
+	// Each shard prefers its own exact-case rows; across shards too, an
+	// exact match anywhere drops the rows that differ only in case.
+	if slices.ContainsFunc(out, func(s index.Symbol) bool { return !s.CaseMismatch }) {
+		out = slices.DeleteFunc(out, func(s index.Symbol) bool { return s.CaseMismatch })
 	}
 	return dedupeSymbols(out), nil
 }

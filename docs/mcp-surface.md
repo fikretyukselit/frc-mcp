@@ -132,14 +132,25 @@ Detects or declares the project's pin set.
 
   If the symbol exists only in another season, the status is `version_mismatch` and the response says where the
   symbol lives.
+- **Letter case:** names are matched exactly. A name that matches only when case is ignored is another symbol (YAGSL's
+  `MotorType#TALONFX` constant for `TalonFX`): it is returned only when nothing matches exactly, marked
+  `match: case_differs`, with status `low_confidence`, and never listed as the symbol's other-season form.
+- **Without a table:** `curated[]` lists the curated rules that rename or remove the name in another season, so a name
+  gone before the indexed seasons (`CANSparkMax`, REVLib 2025) is `version_mismatch` with its replacement. A name of a
+  license-restricted library whose table this index leaves out (Phoenix 6, REVLib Java on a published index) says so in
+  `next` instead of looking like a typo.
 
 ### `frc_verify_code` (Java M2; C++, Python and call shapes M4)
 - **In:** `code`, or `path` (stdio mode only, under the project root: `.java`, `.cpp`/`.h`/…, `.py`); `language?`
   (default: from the path extension, the pin, else detected from the code); the `Pin` fields.
 - **Out:**
   - `findings[]`, each with `line, col, symbol, severity, kind, message, fix?, citation`.
-  - `coverage` per library: `partial (…)` names what was checked, `none (…)` says why a library was not. Silence
-    without coverage is not approval.
+  - `coverage` per library: `partial (…)` names what was checked, `none (…)` says why a library was not (for
+    Phoenix 6 and REVLib on a published index: no redistribution license). Silence without coverage is not approval.
+  - A library without a table is still checked against the curated rules: an import or qualified name that a rule
+    renamed or removed is `wrong_season`, an `error` when the change is from an earlier season than the pin
+    (`com.revrobotics.CANSparkMax` in 2026), a `warning` in the season of the change, when the old name may linger
+    deprecated.
   - Summary counts.
 - **What is checked:**
   - Java: imports (single, wildcard, static), fully qualified names, members on receivers whose type is declared in the
@@ -180,7 +191,11 @@ Detects or declares the project's pin set.
   1. `curated`: `data/migrations/*.yaml`, one rule per upstream change (`kind` rename, move, removed, signature or
      behavior), each citing the PR, changelog or docs page it comes from. The index build validates every `from`
      against the from-season table and every `to` against the to-season table and fails on a mismatch, so a rule
-     cannot drift from the tables it describes. Confidence `high` (`medium` for rules marked `verified: false`).
+     cannot drift from the tables it describes. A historical rule, from before the oldest indexed table of its
+     library (REVLib 2024 → 2025), is checked against the oldest newer table: the old name must be gone and the new one
+     present. Confidence `high` (`medium` for rules marked `verified: false`). Rules are the project's own data (MIT)
+     and always go to a publishable shard, even when the library's table is license-restricted; without the table a
+     rule maps its name alone, with a note saying so.
   2. `upstream`: the library's own deprecation note (`@deprecated Use X`), resolved to a target-season symbol when it
      names one uniquely. Confidence `medium`, or `low` when the note names no indexed symbol.
   3. `generated`: `apisym.Diff`'s same-name moves between consecutive seasons (e.g. `edu.wpi.first.math.geometry.Pose2d`

@@ -65,20 +65,29 @@ func refCheck(ctx context.Context, r Resolver, code, lang, season string) Result
 			if ok {
 				res.Coverage[lib] = partialRefs
 			} else {
-				res.Coverage[lib] = "none (no " + season + " " + lang + " API indexed)"
+				res.Coverage[lib] = noTable(lib, lang, season)
 			}
 		}
 		return ok
 	}
 	okTypes := map[string]bool{}
+	curated := map[string]bool{} // types of table-less libraries already checked against the rules
 	for _, ref := range Refs(code, lang) {
 		lib := LibraryOf(ref.Symbol, lang)
-		if lib == "" || !isIndexed(lib) {
+		if lib == "" {
 			continue
 		}
 		emit := func(f Finding) {
 			f.Line, f.Col = ref.Line, ref.Col
 			res.Findings = append(res.Findings, f)
+		}
+		if !isIndexed(lib) {
+			if !ref.Member && !curated[ref.Symbol] {
+				curated[ref.Symbol] = true
+				res.Checked++
+				curatedCheck(r, ref.Symbol, lang, season, emit)
+			}
+			continue
 		}
 		res.Checked++
 		if !ref.Member {

@@ -215,7 +215,9 @@ func note(obj string) string {
 	}
 	var parts []string
 	if data != "" {
-		parts = append(parts, "ReCalc data source: "+data)
+		// dataSource names who measured the curve, which is often not the
+		// seller (CTRE's dyno runs cover REV motors): say so explicitly.
+		parts = append(parts, "measured by "+data+" (ReCalc dataSource; not necessarily the vendor)")
 	}
 	if typ != "" {
 		parts = append(parts, strings.ToLower(typ))

@@ -56,7 +56,7 @@ func TestParseRecorded(t *testing.T) {
 		}
 	}
 	if neo.Source != "recalc" || neo.Season != "all" || neo.UpstreamRev != src.Version || neo.License != "MIT" ||
-		neo.Name != "NEO" || neo.Category != "motor" || neo.Note != "ReCalc data source: CTRE; brushless; sold by REV" {
+		neo.Name != "NEO" || neo.Category != "motor" || neo.Note != "measured by CTRE (ReCalc dataSource; not necessarily the vendor); brushless; sold by REV" {
 		t.Errorf("neo row %+v", neo)
 	}
 	k := got["krakenx60-foc"]

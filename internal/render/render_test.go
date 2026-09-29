@@ -178,3 +178,21 @@ func TestHardwareGolden(t *testing.T) {
 		}}
 	golden(t, "hardware_sources", render.HardwareMarkdown(out))
 }
+
+// A name that matches only when case is ignored is another symbol (YAGSL's
+// TALONFX constant for "TalonFX"): low confidence, marked, and never shown
+// as the symbol's other-season form.
+func TestAPICaseMismatch(t *testing.T) {
+	yagsl := index.Symbol{FQN: "swervelib.motors.MotorType#TALONFX", Kind: "field", Season: "2026", CaseMismatch: true}
+	o := render.API([]index.Symbol{yagsl}, nil, render.Context{Now: now, BuiltAt: builtAt}, "2026")
+	if o.Status != "low_confidence" || o.Confidence >= 0.5 || o.Matches[0].Match != "case_differs" ||
+		!strings.Contains(render.APIMarkdown(o), "only when letter case is ignored") {
+		t.Fatalf("case-only match: %+v", o)
+	}
+	real27 := index.Symbol{FQN: "com.ctre.phoenix6.hardware.TalonFX", Kind: "class", Season: "2027"}
+	o = render.API([]index.Symbol{yagsl}, []index.Symbol{real27, {FQN: yagsl.FQN, Season: "2027", CaseMismatch: true}},
+		render.Context{Now: now, BuiltAt: builtAt}, "2026")
+	if o.Status != "version_mismatch" || len(o.Matches) != 0 || len(o.OtherSeasons) != 1 || o.OtherSeasons[0].FQN != real27.FQN {
+		t.Fatalf("exact name in another season: %+v", o)
+	}
+}

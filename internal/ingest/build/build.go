@@ -300,9 +300,17 @@ func diffSeasons(shards map[string]*shardData, _ map[string]sources.Source) []Di
 }
 
 // applyMigrations validates curated rules against the symbol tables of this
-// run and writes each into the shard holding its from-season table. Curated
-// replacements override upstream and generated ones. A rule naming a symbol
-// that the table lacks fails the build: rules must track upstream exactly.
+// run and writes them into a shard. Curated replacements override upstream
+// and generated ones. A rule naming a symbol that the table lacks fails the
+// build: rules must track upstream exactly.
+//
+// Rules are the project's own data (MIT), so they always go to a publishable
+// shard, even when the library's API table is license-restricted: a hosted
+// server without the Phoenix 6 table still maps Phoenix 6 code.
+//
+// A historical rule (its from season predates every table of the library,
+// e.g. REVLib's 2025 CANSparkMax → SparkMax) is checked against the oldest
+// newer table instead: the old name must be gone and the new one present.
 func applyMigrations(shards map[string]*shardData, rules []index.Migration) (written, skipped int, err error) {
 	type tkey struct{ lib, lang, season string }
 	type ref struct {
@@ -310,6 +318,8 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration) (wri
 		i  int
 	}
 	tables := map[tkey]map[string][]ref{}
+	owner := map[tkey]*shardData{}      // shard of each table (first by name)
+	seasons := map[[2]string][]string{} // (lib, lang) → table seasons, oldest first
 	names := make([]string, 0, len(shards))
 	for n := range shards {
 		names = append(names, n)
@@ -322,15 +332,43 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration) (wri
 			k := tkey{s.Library, s.Language, s.Season}
 			if tables[k] == nil {
 				tables[k] = map[string][]ref{}
+				owner[k] = sd
+				ll := [2]string{s.Library, s.Language}
+				seasons[ll] = append(seasons[ll], s.Season)
 			}
 			tables[k][s.FQN] = append(tables[k][s.FQN], ref{sd, i})
 		}
+	}
+	for _, ss := range seasons {
+		sort.Strings(ss)
 	}
 	var bad []string
 	for _, m := range rules {
 		from := tables[tkey{m.Library, m.Language, m.FromSeason}]
 		if from == nil {
-			skipped++
+			// Historical: validate against the oldest table at or after ToSeason.
+			var at string
+			for _, se := range seasons[[2]string{m.Library, m.Language}] {
+				if se >= m.ToSeason {
+					at = se
+					break
+				}
+			}
+			if at == "" || m.FromSeason >= at {
+				skipped++ // table not built in this run
+				continue
+			}
+			t := tables[tkey{m.Library, m.Language, at}]
+			switch {
+			case len(t[m.From]) > 0:
+				bad = append(bad, fmt.Sprintf("%s (%s): %s still exists in the %s table", m.RuleID, m.Language, m.From, at))
+			case m.To != "" && len(t[m.To]) == 0:
+				bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.To, at))
+			default:
+				home := publicHome(shards, names, owner[tkey{m.Library, m.Language, at}], m.Language, at)
+				home.migrations = append(home.migrations, m)
+				written++
+			}
 			continue
 		}
 		refs := from[m.From]
@@ -348,13 +386,52 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration) (wri
 				s.Replacement, s.ReplacementSrc = m.To, "curated"
 			}
 		}
-		refs[0].sd.migrations = append(refs[0].sd.migrations, m)
+		home := publicHome(shards, names, refs[0].sd, m.Language, m.FromSeason)
+		home.migrations = append(home.migrations, m)
 		written++
 	}
 	if len(bad) > 0 {
 		return 0, 0, fmt.Errorf("migrate: %d curated rule(s) do not match the symbol tables:\n  %s", len(bad), strings.Join(bad, "\n  "))
 	}
 	return written, skipped, nil
+}
+
+// publicHome is the shard a curated rule is stored in: the shard of its
+// table when that shard is publishable, else the first publishable shard
+// (by name) with a symbol table of the same language and season, else the
+// table's own shard (a partial run with no public table of that season).
+func publicHome(shards map[string]*shardData, names []string, own *shardData, lang, season string) *shardData {
+	if !own.restricted() {
+		return own
+	}
+	for _, n := range names {
+		sd := shards[n]
+		if sd.restricted() {
+			continue
+		}
+		for _, s := range sd.symbols {
+			if s.Language == lang && s.Season == season {
+				return sd
+			}
+		}
+	}
+	return own
+}
+
+// restricted reports whether the shard carries content without a
+// redistribution license (LicenseRef-*), which publishing leaves out.
+func (sd *shardData) restricted() bool {
+	for _, s := range sd.symbols {
+		if index.RestrictedLicense(s.License) {
+			return true
+		}
+	}
+	for _, c := range sd.chunks {
+		if index.RestrictedLicense(c.License) {
+			return true
+		}
+	}
+	return false
 }
 
 // applyHardware adds the curated hardware rows to their shard when that shard

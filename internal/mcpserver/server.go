@@ -344,6 +344,9 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 	}
 	others := slices.DeleteFunc(all, func(x index.Symbol) bool { return x.Season == season })
 	out := render.API(matches, others[:min(len(others), 5)], render.Context{Now: s.now(), BuiltAt: e.BuiltAt()}, season)
+	if out.Status != retrieve.StatusOK {
+		apiCurated(ctx, e, &out, in.Symbol, in.Language, season)
+	}
 	out.PinSource = "default"
 	switch {
 	case fromPin:
@@ -354,6 +357,50 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 	out.Language = in.Language
 	out.IndexStale = e.Stale(s.now())
 	return text(render.APIMarkdown(out)), out, nil
+}
+
+// apiCurated answers a name the season's tables do not have from the
+// curated rules: a name renamed or removed in an earlier season (REVLib's
+// CANSparkMax), a later season's name, or a type of a library whose table
+// this index leaves out (license-restricted vendor APIs).
+func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, name, lang, season string) {
+	restricted := ""
+	for _, mr := range e.Migrations() {
+		if lang != "" && mr.Language != lang {
+			continue
+		}
+		owner, _, _ := strings.Cut(mr.From, "#")
+		switch {
+		case migrate.NameIs(mr.From, name) && mr.ToSeason <= season && mr.From != mr.To,
+			mr.To != "" && migrate.NameIs(mr.To, name) && mr.FromSeason >= season && mr.From != mr.To:
+			out.Curated = append(out.Curated, render.MigrateMapping{From: mr.From, To: mr.To, FromSeason: mr.FromSeason,
+				ToSeason: mr.ToSeason, Language: mr.Language, Library: mr.Library, Kind: mr.Kind, Notes: mr.Notes,
+				Confidence: map[bool]string{true: "high", false: "medium"}[mr.Verified], Source: migrate.SrcCurated,
+				RuleID: mr.RuleID, Citation: mr.Citation})
+		case restricted == "" && verify.RestrictedPublisher(mr.Library) != "" && (migrate.NameIs(owner, name) || migrate.NameIs(mr.From, name)) &&
+			e.LibraryVersion(ctx, mr.Library, season, mr.Language) == "":
+			restricted = mr.Library
+		}
+	}
+	// Only names differing in case (YAGSL's TALONFX for TalonFX) are no answer.
+	noExact := len(out.Matches) == 0 || out.Matches[0].Match != ""
+	if len(out.Curated) > 0 && noExact {
+		c := out.Curated[0]
+		out.Status, out.Confidence = retrieve.StatusVersionMismatch, 0
+		switch {
+		case c.To == "":
+			out.Next = []string{fmt.Sprintf("%s was removed in %s %s; read curated[0].notes for what replaces it", name, verify.LibraryName(c.Library), c.ToSeason)}
+		case migrate.NameIs(c.From, name):
+			out.Next = []string{fmt.Sprintf("%s is not a %s name: it became %s in %s %s (see curated); use that", name, season, c.To, verify.LibraryName(c.Library), c.ToSeason)}
+		default:
+			out.Next = []string{fmt.Sprintf("%s is the %s name; season %s uses %s", name, c.ToSeason, season, c.From)}
+		}
+	}
+	if restricted != "" && noExact {
+		out.Next = append([]string{fmt.Sprintf("%s is a %s name, but this index has no %s %s API table: %s grants no redistribution license, "+
+			"so the published index leaves it out. Use frc_search for its docs, frc_migrate for curated changes, or build the index locally (frc-mcp index run)",
+			name, verify.LibraryName(restricted), season, verify.LibraryName(restricted), verify.RestrictedPublisher(restricted))}, out.Next...)
+	}
 }
 
 // ---- frc_context ----

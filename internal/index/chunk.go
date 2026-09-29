@@ -148,6 +148,9 @@ type Symbol struct {
 	RetrievedAt    time.Time `json:"retrieved_at"`
 	License        string    `json:"license"`
 	Trust          string    `json:"trust"`
+	// CaseMismatch marks a lookup result whose name matches the query only
+	// case-insensitively (set by Reader.Symbols, never stored).
+	CaseMismatch bool `json:"-"`
 }
 
 // SimpleName returns the last path element of an FQN: the member name for
@@ -211,3 +214,8 @@ func contains(set []string, v string) bool {
 	}
 	return false
 }
+
+// RestrictedLicense reports whether a license id is a LicenseRef-*: content
+// whose publisher grants no redistribution license (docs/sources.md §0.2).
+// It is never published nor served by a hosted server.
+func RestrictedLicense(license string) bool { return strings.HasPrefix(license, "LicenseRef-") }

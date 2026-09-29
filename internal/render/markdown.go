@@ -66,6 +66,9 @@ func APIMarkdown(o APIOut) string {
 	if len(o.Matches) == 0 && o.Status != "version_mismatch" {
 		b.WriteString("\nNo matching symbol.\n")
 	}
+	if len(o.Matches) > 0 && o.Matches[0].Match == "case_differs" {
+		b.WriteString("\nNo symbol has exactly this name. These match only when letter case is ignored:\n")
+	}
 	for _, m := range o.Matches {
 		symbol(&b, m)
 	}
@@ -73,6 +76,19 @@ func APIMarkdown(o APIOut) string {
 		b.WriteString("\nSame symbol in OTHER seasons:\n")
 		for _, m := range o.OtherSeasons {
 			symbol(&b, m)
+		}
+	}
+	if len(o.Curated) > 0 {
+		b.WriteString("\nCurated rules for this name:\n")
+		for _, m := range o.Curated {
+			fmt.Fprintf(&b, "\n- %s `%s` → %s — %s · %s %s→%s", m.Language, m.From, codeOrDash(m.To), m.Kind, m.Library, m.FromSeason, m.ToSeason)
+			if m.Notes != "" {
+				fmt.Fprintf(&b, "\n  %s", m.Notes)
+			}
+			if m.Citation != "" {
+				fmt.Fprintf(&b, "\n  source: %s", m.Citation)
+			}
+			b.WriteString("\n")
 		}
 	}
 	footer(&b, o.Envelope)
