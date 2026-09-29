@@ -310,9 +310,12 @@ func (r *Reader) LibraryVersion(ctx context.Context, library, season, language s
 	return v
 }
 
-// Licenses lists the distinct chunk licenses in the shard (publish policy).
+// Licenses lists the distinct licenses of everything the shard serves —
+// chunks, symbols, release facts and hardware rows — for the publish and
+// hosted-serving policies (a symbol-only shard must not slip through).
 func (r *Reader) Licenses(ctx context.Context) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT license FROM chunk ORDER BY license`)
+	rows, err := r.db.QueryContext(ctx, `SELECT license FROM chunk UNION SELECT license FROM symbol
+		UNION SELECT license FROM release UNION SELECT license FROM hw_spec ORDER BY 1`)
 	if err != nil {
 		return nil, err
 	}

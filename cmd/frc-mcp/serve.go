@@ -31,6 +31,7 @@ func serve(ctx context.Context, log *slog.Logger, args []string) error {
 	offline := fs.Bool("offline", false, "never contact the network (no index sync)")
 	syncURL := fs.String("sync-url", dist.DefaultSyncURL, "signed index channel to sync from")
 	syncEvery := fs.Duration("sync-every", 6*time.Hour, "index sync interval")
+	unlicensed := fs.Bool("include-unlicensed", false, "with --transport http, also serve shards whose content has no redistribution license (LicenseRef-*); only with the vendors' permission")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -43,7 +44,10 @@ func serve(ctx context.Context, log *slog.Logger, args []string) error {
 	var current []*index.Reader
 	load := func(reason string) {
 		start := time.Now()
-		engine, sh := openEngine(ctx, log, *dir, *season, !*noDense)
+		// Over HTTP others connect, so serving is redistribution: leave out
+		// unlicensed shards unless explicitly allowed. stdio serves the
+		// user's own local index.
+		engine, sh := openEngineWith(ctx, log, *dir, *season, !*noDense, *transport != "http" || *unlicensed)
 		if engine == nil {
 			log.Warn("no index shards found; tools report status=syncing", "dir", *dir, "hint", "run `frc-mcp sync`")
 			return

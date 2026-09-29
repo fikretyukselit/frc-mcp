@@ -288,6 +288,10 @@ stable.
   - A stateless handler that implements `server/discover` and honors the `Mcp-Method`/`Mcp-Name` headers.
   - Origin validation, and a bearer token (OAuth 2.1 + CIMD later).
   - Filesystem arguments are disabled.
+  - **Serving is redistribution:** shards holding any `LicenseRef-*` content (chunks, symbols, release facts or hardware
+    rows: today the CTRE and REV docs/APIs/release notes, and the forum shard) are not loaded unless the operator
+    passes `--include-unlicensed`, which is only for when the vendors have granted permission (`docs/sources.md`
+    §0.2). stdio serves the user's own local index and loads everything.
   - An optional server card at `/.well-known/mcp/server-card.json` (a draft extension, tracked).
 
 ## 7. Example client config (pin the version)
