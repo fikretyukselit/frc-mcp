@@ -74,7 +74,7 @@ var vendorRoots = map[string]string{
 var (
 	importRe  = regexp.MustCompile(`(?m)^[ \t]*import[ \t]+(static[ \t]+)?([A-Za-z_][\w.]*?)(\.\*)?[ \t]*;`)
 	fqnRe     = regexp.MustCompile(`\b((?:edu\.wpi\.first|org\.wpilib)(?:\.[a-z_]\w*)*(?:\.[A-Z]\w*)+)`)
-	declRe    = regexp.MustCompile(`\b([A-Z]\w*)(?:\.[A-Z]\w*)*(?:<[^;(){}=]*>)?(?:\[\])*[ \t]+([a-zA-Z_]\w*)[ \t]*(?:=|;|,|\)|:)`)
+	declRe    = regexp.MustCompile(`\b([A-Z]\w*(?:\.[A-Z]\w*)*)(?:<[^;(){}=]*>)?(?:\[\])*[ \t]+([a-zA-Z_]\w*)[ \t]*(?:=|;|,|\)|:)`)
 	callRe    = regexp.MustCompile(`\b([A-Za-z_]\w*)\s*\.\s*([a-z_]\w*)\s*\(`)
 	packageRe = regexp.MustCompile(`(?m)^[ \t]*package[ \t]+([\w.]+)[ \t]*;`)
 )
@@ -251,12 +251,7 @@ func javaCheck(ctx context.Context, r Resolver, code, season string) Result {
 
 	// Receivers: variables declared with an imported type; static calls on
 	// imported types.
-	vars := map[string]string{}
-	for _, m := range declRe.FindAllStringSubmatch(src, -1) {
-		if fqn, ok := imported[m[1]]; ok {
-			vars[m[2]] = fqn
-		}
-	}
+	vars := declaredVars(src, imported)
 	checkedCalls := map[string]bool{}
 	shapes := map[string]bool{} // "fqn#member(kinds)" already checked
 	checkShape := func(fqn, member string, off, argsAt int, overloads func() ([]index.Symbol, bool)) {
@@ -390,6 +385,9 @@ func checkPackage(ctx context.Context, r Resolver, pkg, season string, emit func
 }
 
 func checkMember(ctx context.Context, r Resolver, typeFQN, member, season, lang string, emit func(Finding)) {
+	if lang == "java" && javaLangMembers[member] {
+		return // declared on java.lang.Object / Enum / Record, which the tables do not index
+	}
 	fqn := typeFQN + "#" + member
 	if pinned := exact(ctx, r, fqn, season, lang); len(pinned) > 0 {
 		// Overloads: warn only if every overload is deprecated.
@@ -452,6 +450,42 @@ func declaring(ctx context.Context, r Resolver, typeFQN, member, season, lang st
 	}
 	return ""
 }
+
+// declaredVars maps variable names to the imported type they are declared
+// with ("Pose2d x", "TrapezoidProfile.Constraints c" → the nested type).
+// Scopes are not tracked, so a name declared with two different types in
+// the file is ambiguous and left out: guessing would turn a call on one
+// into a false finding on the other.
+func declaredVars(src string, imported map[string]string) map[string]string {
+	vars, bad := map[string]string{}, map[string]bool{}
+	for _, m := range declRe.FindAllStringSubmatch(src, -1) {
+		head, rest, nested := strings.Cut(m[1], ".")
+		fqn, ok := imported[head]
+		if !ok {
+			if prev, seen := vars[m[2]]; seen && prev != "" {
+				bad[m[2]] = true // shadowed by a type we do not know
+			}
+			continue
+		}
+		if nested {
+			fqn += "." + rest
+		}
+		if prev, seen := vars[m[2]]; seen && prev != fqn {
+			bad[m[2]] = true
+		}
+		vars[m[2]] = fqn
+	}
+	for n := range bad {
+		delete(vars, n)
+	}
+	return vars
+}
+
+// javaLangMembers are inherited from java.lang.Object, Enum or Record by
+// every class; the API tables do not list them per class.
+var javaLangMembers = map[string]bool{"toString": true, "hashCode": true, "equals": true, "getClass": true,
+	"notify": true, "notifyAll": true, "wait": true, "clone": true, "finalize": true, "name": true, "ordinal": true,
+	"compareTo": true, "values": true, "valueOf": true, "getDeclaringClass": true, "describeConstable": true}
 
 // HasMember reports whether typeFQN declares or inherits member in season
 // (complete=false: some supertype could not be resolved, so absence is not
@@ -527,8 +561,6 @@ func splitTop(s string) []string {
 	return append(out, s[start:])
 }
 
-var superRe = regexp.MustCompile(`\b(?:extends|implements)\s+([^{]+)`)
-
 // inHierarchy reports whether member is declared on typeFQN or any resolved
 // supertype in season. complete=false means some supertype (outside the
 // index, e.g. java.lang or a vendor class) could not be checked.
@@ -563,51 +595,55 @@ func inHierarchy(ctx context.Context, r Resolver, typeFQN, member, season, lang 
 	return false, complete
 }
 
-// supertypes extracts simple names from "... extends A<T> implements B, C<X>".
+// supertypes extracts simple names from "class X<T> extends A<T> implements
+// B, C<X>" (and "interface X extends A, B"): the text after each keyword up
+// to the next keyword or "{", split on top-level commas, generics dropped.
 func supertypes(sig string) []string {
+	if i := strings.IndexByte(sig, '{'); i >= 0 {
+		sig = sig[:i]
+	}
+	sig = dropGenerics(sig) // "A<T extends Number>": a bound, not a supertype
 	var out []string
-	for _, m := range superRe.FindAllStringSubmatch(sig, -1) {
-		depth := 0
-		var cur strings.Builder
-		flush := func() {
-			if n := strings.TrimSpace(cur.String()); n != "" {
+	for _, loc := range superKwRe.FindAllStringIndex(sig, -1) {
+		rest := sig[loc[1]:]
+		if next := superKwRe.FindStringIndex(rest); next != nil {
+			rest = rest[:next[0]]
+		}
+		for _, part := range splitTop(rest) {
+			n := strings.TrimSpace(part)
+			if i := strings.IndexByte(n, '<'); i >= 0 {
+				n = n[:i]
+			}
+			if f := strings.Fields(n); len(f) > 0 {
+				n = f[0]
 				if i := strings.LastIndexByte(n, '.'); i >= 0 {
 					n = n[i+1:]
 				}
-				out = append(out, strings.Fields(n)[0])
-			}
-			cur.Reset()
-		}
-		for _, c := range m[1] {
-			switch {
-			case c == '<':
-				depth++
-			case c == '>':
-				depth--
-			case depth > 0:
-			case c == ',':
-				flush()
-			default:
-				if strings.HasPrefix(strings.TrimSpace(cur.String())+string(c), "implements") && depth == 0 {
-					cur.Reset()
-					continue
-				}
-				cur.WriteRune(c)
-			}
-		}
-		flush()
-	}
-	// "extends A implements B" is matched once by the regex; split words.
-	var res []string
-	for _, n := range out {
-		for _, w := range strings.Fields(n) {
-			if w != "implements" && w != "extends" {
-				res = append(res, w)
+				out = append(out, n)
 			}
 		}
 	}
-	return res
+	return out
 }
+
+// dropGenerics removes every balanced <…> section.
+func dropGenerics(s string) string {
+	var b strings.Builder
+	depth := 0
+	for _, c := range s {
+		switch {
+		case c == '<':
+			depth++
+		case c == '>' && depth > 0:
+			depth--
+		case depth == 0:
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
+var superKwRe = regexp.MustCompile(`\b(?:extends|implements|permits)\b`)
 
 // resolveType finds a supertype's FQN: the name itself when qualified, the
 // same package next, then a unique simple-name match in the season.

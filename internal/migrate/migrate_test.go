@@ -188,6 +188,10 @@ public class Drive {
 	if got[cs].Line != 3 {
 		t.Errorf("ChassisSpeeds line = %d, want 3", got[cs].Line)
 	}
+	// A member the file calls is reported at the call, not at the import.
+	if l := got[cs+"#fromFieldRelativeSpeeds"].Line; l != 11 {
+		t.Errorf("fromFieldRelativeSpeeds line = %d, want 11 (the call)", l)
+	}
 }
 
 func keys(m map[string]Mapping) []string {

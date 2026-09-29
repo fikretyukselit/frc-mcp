@@ -195,3 +195,15 @@ func TestVersionSkewCapsPythonFindings(t *testing.T) {
 		t.Fatalf("with skew: %+v %v", r.Findings, r.Coverage)
 	}
 }
+
+func TestObjectMembersNeverWrongSeason(t *testing.T) {
+	e := engineOf(t, []row{
+		{"edu.wpi.first.math.trajectory.Trajectory", "wpilib", "2026", "java", "class", "public class Trajectory", "org.wpilib.math.trajectory.Trajectory"},
+		{"edu.wpi.first.math.trajectory.Trajectory#toString", "wpilib", "2026", "java", "method", "public String toString()", ""},
+		{"org.wpilib.math.trajectory.Trajectory", "wpilib", "2027", "java", "class", "public class Trajectory", ""},
+	})
+	r := verify.Java(context.Background(), e, "import org.wpilib.math.trajectory.Trajectory;\nclass A { String f(Trajectory t) { return t.toString(); } }\n", "2027")
+	if r.Errors != 0 {
+		t.Fatalf("Object member flagged: %+v", r.Findings)
+	}
+}

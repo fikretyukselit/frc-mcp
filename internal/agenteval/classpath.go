@@ -20,7 +20,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -160,12 +162,22 @@ func VendordepArtifacts(raw []byte) ([]Artifact, error) {
 }
 
 // Fetcher downloads jars into a content cache (group/name/version paths).
+// It is safe for concurrent use.
 type Fetcher struct {
 	Dir    string
 	Client *http.Client
-	// Hosts allowed for downloads (and redirects); empty allows the two
-	// built-in repositories only.
-	Hosts []string
+
+	mu    sync.Mutex
+	hosts []string // allowed besides the built-in repositories
+}
+
+// AllowHost adds a download (and redirect) host, e.g. a vendor Maven repo.
+func (f *Fetcher) AllowHost(h string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !slices.Contains(f.hosts, h) {
+		f.hosts = append(f.hosts, h)
+	}
 }
 
 // ErrHost is returned for a download outside the allowed hosts.
@@ -176,8 +188,11 @@ func (f *Fetcher) allowed(u string) bool {
 	if err != nil || p.Scheme != "https" {
 		return false
 	}
+	f.mu.Lock()
+	extra := slices.Clone(f.hosts)
+	f.mu.Unlock()
 	for _, h := range append([]string{"frcmaven.wpi.edu", "repo1.maven.org", "storage.googleapis.com", "github.com",
-		"release-assets.githubusercontent.com", "objects.githubusercontent.com"}, f.Hosts...) {
+		"release-assets.githubusercontent.com", "objects.githubusercontent.com"}, extra...) {
 		if p.Hostname() == h {
 			return true
 		}
@@ -238,9 +253,10 @@ func (f *Fetcher) get(ctx context.Context, u string) (*http.Response, error) {
 	if !f.allowed(u) {
 		return nil, fmt.Errorf("%w: %s", ErrHost, u)
 	}
-	c := f.Client
-	if c == nil {
-		c = &http.Client{Timeout: 5 * time.Minute}
+	c := &http.Client{Timeout: 5 * time.Minute}
+	if f.Client != nil {
+		cc := *f.Client // never mutate a shared client from concurrent downloads
+		c = &cc
 	}
 	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) > 5 || !f.allowed(req.URL.String()) {

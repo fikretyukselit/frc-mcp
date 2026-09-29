@@ -110,12 +110,7 @@ func javaRefs(code string) []Ref {
 		}
 		rs.add(trimToType(src[m[2]:m[3]]), m[2], false)
 	}
-	vars := map[string]string{}
-	for _, m := range declRe.FindAllStringSubmatch(src, -1) {
-		if fqn, ok := imported[m[1]]; ok {
-			vars[m[2]] = fqn
-		}
-	}
+	vars := declaredVars(src, imported)
 	for _, m := range callRe.FindAllStringSubmatchIndex(src, -1) {
 		recv, member := src[m[2]:m[3]], src[m[4]:m[5]]
 		fqn := vars[recv]
@@ -211,13 +206,21 @@ func pythonRefs(code string) []Ref {
 			}
 		}
 	}
-	vars := map[string]string{}
+	vars, bad := map[string]string{}, map[string]bool{}
 	for _, m := range pyAssignRe.FindAllStringSubmatch(src, -1) {
+		t := ""
 		if q, ok := names[m[2]]; ok {
-			vars[m[1]] = q
+			t = q
 		} else if head, rest, ok := strings.Cut(m[2], "."); ok && modules[head] != "" {
-			vars[m[1]] = modules[head] + "." + rest
+			t = modules[head] + "." + rest
 		}
+		if prev, seen := vars[m[1]]; seen && prev != t {
+			bad[m[1]] = true // reassigned (or self.x in two classes): ambiguous
+		}
+		vars[m[1]] = t
+	}
+	for n := range bad {
+		delete(vars, n)
 	}
 	for _, m := range pyCallRe.FindAllStringSubmatchIndex(src, -1) {
 		recv, member := src[m[2]:m[3]], src[m[4]:m[5]]
