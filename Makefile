@@ -54,3 +54,7 @@ doctor: build
 
 clean:
 	rm -rf bin dist $(SHARDS) .fixture .cache bench.txt
+
+.PHONY: conformance
+conformance: ## MCP conformance suite (server scenarios; needs node)
+	./scripts/conformance.sh
