@@ -1,0 +1,67 @@
+# Control tasks, 2026 season (WPILib 2026.2.1): the same asks as the 2027
+# set where it makes sense. Agents have seen far more 2026 code, so the gap
+# with and without frc-mcp is expected to be smaller here.
+- id: swerve-module-targets-2026
+  season: "2026"
+  tags: [kinematics, swerve, control-set]
+  files: [src/main/java/frc/robot/SwerveMath.java]
+  prompt: |
+    This is a WPILib 2026 Java robot project. Write src/main/java/frc/robot/SwerveMath.java: a class SwerveMath whose
+    constructor takes the drivetrain's track width and wheelbase in meters (modules at the four corners, front-left
+    first). Add a method that takes a field-relative desired velocity (vx and vy in m/s, omega in rad/s) and the
+    robot's current heading in radians, and returns the four module targets for WPILib's swerve kinematics,
+    desaturated to 4.5 m/s. Use WPILib's own kinematics classes.
+
+- id: robot-skeleton-2026
+  season: "2026"
+  tags: [framework, commands, control-set]
+  files: [src/main/java/frc/robot/Main.java, src/main/java/frc/robot/Robot.java, src/main/java/frc/robot/RobotContainer.java]
+  prompt: |
+    Set up a new WPILib 2026 command-based Java robot project: write Main.java, Robot.java and RobotContainer.java in
+    src/main/java/frc/robot. Robot runs the command scheduler every loop, schedules the autonomous command from
+    RobotContainer when autonomous starts and cancels it when teleop starts. RobotContainer.getAutonomousCommand()
+    can return a command that does nothing for now.
+
+- id: auto-chooser-2026
+  season: "2026"
+  tags: [dashboard, commands, control-set]
+  files: [src/main/java/frc/robot/AutoSelector.java]
+  prompt: |
+    WPILib 2026, Java, command-based. Write src/main/java/frc/robot/AutoSelector.java: a class that offers three
+    autonomous routines on the dashboard for the drive team to pick from before the match ("Do nothing" as the
+    default, "Taxi" which prints "taxi", "Two piece" which prints "two piece"), and has a method
+    `Command getSelected()` that returns the chosen routine. Publish the chooser under the name "Auto".
+
+- id: flywheel-talonfx-2026
+  season: "2026"
+  vendordeps: ["CTRE-Phoenix (v6)"]
+  tags: [phoenix6, control, control-set]
+  files: [src/main/java/frc/robot/subsystems/Flywheel.java]
+  prompt: |
+    WPILib 2026, Java, command-based, CTRE Phoenix 6 26.3.0. Write src/main/java/frc/robot/subsystems/Flywheel.java: a
+    shooter flywheel subsystem driven by one Kraken X60 (TalonFX) with CAN id 5 on the CANivore bus named "canivore".
+    Configure velocity gains (kS 0.1, kV 0.12, kP 0.2) and coast mode once in the constructor, and add
+    `void setRPM(double rpm)` using closed-loop velocity control, `double getRPM()` and
+    `boolean atSpeed(double toleranceRpm)`.
+
+- id: arm-sparkmax-2026
+  season: "2026"
+  vendordeps: [REVLib]
+  tags: [revlib, control, control-set]
+  files: [src/main/java/frc/robot/subsystems/Arm.java]
+  prompt: |
+    WPILib 2026, Java, command-based, REVLib 2026.0.5. Write src/main/java/frc/robot/subsystems/Arm.java: an arm
+    subsystem with a SPARK MAX (CAN id 9, brushless NEO). Configure it once in the constructor: brake mode, 40 A smart
+    current limit, and the on-controller position PID (kP 0.8) using the built-in encoder. Add
+    `void setAngleRotations(double rotations)` using the controller's closed-loop position control and
+    `double getAngleRotations()`.
+
+- id: arm-pid-command-2026
+  season: "2026"
+  tags: [commands, control, control-set]
+  files: [src/main/java/frc/robot/commands/ArmToAngle.java]
+  prompt: |
+    WPILib 2026, Java, command-based. Write src/main/java/frc/robot/commands/ArmToAngle.java: a command that drives an
+    arm to a target angle with a WPILib PID controller (kP 5, kI 0, kD 0.2, tolerance 0.02 rad) and ends when it
+    reaches the setpoint. Its constructor takes a `DoubleSupplier angleRad` (measurement), a `DoubleConsumer
+    setVoltage` (output), the target angle in radians and the arm Subsystem it requires.
