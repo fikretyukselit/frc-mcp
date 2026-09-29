@@ -104,10 +104,36 @@ attacker-controlled text that the agent then obeys**.
   operator opt-in and a published notice.
 
 ## 3. Testing
-- Injection corpus (`eval/security/injection/*.md`) cases:
-  - the sanitizer strips all hidden-text vectors;
-  - suspect detection achieves ≥ 0.95 recall on the corpus;
-  - fenced rendering is golden-tested.
+- **Injection corpus** in `eval/security/injection/`:
+  - `cases.jsonl` is the tuning set: attack families plus realistic FRC docs sentences that must stay unflagged.
+  - `hidden.jsonl` holds hidden-text vectors; `Clean` must remove each payload.
+  - `holdout.jsonl` is written after tuning and is **never tuned against**. Rotate it into `cases.jsonl` and write a
+    fresh one.
+  - `TestRealIndexNotSuspect` runs the detector over every chunk of the real index (`make index`).
+  - Fenced rendering is golden-tested (`search_troubleshoot_fenced`). Fence delimiters inside content are escaped.
+- **Results (M3, 2026-09-29):**
+
+  | Set | Recall | False positives |
+  |---|---|---|
+  | tuning `cases.jsonl` (87 attacks / 55 benign) | 1.000 | 0 |
+  | hidden-text vectors (8) | all payloads removed | — |
+  | holdout v1 (25 / 15), measured before rotation | 0.680 | 0 |
+  | holdout v2 (20 / 10), current | **0.250** | 0 |
+  | real index, 12,129 chunks | — | **0** |
+
+- **What the numbers mean.** Pattern detection reliably catches the known families: override phrases, forged
+  chat/tool markup, `curl | sh`, credential paths and directives that address an AI. It does **not** generalize to
+  novel paraphrases (holdout v2: 0.25). This is expected, and it is why suspect detection is only a down-rank-and-label
+  signal. The controls that carry the weight are:
+  - trust tiers: community text is excluded by default;
+  - fencing;
+  - the static tool surface;
+  - the absence of any write or exec tool in frc-mcp.
+- **Rejected alternative:** a kNN detector over potion-code-16M-v2 sentence embeddings, nearest attack exemplar
+  versus nearest benign exemplar. On holdout v2 it reached at best 7/20 recall, at the cost of 168 flagged sentences
+  in real docs (0/20 false-positive-free at 0.55). The static code-embedding model does not separate intent. The next
+  step, if community content is ever enabled by default, is a small classifier trained on a public injection dataset.
+  It would run at ingest only, so query latency is unaffected.
 - SSRF tests use a local resolver that returns private IPs, redirect chains to disallowed hosts, oversized bodies, and
   slow-loris responses.
 - Surface-immutability golden test (§2.2).

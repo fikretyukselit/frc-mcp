@@ -93,3 +93,18 @@ func FuzzCleanIdempotent(f *testing.F) {
 		}
 	})
 }
+
+// Real-index false positives found while tuning (M3); keep them unflagged.
+func TestSuspectRealDocsRegressions(t *testing.T) {
+	for _, s := range []string{
+		"When connecting to a device with SSH (instead of the default POST), credentials must be configured in Settings for general use.",
+		"public final class ProtobufLinearSystem extends ProtoMessage<System.ProtobufLinearSystem> implements Cloneable",
+		"The previous instructions for Phoenix 5 no longer apply.",
+		"The assistant coach should run the practice match.",
+		"Resource Management: They act as locks that commands must acquire to run.",
+	} {
+		if Suspect(Clean(s)) {
+			t.Errorf("false positive: %q", s)
+		}
+	}
+}
