@@ -27,9 +27,18 @@
 - **The gain is all in the season the model does not know.** On 2026 both conditions pass (the model's training data
   covers it); on 2027 Sonnet without frc-mcp passes 20%, and with it 98%. Without the server it writes
   `edu.wpi.first.*` imports, `ChassisSpeeds`, `SmartDashboard` and `new TalonFX(id, "canivore")` in a 2027 project.
-- **Exit criterion (≥ +20 pp): met for Sonnet, not for Haiku.** Haiku calls frc_api and frc_search (6 calls per run)
-  but never frc_verify_code, and 17 of its 20 2027 attempts fail to compile. Sonnet verified its code in 39 of 60
-  2027 runs; its one failure (`PWMSparkMax.set`, `setThrottle` in 2027) was in a run that did not.
+- **Exit criterion (≥ +20 pp): met for Sonnet; Haiku first missed it.** Haiku called frc_api and frc_search (6 calls
+  per run) but never frc_verify_code, and 17 of its 20 2027 attempts failed to compile. Sonnet verified its code in 39
+  of 60 2027 runs; its one failure (`PWMSparkMax.set`, `setThrottle` in 2027) was in a run that did not.
+- **Fix: one line in the server instructions** ("call frc_verify_code on every file you touched before you say you are
+  done"). Re-running the frc-mcp condition (one trial; the baseline has no server, so it is unchanged):
+
+  | Model | frc-mcp, before | frc-mcp, with the rule | Baseline | Paired difference with the rule (95% bootstrap) |
+  |---|---|---|---|---|
+  | Haiku | 9/26 (2027: 3/20), verify used in 0 runs | **16/26** (2027: 10/20), verify used in 26 | 5/26 | **+42.3 pp** (+23.1 to +61.5) |
+  | Sonnet | 25/26 (2027: 19/20), verify used in 15 | 25/26 (2027: 19/20), verify used in 26 | 9/26 | +61.5 pp (+42.3 to +80.8) |
+
+  Results: `eval/results/2026-09-29-*-verify-rule.jsonl`.
 - **The verifier on agent code:** it flagged 32 of the 49 failed Sonnet compiles and 30 of the 38 failed Haiku
   compiles, with **0 errors on code that compiled** (208 runs).
 - **Cost:** with frc-mcp Sonnet takes 12 turns instead of 7 and about 2.2× the cost of the baseline (USD 0.13 vs 0.06 per task
