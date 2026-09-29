@@ -440,9 +440,9 @@ const maxVerifyBytes = 512 << 10
 
 // VerifyIn is frc_verify_code's input.
 type VerifyIn struct {
-	Code     string `json:"code,omitempty" jsonschema:"Java source to check"`
-	Path     string `json:"path,omitempty" jsonschema:"alternative to code: a .java file under the project root (local servers only)"`
-	Language string `json:"language,omitempty" jsonschema:"java (C++ and Python arrive in M3)"`
+	Code     string `json:"code,omitempty" jsonschema:"source file to check (Java, C++ or Python)"`
+	Path     string `json:"path,omitempty" jsonschema:"alternative to code: a .java, .cpp/.h or .py file under the project root (local servers only)"`
+	Language string `json:"language,omitempty" jsonschema:"java, cpp or python (default: from the path extension, else detected from the code)"`
 	Season   string `json:"frc_season,omitempty" jsonschema:"FRC season to check against (default: pin, then the current stable season)"`
 	Pin      string `json:"pin,omitempty" jsonschema:"pin handle from frc_context"`
 }
@@ -452,9 +452,6 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 	fromPin, err := applyPin(in.Pin, &in.Season, &lang, &channel)
 	if err != nil {
 		return nil, render.VerifyOut{}, err
-	}
-	if in.Language == "" {
-		in.Language = "java"
 	}
 	if err := validateCommon(in.Season, "", in.Language); err != nil {
 		return nil, render.VerifyOut{}, err
@@ -467,19 +464,26 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 		if s.opt.NoFilesystem {
 			return nil, render.VerifyOut{}, errors.New("path is disabled on this (hosted) server; pass the file content as code")
 		}
-		root := s.opt.ProjectRoot
-		if root == "" {
-			root = "."
-		}
-		b, err := project.ReadSource(root, in.Path, maxVerifyBytes)
+		b, err := project.ReadSource(s.root(), in.Path, maxVerifyBytes)
 		if err != nil {
-			return nil, render.VerifyOut{}, fmt.Errorf("%w; path must be a .java file under the project root %s", err, root)
+			return nil, render.VerifyOut{}, fmt.Errorf("%w; path must be a source file under the project root %s", err, s.root())
 		}
 		code, file = string(b), in.Path
+		if in.Language == "" {
+			in.Language = project.SourceLanguage(in.Path)
+		}
 	case in.Code == "":
-		return nil, render.VerifyOut{}, errors.New(`pass code (Java source) or path, e.g. {"code": "import edu.wpi.first.wpilibj.TimedRobot; …"}`)
+		return nil, render.VerifyOut{}, errors.New(`pass code (Java, C++ or Python source) or path, e.g. {"code": "import edu.wpi.first.wpilibj.TimedRobot; …"}`)
 	case len(in.Code) > maxVerifyBytes:
 		return nil, render.VerifyOut{}, fmt.Errorf("code is %d bytes; the limit is %d — verify one file per call", len(in.Code), maxVerifyBytes)
+	}
+	if (in.Language == "" || in.Language == "any") && file == "" && lang != "" && lang != "any" {
+		in.Language = lang // the pin's project language
+	}
+	if in.Language == "" || in.Language == "any" {
+		if in.Language = verify.DetectLanguage(code); in.Language == "" {
+			in.Language = "java"
+		}
 	}
 	e := s.engine.Load()
 	if !e.Ready() {
@@ -495,21 +499,11 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 	}
 	out := render.VerifyOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
 		Season: in.Season, PinSource: pinSource, Language: in.Language}, File: file, Findings: []render.VerifyFinding{}}
-	if in.Language != "java" {
-		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
-		out.Coverage = map[string]string{"wpilib": "none (" + in.Language + " verification arrives in M4; its symbols are searchable with frc_api)"}
-		out.Next = []string{"only Java is verified today; use frc_api to check individual " + in.Language + " symbols"}
-		return text(render.VerifyMarkdown(out)), out, nil
-	}
 	// A file under the project root: use the project's vendordep versions so
 	// version skew within a season caps vendor findings (verify.Options).
 	opt := verify.Options{}
 	if file != "" {
-		root := s.opt.ProjectRoot
-		if root == "" {
-			root = "."
-		}
-		if p, err := project.Detect(root); err == nil {
+		if p, err := project.Detect(s.root()); err == nil {
 			opt.Installed = map[string]string{}
 			for _, v := range p.Vendordeps {
 				if lib := verify.LibraryOfVendordep(v.Name); lib != "" {
@@ -518,7 +512,7 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 			}
 		}
 	}
-	r := verify.JavaWith(ctx, e, code, in.Season, opt)
+	r := verify.Check(ctx, e, code, in.Language, in.Season, opt)
 	out.Coverage, out.Checked, out.Errors, out.Warnings = r.Coverage, r.Checked, r.Errors, r.Warnings
 	for _, f := range r.Findings {
 		out.Findings = append(out.Findings, render.VerifyFinding(f))

@@ -381,3 +381,53 @@ func TestVerifyCodeTool(t *testing.T) {
 		t.Error("hosted server must refuse path")
 	}
 }
+
+func TestMigrateTool(t *testing.T) {
+	root := t.TempDir()
+	src := "package frc.robot;\nimport edu.wpi.first.math.kinematics.SwerveDriveKinematics;\nimport frc.robot.Constants;\npublic class Drive {}\n"
+	if err := os.WriteFile(filepath.Join(root, "Drive.java"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := mcpserver.New(testfixture.Engine(t), mcpserver.Options{Version: "t", ProjectRoot: root})
+	ctx := context.Background()
+	ct, st := mcp.NewInMemoryTransports()
+	ss, _ := srv.MCP().Connect(ctx, st, nil)
+	cs, _ := mcp.NewClient(&mcp.Implementation{Name: "c", Version: "0"}, nil).Connect(ctx, ct, nil)
+	defer cs.Close()
+	defer ss.Close()
+
+	_, sc, text := call(t, cs, "frc_migrate", map[string]any{"symbol": "SwerveDriveKinematics", "from": "2026", "to": "2027", "language": "java"})
+	maps, _ := sc["mappings"].([]any)
+	if sc["status"] != "ok" || len(maps) != 1 || !strings.Contains(text, "org.wpilib.math.kinematics.SwerveDriveKinematics") {
+		t.Fatalf("symbol: %v\n%s", sc, text)
+	}
+	if m := maps[0].(map[string]any); m["source"] != "generated" || m["confidence"] != "high" || m["kind"] != "move" {
+		t.Errorf("mapping %v", m)
+	}
+	// Versions are accepted for from/to; to defaults to the next indexed season.
+	_, sc, _ = call(t, cs, "frc_migrate", map[string]any{"path": "Drive.java", "from": "2026.2.1"})
+	if sc["to_season"] != "2027" || sc["from_season"] != "2026" {
+		t.Fatalf("path mode seasons: %v", sc)
+	}
+	if maps, _ := sc["mappings"].([]any); len(maps) != 1 || maps[0].(map[string]any)["line"] != float64(2) {
+		t.Fatalf("path mode: %v", sc)
+	}
+	_, sc, _ = call(t, cs, "frc_migrate", map[string]any{"symbol": "org.wpilib.math.kinematics.SwerveDriveKinematics", "from": "2026", "to": "2027"})
+	if already, _ := sc["already_in_target"].([]any); len(already) != 1 {
+		t.Fatalf("already migrated: %v", sc)
+	}
+	for _, bad := range []map[string]any{
+		{"from": "2026", "to": "2027"},
+		{"symbol": "X", "code": "class X {}"},
+		{"symbol": "X", "from": "2026", "to": "2026"},
+		{"symbol": "X", "from": "last year"},
+	} {
+		if res, _, text := call(t, cs, "frc_migrate", bad); !res.IsError {
+			t.Errorf("%v must be refused: %s", bad, text)
+		}
+	}
+	_, sc, _ = call(t, cs, "frc_verify_code", map[string]any{"code": "frc::SwerveDriveKinematics<4> k;\n", "frc_season": "2026"})
+	if sc["language"] != "cpp" {
+		t.Errorf("C++ not detected: %v", sc)
+	}
+}

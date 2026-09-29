@@ -17,7 +17,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/verify"
 )
 
-// verifyCmd checks every Java file of a robot project against the season
+// verifyCmd checks every Java, C++ and Python file of a robot project against the season
 // detected from its build files (or --season). It is the CLI twin of
 // frc_verify_code and the harness for the false-positive gate.
 func verifyCmd(ctx context.Context, args []string) error {
@@ -63,10 +63,11 @@ func verifyCmd(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && (d.Name() == "build" || d.Name() == ".git" || d.Name() == "bin" || d.Name() == "node_modules") {
+		if d.IsDir() && (d.Name() == "build" || d.Name() == ".git" || d.Name() == "bin" || d.Name() == "node_modules" || d.Name() == "venv" || d.Name() == ".venv") {
 			return filepath.SkipDir
 		}
-		if d.IsDir() || !strings.HasSuffix(path, ".java") {
+		lang := project.SourceLanguage(path)
+		if d.IsDir() || lang == "" {
 			return nil
 		}
 		b, err := os.ReadFile(path) //nolint:gosec // G122: CLI walks the operator's own project directory
@@ -75,7 +76,7 @@ func verifyCmd(ctx context.Context, args []string) error {
 		}
 		files++
 		lines += strings.Count(string(b), "\n") + 1
-		r := verify.JavaWith(ctx, e, string(b), *season, opt)
+		r := verify.Check(ctx, e, string(b), lang, *season, opt)
 		for lib, c := range r.Coverage {
 			if coverage[lib] == "" || strings.HasPrefix(coverage[lib], "none") {
 				coverage[lib] = c

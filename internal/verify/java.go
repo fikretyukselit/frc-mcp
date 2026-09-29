@@ -253,18 +253,54 @@ func javaCheck(ctx context.Context, r Resolver, code, season string) Result {
 		}
 	}
 	checkedCalls := map[string]bool{}
+	shapes := map[string]bool{} // "fqn#member(kinds)" already checked
+	checkShape := func(fqn, member string, off, argsAt int, overloads func() ([]index.Symbol, bool)) {
+		args, ok := callArgs(src, argsAt)
+		if !ok {
+			return
+		}
+		kinds := kindsOf(args)
+		key := fqn + "#" + member + "(" + describe(kinds) + ")"
+		if shapes[key] {
+			return
+		}
+		shapes[key] = true
+		if pinned, complete := overloads(); complete && len(pinned) > 0 {
+			checkCall(ctx, r, fqn, member, pinned, kinds, season, func(f Finding) { add(off, f) })
+		}
+	}
 	for _, m := range callRe.FindAllStringSubmatchIndex(src, -1) {
 		recv, member := src[m[2]:m[3]], src[m[4]:m[5]]
 		fqn := vars[recv]
 		if fqn == "" {
 			fqn = imported[recv]
 		}
-		if fqn == "" || checkedCalls[fqn+"#"+member] {
+		if fqn == "" {
 			continue
 		}
-		checkedCalls[fqn+"#"+member] = true
-		res.Checked++
-		checkMember(ctx, r, fqn, member, season, lang, func(f Finding) { add(m[4], f) })
+		if !checkedCalls[fqn+"#"+member] {
+			checkedCalls[fqn+"#"+member] = true
+			res.Checked++
+			checkMember(ctx, r, fqn, member, season, lang, func(f Finding) { add(m[4], f) })
+		}
+		checkShape(fqn, member, m[4], m[1], func() ([]index.Symbol, bool) {
+			return hierarchyOverloads(ctx, r, fqn, member, season, 0, map[string]bool{})
+		})
+	}
+	// Constructor calls on imported or fully qualified covered types.
+	for _, m := range newRe.FindAllStringSubmatchIndex(src, -1) {
+		name := src[m[2]:m[3]]
+		fqn := imported[name]
+		if fqn == "" && strings.Contains(name, ".") && isCovered(name) {
+			fqn = trimToType(name)
+		}
+		if fqn == "" {
+			continue
+		}
+		ctor := simple(fqn)
+		checkShape(fqn, ctor, m[2], m[1], func() ([]index.Symbol, bool) {
+			return exact(ctx, r, fqn+"#"+ctor, season, lang), true
+		})
 	}
 
 	sort.SliceStable(res.Findings, func(i, j int) bool {
