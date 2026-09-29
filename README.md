@@ -1,90 +1,86 @@
 # frc-mcp
 
-**FRC knowledge for AI coding agents, correct for the version you use.** frc-mcp is a Model Context Protocol server.
+**FRC knowledge for AI coding agents, correct for the season you use.** frc-mcp is a Model Context Protocol server.
 It gives Claude Code, Cursor, VS Code Copilot and other MCP clients current FIRST Robotics Competition software
-knowledge, pinned to the versions your robot project actually uses. It covers:
-- WPILib docs and the Java/C++/Python APIs;
-- vendor libraries such as CTRE Phoenix 6, REVLib, PhotonVision, Limelight, PathPlanner, Choreo, AdvantageKit and YAGSL;
-- vendordeps and release notes.
-
-> **Status:** M1 is done. The server indexes the real WPILib docs and Java API for 2026 and 2027-alpha:
-> - 7.8k chunks and 35k API symbols;
-> - retrieval quality of Recall@10 0.976 and nDCG@10 0.857, with **0 wrong-season results**;
-> - search p95 of about 5 ms.
->
-> M2 adds the vendordep catalog, a Java code verifier (0 false errors on 128k lines of real 2026 team code) and a
-> signed index sync. Vendor docs and APIs arrive in M3. See [`CLAUDE.md`](CLAUDE.md) §9 for the roadmap.
+knowledge, pinned to the versions your robot project uses:
+- WPILib docs and the Java, C++ and Python APIs (2026 and the 2027 alpha);
+- vendor libraries: CTRE Phoenix 6, REVLib, PhotonVision, PathPlanner, Choreo, AdvantageKit, YAGSL;
+- the vendordep catalog, release notes and motor/hardware specs.
 
 ## Why
 
-LLMs write robot code against last season's API. frc-mcp pins every answer to one FRC season and never blends
-seasons. When a confident answer exists only in another season (for example `CANSparkMax` in 2026, or
-`edu.wpi.first` packages in 2027), it returns `version_mismatch` and points to where that answer lives. Every result
-carries a citation and a trust tier. Forum text is fenced off as untrusted data.
+Coding agents write robot code against whatever season they saw most in training. With the 2027 season's API
+changes (`org.wpilib.*` packages, `ChassisVelocities`, Telemetry/Tunables, new Phoenix 6 constructors), that code
+does not compile. frc-mcp answers every question for one season, never blends seasons, maps old APIs to new ones
+with cited sources, and checks code against the real API before the agent says it is done.
 
-## Quick start
+**Measured** (`docs/benchmarks.md`): the same agent solving 26 robot-code tasks, compiled against the GradleRIO
+classpath. With frc-mcp, **98.7%** of Sonnet's solutions compile, against **38.5%** without it; for 2027 tasks alone,
+98% against 20%. Haiku improves by 42 points.
+
+## Install
+
+Download the archive for your OS from the [latest release](https://github.com/fikretyukselit/frc-mcp/releases/latest)
+and put `frc-mcp` on your `PATH`, or build it with Go 1.27+:
 
 ```sh
-make index            # fetch + build the WPILib index into .shards (~25 s cold, conditional GET afterwards)
-make doctor           # index status and search latency on this machine
-make eval             # retrieval metrics vs the committed baseline
-bin/frc-mcp serve --index .shards      # stdio MCP server
+go install github.com/fikretyukselit/frc-mcp/cmd/frc-mcp@latest
 ```
 
-Client config (use a pinned path or version, never `@latest`):
+Add it to your MCP client. For Claude Code:
+
+```sh
+claude mcp add frc -- frc-mcp serve
+```
+
+For clients configured with JSON (Cursor, VS Code, Claude Desktop), use a pinned path:
 
 ```json
-{ "mcpServers": { "frc": { "command": "/path/to/frc-mcp", "args": ["serve", "--index", "/path/to/shards"] } } }
+{ "mcpServers": { "frc": { "command": "/usr/local/bin/frc-mcp", "args": ["serve"] } } }
 ```
 
-## Tools (M2)
+On first start the server downloads the signed index (about 50 MB) in the background and keeps it updated. Every
+download is verified with the Foundation's ed25519 key before use. `frc-mcp sync` does the same by hand, and
+`frc-mcp doctor` shows what is installed.
 
-| Tool | Purpose |
+## Tools
+
+| Tool | What it does |
 |---|---|
-| `frc_context` | Detects the project's season, language, WPILib and vendordep versions (from `build.gradle`, `vendordeps/`, `pyproject.toml`) and returns a pin handle |
-| `frc_search` | Hybrid search pinned to one season: BM25, exact symbol lookup and dense (model2vec) results combined with RRF, then boosts, confidence and abstention |
-| `frc_fetch` | Returns a full section by id (search → fetch), paged by token budget |
-| `frc_api` | Exact lookup across 35k API symbols: signatures, deprecated/removed status, and replacements, including the generated `edu.wpi.first` → `org.wpilib` map |
+| `frc_context` | Detects the project's season, language, WPILib and vendordep versions and returns a pin for the other tools |
+| `frc_search` | Searches docs and APIs for one season (BM25 + exact symbols + embeddings), with citations |
+| `frc_fetch` | Returns a full doc section by id |
+| `frc_api` | Exact symbol lookup: signatures, deprecations, replacements, other seasons |
+| `frc_verify_code` | Checks Java, C++ or Python robot code against the season's real API: wrong-season names, calls that cannot compile, deprecations, each with the fix |
+| `frc_migrate` | Maps symbols or a whole file to another season (2026 → 2027) from 238 cited rules plus generated package moves |
+| `frc_vendordep` | Resolves vendordeps from the official catalog and checks an installed set for conflicts and wrong years |
+| `frc_whats_new` | Release notes of WPILib and the vendors |
+| `frc_hardware` | Motor, encoder, IMU and swerve module specs, each source labeled and never merged, with WPILib sim factories |
 
-| `frc_vendordep` | Resolves a vendor library from the official WPILib catalog (newest version, install command, frcYear), or checks a whole installed set: outdated, wrong year, conflicts |
-| `frc_verify_code` | Checks Java robot code against the pinned season's API: wrong-season imports and calls come with the exact fix; deprecated APIs are flagged |
+The same checks work from the command line:
 
-Also new: `frc-mcp verify DIR` checks a whole robot project from the command line, and `frc-mcp sync` installs or
-updates the signed index. Next come `frc_migrate`, `frc_whats_new` and `frc_hardware`; see
-[MCP surface](docs/mcp-surface.md).
+```sh
+frc-mcp verify path/to/robot            # every Java/C++/Python file against the project's season
+frc-mcp migrate --to 2027 path/to/robot # what a 2026 project must change for 2027
+```
 
-## Performance (Apple M2, real WPILib index)
+## Content and licenses
 
-| Measurement | Result |
-|---|---|
-| `frc_search` p95 (hybrid) | ~5 ms |
-| Warm launch to first `tools/list` | 19 ms |
-| Query embedding | 4.7 µs |
+The code is MIT. Indexed content keeps its upstream license, and every result carries it in `citation.license`.
+Content whose publisher grants no redistribution license (for example CTRE's and parts of REV's docs) is never
+published in the index or served by a hosted server; you can build it into a local index yourself with
+`frc-mcp index run` (see `docs/sources.md`). Forum posts are opt-in and local only.
 
-More numbers are in [benchmarks](docs/benchmarks.md).
+## Running a shared server
+
+`docs/deploy.md` describes the hosted profile: a container behind Caddy with automatic HTTPS, anonymous access with
+per-client rate limits, no query logging.
 
 ## Development
 
-`make test` · `make race` · `make lint` · `make bench` · `make fuzz` · `make golden`. The build uses pure Go only,
-with `CGO_ENABLED=0`.
-
-## Docs
-
-- [Architecture](docs/architecture.md)
-- [Retrieval](docs/retrieval.md)
-- [Ingestion](docs/ingestion.md)
-- [MCP surface](docs/mcp-surface.md)
-- [Security](docs/security.md)
-- [Source catalog](docs/sources.md)
-- [Benchmarks](docs/benchmarks.md)
-- [ADRs](docs/adr/)
-- [Reviews](docs/reviews/)
-
-## License
-
-The frc-mcp source code is released under the [MIT License](LICENSE). Content served from index shards (WPILib and vendor
-documentation, API references, forum posts) keeps its **upstream license**. Every result carries it in
-`citation.license`, and full-page redistribution follows the per-source rules in [`docs/security.md`](docs/security.md)
-and [`docs/sources.md`](docs/sources.md).
+`make test` · `make race` · `make lint` · `make bench` · `make fuzz` · `make golden`. Pure Go, `CGO_ENABLED=0`.
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md); design docs: [architecture](docs/architecture.md),
+[retrieval](docs/retrieval.md), [ingestion](docs/ingestion.md), [MCP surface](docs/mcp-surface.md),
+[security](docs/security.md), [sources](docs/sources.md), [benchmarks](docs/benchmarks.md), [ADRs](docs/adr/).
 
 Maintained by the [Fikret Yüksel Foundation](https://github.com/fikretyukselit).
