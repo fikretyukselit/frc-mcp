@@ -67,8 +67,8 @@ func Create(ctx context.Context, path, name string) (*Writer, error) {
 		return nil, err
 	}
 	w.symbol, err = tx.PrepareContext(ctx, `INSERT INTO symbol (fqn, simple, owner, library, version, season, language,
-		kind, signature, summary, since, deprecated_in, removed_in, replacement, chunk_id, source_url, upstream_rev,
-		retrieved_at, license, trust) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+		kind, signature, summary, since, deprecated_in, removed_in, replacement, replacement_src, chunk_id, source_url,
+		upstream_rev, retrieved_at, license, trust) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		w.abort()
 		return nil, err
@@ -133,7 +133,7 @@ func (w *Writer) AddSymbol(ctx context.Context, s Symbol) error {
 	}
 	if _, err := w.symbol.ExecContext(ctx, s.FQN, SimpleName(s.FQN), OwnerName(s.FQN), s.Library, s.Version,
 		s.Season, s.Language, s.Kind, s.Signature, s.Summary, s.Since, s.DeprecatedIn, s.RemovedIn, s.Replacement,
-		s.ChunkID, s.SourceURL, s.UpstreamRev, s.RetrievedAt.Unix(), s.License, s.Trust); err != nil {
+		s.ReplacementSrc, s.ChunkID, s.SourceURL, s.UpstreamRev, s.RetrievedAt.Unix(), s.License, s.Trust); err != nil {
 		return fmt.Errorf("index: insert symbol %s: %w", s.FQN, err)
 	}
 	w.digest(s)

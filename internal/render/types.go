@@ -246,3 +246,51 @@ type HardwareOut struct {
 	Unknown []string    `json:"unknown,omitempty"`
 	Known   []string    `json:"known,omitempty" jsonschema:"part ids with data (when a requested part is unknown)"`
 }
+
+// MigrateMapping is one frc_migrate mapping.
+type MigrateMapping struct {
+	From       string `json:"from"`
+	To         string `json:"to,omitempty" jsonschema:"counterpart in the target season; empty for removed APIs (read notes)"`
+	FromSeason string `json:"from_season"`
+	ToSeason   string `json:"to_season"`
+	Language   string `json:"language"`
+	Library    string `json:"library"`
+	Kind       string `json:"kind" jsonschema:"rename | move | removed | signature | behavior | unchanged"`
+	Notes      string `json:"notes,omitempty"`
+	Confidence string `json:"confidence" jsonschema:"high | medium | low"`
+	Source     string `json:"source" jsonschema:"curated (cited rule) | upstream (library deprecation note) | generated (same-name move between seasons) | unchanged"`
+	RuleID     string `json:"rule_id,omitempty"`
+	Citation   string `json:"citation,omitempty" jsonschema:"upstream change the curated rule cites"`
+	Line       int    `json:"line,omitempty" jsonschema:"code mode: line of first use"`
+}
+
+// MigratePointer is a doc or changelog chunk that may explain an
+// unresolved symbol.
+type MigratePointer struct {
+	ID      string `json:"id" jsonschema:"chunk id; pass to frc_fetch"`
+	Title   string `json:"title"`
+	Library string `json:"library"`
+	Kind    string `json:"kind"`
+}
+
+// MigrateUnresolved is a symbol without a known counterpart.
+type MigrateUnresolved struct {
+	Symbol   string           `json:"symbol"`
+	Language string           `json:"language"`
+	Library  string           `json:"library,omitempty"`
+	Reason   string           `json:"reason"`
+	Line     int              `json:"line,omitempty"`
+	Pointers []MigratePointer `json:"pointers,omitempty" jsonschema:"target-season docs or release notes mentioning the symbol"`
+}
+
+// MigrateOut is frc_migrate's result.
+type MigrateOut struct {
+	Envelope
+	FromSeason string              `json:"from_season"`
+	ToSeason   string              `json:"to_season"`
+	Mappings   []MigrateMapping    `json:"mappings"`
+	Unresolved []MigrateUnresolved `json:"unresolved"`
+	NotFound   []string            `json:"not_found,omitempty" jsonschema:"inputs that are not symbols of the from season (team code or a typo)"`
+	AlreadyIn  []string            `json:"already_in_target,omitempty" jsonschema:"symbols that already belong to the target season"`
+	Checked    int                 `json:"checked" jsonschema:"symbols or code references examined"`
+}

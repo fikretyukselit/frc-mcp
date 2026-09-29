@@ -67,6 +67,7 @@ CREATE TABLE symbol (
   deprecated_in TEXT NOT NULL DEFAULT '',
   removed_in    TEXT NOT NULL DEFAULT '',
   replacement   TEXT NOT NULL DEFAULT '',
+  replacement_src TEXT NOT NULL DEFAULT '' CHECK (replacement_src IN ('','upstream','generated','curated')),
   chunk_id      TEXT NOT NULL DEFAULT '',
   source_url    TEXT NOT NULL,
   upstream_rev  TEXT NOT NULL,
@@ -141,6 +142,26 @@ CREATE TABLE hw_spec (
   trust        TEXT NOT NULL,
   PRIMARY KEY (part, source, season)
 ) WITHOUT ROWID;
+
+-- Curated migration rules (data/migrations/*.yaml, frc_migrate), written into
+-- the shard that holds the from-season symbol table of the library/language
+-- and validated against both seasons' tables at build time. Added in v2.
+CREATE TABLE migration (
+  rule_id      TEXT NOT NULL,
+  library      TEXT NOT NULL,
+  language     TEXT NOT NULL,
+  from_season  TEXT NOT NULL,
+  to_season    TEXT NOT NULL,
+  kind         TEXT NOT NULL CHECK (kind IN ('rename','move','removed','signature','behavior')),
+  from_fqn     TEXT NOT NULL,
+  to_fqn       TEXT NOT NULL DEFAULT '',
+  notes        TEXT NOT NULL DEFAULT '',
+  citation     TEXT NOT NULL,
+  verified     INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (library, language, from_season, rule_id, from_fqn)
+) WITHOUT ROWID;
+CREATE INDEX migration_from ON migration (from_fqn);
+CREATE INDEX migration_to   ON migration (to_fqn) WHERE to_fqn <> '';
 `
 
 // Enum codes returned by the light FTS query (no per-row string allocation).

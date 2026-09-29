@@ -131,7 +131,7 @@ const chunkCols = `c.id, c.doc_id, c.doc_num, c.ord, c.library, c.version_lo, c.
 	c.retrieved_at, c.license, c.trust, c.suspect, c.authority, c.tokens`
 
 const symbolCols = `fqn, library, version, season, language, kind, signature, summary, since, deprecated_in,
-	removed_in, replacement, chunk_id, source_url, upstream_rev, retrieved_at, license, trust`
+	removed_in, replacement, replacement_src, chunk_id, source_url, upstream_rev, retrieved_at, license, trust`
 
 // Filter predicates shared by FTS and symbol queries. Empty string / empty
 // JSON array means "no constraint". Parameters are positional:
@@ -272,14 +272,10 @@ func (r *Reader) SymbolsReplacedBy(ctx context.Context, fqn, season string) ([]S
 	defer rows.Close()
 	var out []Symbol
 	for rows.Next() {
-		var s Symbol
-		var at int64
-		if err := rows.Scan(&s.FQN, &s.Library, &s.Version, &s.Season, &s.Language, &s.Kind, &s.Signature,
-			&s.Summary, &s.Since, &s.DeprecatedIn, &s.RemovedIn, &s.Replacement, &s.ChunkID, &s.SourceURL,
-			&s.UpstreamRev, &at, &s.License, &s.Trust); err != nil {
+		s, err := scanSymbol(rows)
+		if err != nil {
 			return nil, err
 		}
-		s.RetrievedAt = time.Unix(at, 0).UTC()
 		out = append(out, s)
 	}
 	return out, rows.Err()
@@ -296,14 +292,10 @@ func (r *Reader) Members(ctx context.Context, owner, season, language string) ([
 	defer rows.Close()
 	var out []Symbol
 	for rows.Next() {
-		var s Symbol
-		var at int64
-		if err := rows.Scan(&s.FQN, &s.Library, &s.Version, &s.Season, &s.Language, &s.Kind, &s.Signature,
-			&s.Summary, &s.Since, &s.DeprecatedIn, &s.RemovedIn, &s.Replacement, &s.ChunkID, &s.SourceURL,
-			&s.UpstreamRev, &at, &s.License, &s.Trust); err != nil {
+		s, err := scanSymbol(rows)
+		if err != nil {
 			return nil, err
 		}
-		s.RetrievedAt = time.Unix(at, 0).UTC()
 		out = append(out, s)
 	}
 	return out, rows.Err()
@@ -406,14 +398,10 @@ func (r *Reader) Symbols(ctx context.Context, q SymbolQuery) ([]Symbol, error) {
 	defer rows.Close()
 	var out []Symbol
 	for rows.Next() {
-		var s Symbol
-		var at int64
-		if err := rows.Scan(&s.FQN, &s.Library, &s.Version, &s.Season, &s.Language, &s.Kind, &s.Signature,
-			&s.Summary, &s.Since, &s.DeprecatedIn, &s.RemovedIn, &s.Replacement, &s.ChunkID, &s.SourceURL,
-			&s.UpstreamRev, &at, &s.License, &s.Trust); err != nil {
+		s, err := scanSymbol(rows)
+		if err != nil {
 			return nil, err
 		}
-		s.RetrievedAt = time.Unix(at, 0).UTC()
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -441,6 +429,16 @@ func (r *Reader) Symbols(ctx context.Context, q SymbolQuery) ([]Symbol, error) {
 }
 
 type scanner interface{ Scan(...any) error }
+
+func scanSymbol(sc scanner) (Symbol, error) {
+	var s Symbol
+	var at int64
+	err := sc.Scan(&s.FQN, &s.Library, &s.Version, &s.Season, &s.Language, &s.Kind, &s.Signature, &s.Summary, &s.Since,
+		&s.DeprecatedIn, &s.RemovedIn, &s.Replacement, &s.ReplacementSrc, &s.ChunkID, &s.SourceURL, &s.UpstreamRev, &at,
+		&s.License, &s.Trust)
+	s.RetrievedAt = time.Unix(at, 0).UTC()
+	return s, err
+}
 
 func scanChunk(s scanner) (int64, *Chunk, error) {
 	var c Chunk

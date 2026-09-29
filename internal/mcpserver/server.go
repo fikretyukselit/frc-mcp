@@ -20,6 +20,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/facts"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/mcpserver/surface"
+	"github.com/fikretyukselit/frc-mcp/internal/migrate"
 	"github.com/fikretyukselit/frc-mcp/internal/project"
 	"github.com/fikretyukselit/frc-mcp/internal/render"
 	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
@@ -118,6 +119,8 @@ func (s *Server) register() {
 		Annotations: readOnly("FRC library release notes"), InputSchema: whatsNewSchema()}, s.whatsNew)
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_hardware", Title: "FRC motor specs", Description: surface.Hardware(),
 		Annotations: readOnly("FRC motor specs"), InputSchema: hardwareSchema()}, s.hardware)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_migrate", Title: "Map FRC APIs across seasons", Description: surface.Migrate(),
+		Annotations: readOnly("Map FRC APIs across seasons"), InputSchema: migrateSchema()}, s.migrate)
 	s.mcp.AddResource(&mcp.Resource{URI: "frc://index/manifest", Name: "index-manifest", Title: "Loaded index shards",
 		Description: "Shards currently loaded: names, build ids, build times, seasons, chunk and symbol counts.",
 		MIMEType:    "application/json"}, s.manifest)
@@ -437,9 +440,9 @@ const maxVerifyBytes = 512 << 10
 
 // VerifyIn is frc_verify_code's input.
 type VerifyIn struct {
-	Code     string `json:"code,omitempty" jsonschema:"Java source to check"`
-	Path     string `json:"path,omitempty" jsonschema:"alternative to code: a .java file under the project root (local servers only)"`
-	Language string `json:"language,omitempty" jsonschema:"java (C++ and Python arrive in M3)"`
+	Code     string `json:"code,omitempty" jsonschema:"source file to check (Java, C++ or Python)"`
+	Path     string `json:"path,omitempty" jsonschema:"alternative to code: a .java, .cpp/.h or .py file under the project root (local servers only)"`
+	Language string `json:"language,omitempty" jsonschema:"java, cpp or python (default: from the path extension, else detected from the code)"`
 	Season   string `json:"frc_season,omitempty" jsonschema:"FRC season to check against (default: pin, then the current stable season)"`
 	Pin      string `json:"pin,omitempty" jsonschema:"pin handle from frc_context"`
 }
@@ -449,9 +452,6 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 	fromPin, err := applyPin(in.Pin, &in.Season, &lang, &channel)
 	if err != nil {
 		return nil, render.VerifyOut{}, err
-	}
-	if in.Language == "" {
-		in.Language = "java"
 	}
 	if err := validateCommon(in.Season, "", in.Language); err != nil {
 		return nil, render.VerifyOut{}, err
@@ -464,19 +464,26 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 		if s.opt.NoFilesystem {
 			return nil, render.VerifyOut{}, errors.New("path is disabled on this (hosted) server; pass the file content as code")
 		}
-		root := s.opt.ProjectRoot
-		if root == "" {
-			root = "."
-		}
-		b, err := project.ReadSource(root, in.Path, maxVerifyBytes)
+		b, err := project.ReadSource(s.root(), in.Path, maxVerifyBytes)
 		if err != nil {
-			return nil, render.VerifyOut{}, fmt.Errorf("%w; path must be a .java file under the project root %s", err, root)
+			return nil, render.VerifyOut{}, fmt.Errorf("%w; path must be a source file under the project root %s", err, s.root())
 		}
 		code, file = string(b), in.Path
+		if in.Language == "" {
+			in.Language = project.SourceLanguage(in.Path)
+		}
 	case in.Code == "":
-		return nil, render.VerifyOut{}, errors.New(`pass code (Java source) or path, e.g. {"code": "import edu.wpi.first.wpilibj.TimedRobot; …"}`)
+		return nil, render.VerifyOut{}, errors.New(`pass code (Java, C++ or Python source) or path, e.g. {"code": "import edu.wpi.first.wpilibj.TimedRobot; …"}`)
 	case len(in.Code) > maxVerifyBytes:
 		return nil, render.VerifyOut{}, fmt.Errorf("code is %d bytes; the limit is %d — verify one file per call", len(in.Code), maxVerifyBytes)
+	}
+	if (in.Language == "" || in.Language == "any") && file == "" && lang != "" && lang != "any" {
+		in.Language = lang // the pin's project language
+	}
+	if in.Language == "" || in.Language == "any" {
+		if in.Language = verify.DetectLanguage(code); in.Language == "" {
+			in.Language = "java"
+		}
 	}
 	e := s.engine.Load()
 	if !e.Ready() {
@@ -492,21 +499,11 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 	}
 	out := render.VerifyOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
 		Season: in.Season, PinSource: pinSource, Language: in.Language}, File: file, Findings: []render.VerifyFinding{}}
-	if in.Language != "java" {
-		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
-		out.Coverage = map[string]string{"wpilib": "none (" + in.Language + " verification arrives in M4; its symbols are searchable with frc_api)"}
-		out.Next = []string{"only Java is verified today; use frc_api to check individual " + in.Language + " symbols"}
-		return text(render.VerifyMarkdown(out)), out, nil
-	}
 	// A file under the project root: use the project's vendordep versions so
 	// version skew within a season caps vendor findings (verify.Options).
 	opt := verify.Options{}
 	if file != "" {
-		root := s.opt.ProjectRoot
-		if root == "" {
-			root = "."
-		}
-		if p, err := project.Detect(root); err == nil {
+		if p, err := project.Detect(s.root()); err == nil {
 			opt.Installed = map[string]string{}
 			for _, v := range p.Vendordeps {
 				if lib := verify.LibraryOfVendordep(v.Name); lib != "" {
@@ -515,7 +512,7 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 			}
 		}
 	}
-	r := verify.JavaWith(ctx, e, code, in.Season, opt)
+	r := verify.Check(ctx, e, code, in.Language, in.Season, opt)
 	out.Coverage, out.Checked, out.Errors, out.Warnings = r.Coverage, r.Checked, r.Errors, r.Warnings
 	for _, f := range r.Findings {
 		out.Findings = append(out.Findings, render.VerifyFinding(f))
@@ -654,6 +651,172 @@ func (s *Server) hardware(ctx context.Context, _ *mcp.CallToolRequest, in Hardwa
 		out.Known = e.HardwareParts()
 	}
 	return text(render.HardwareMarkdown(out)), out, nil
+}
+
+// ---- frc_migrate ----
+
+// MigrateIn is frc_migrate's input.
+type MigrateIn struct {
+	Symbol         string `json:"symbol,omitempty" jsonschema:"one API symbol: simple name (ChassisSpeeds), FQN, Type#member or Type.member"`
+	Code           string `json:"code,omitempty" jsonschema:"a whole source file (Java, C++ or Python) to map every API reference in it"`
+	Path           string `json:"path,omitempty" jsonschema:"alternative to code: a source file under the project root (local servers only)"`
+	Language       string `json:"language,omitempty" jsonschema:"java, cpp or python (default: every language for symbol, detected for code)"`
+	From           string `json:"from,omitempty" jsonschema:"source season or library version, e.g. 2026 or 2026.2.2 (default: pin, then the current stable season)"`
+	To             string `json:"to,omitempty" jsonschema:"target season or version, e.g. 2027 (default: the newest indexed season after from)"`
+	IncludeMembers bool   `json:"include_members,omitempty" jsonschema:"symbol mode: also list curated rules for the type's members"`
+	Pin            string `json:"pin,omitempty" jsonschema:"pin handle from frc_context (supplies from)"`
+}
+
+func (s *Server) migrate(ctx context.Context, _ *mcp.CallToolRequest, in MigrateIn) (*mcp.CallToolResult, render.MigrateOut, error) {
+	var season, lang, channel string
+	fromPin, err := applyPin(in.Pin, &season, &lang, &channel)
+	if err != nil {
+		return nil, render.MigrateOut{}, err
+	}
+	if in.From == "" {
+		in.From = season
+	}
+	from, to := seasonOf(in.From), seasonOf(in.To)
+	if (in.From != "" && from == "") || (in.To != "" && to == "") {
+		return nil, render.MigrateOut{}, fmt.Errorf(`from/to must be a season (2026) or a version (2026.2.2, 2027.0.0-alpha-7); got %q → %q`, in.From, in.To)
+	}
+	if err := validateCommon("", "", in.Language); err != nil {
+		return nil, render.MigrateOut{}, err
+	}
+	if in.Language == "any" {
+		in.Language = ""
+	}
+	code := in.Code
+	n := 0
+	for _, v := range []string{in.Symbol, in.Code, in.Path} {
+		if v != "" {
+			n++
+		}
+	}
+	switch {
+	case n != 1:
+		return nil, render.MigrateOut{}, errors.New(`pass exactly one of symbol, code or path, e.g. {"symbol": "ChassisSpeeds", "from": "2026", "to": "2027"}`)
+	case len(in.Symbol) > maxSymbolLen:
+		return nil, render.MigrateOut{}, fmt.Errorf("symbol is longer than %d characters", maxSymbolLen)
+	case len(in.Code) > maxVerifyBytes:
+		return nil, render.MigrateOut{}, fmt.Errorf("code is %d bytes; the limit is %d — map one file per call", len(in.Code), maxVerifyBytes)
+	case in.Path != "":
+		if s.opt.NoFilesystem {
+			return nil, render.MigrateOut{}, errors.New("path is disabled on this (hosted) server; pass the file content as code")
+		}
+		b, err := project.ReadSource(s.root(), in.Path, maxVerifyBytes)
+		if err != nil {
+			return nil, render.MigrateOut{}, fmt.Errorf("%w (path must be under the project root %s)", err, s.root())
+		}
+		code = string(b)
+		if in.Language == "" {
+			in.Language = project.SourceLanguage(in.Path)
+		}
+	}
+	if code != "" && in.Language == "" {
+		if in.Language = verify.DetectLanguage(code); in.Language == "" {
+			return nil, render.MigrateOut{}, errors.New(`could not tell the language of code; pass "language": "java", "cpp" or "python"`)
+		}
+	}
+	e := s.engine.Load()
+	if !e.Ready() {
+		out := render.MigrateOut{Envelope: syncing(), Mappings: []render.MigrateMapping{}, Unresolved: []render.MigrateUnresolved{}}
+		return text(render.MigrateMarkdown(out)), out, nil
+	}
+	pinSource := "arg"
+	switch {
+	case fromPin && in.From == season:
+		pinSource = "handle"
+	case from == "":
+		from, pinSource = e.DefaultSeason(), "default"
+	}
+	if to == "" {
+		for _, se := range e.SymbolSeasons() {
+			if se > from {
+				to = se
+				break
+			}
+		}
+		if to == "" {
+			return nil, render.MigrateOut{}, fmt.Errorf("no indexed season after %s; pass to (indexed API seasons: %s)", from, strings.Join(e.SymbolSeasons(), ", "))
+		}
+	}
+	if from == to {
+		return nil, render.MigrateOut{}, fmt.Errorf("from and to are both %s; for one season use frc_api or frc_verify_code", from)
+	}
+	res := migrate.Map(ctx, e, migrate.Query{Symbol: in.Symbol, Code: code, Language: in.Language, From: from, To: to,
+		Members: in.IncludeMembers})
+	out := render.MigrateOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
+		Season: to, PinSource: pinSource, Language: in.Language}, FromSeason: from, ToSeason: to,
+		Mappings: []render.MigrateMapping{}, Unresolved: []render.MigrateUnresolved{}, NotFound: res.NotFound,
+		AlreadyIn: res.AlreadyIn, Checked: res.Checked}
+	for _, m := range res.Mappings {
+		out.Mappings = append(out.Mappings, render.MigrateMapping(m))
+	}
+	for i, u := range res.Unresolved {
+		ru := render.MigrateUnresolved{Symbol: u.Symbol, Language: u.Language, Library: u.Library, Reason: u.Reason, Line: u.Line}
+		if i < 5 { // pointers cost a search each; the first few are what gets read
+			ru.Pointers = s.migratePointers(ctx, e, u, to)
+		}
+		out.Unresolved = append(out.Unresolved, ru)
+	}
+	switch {
+	case len(out.Mappings) == 0 && len(out.Unresolved) == 0:
+		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
+		if len(out.AlreadyIn) > 0 {
+			out.Status, out.Confidence = retrieve.StatusOK, 1
+			out.Next = []string{"already " + to + " API; check it with frc_verify_code (frc_season " + to + ")"}
+		} else {
+			out.Next = []string{"no " + from + " API symbol found; check the name with frc_api (frc_season " + from + ")"}
+		}
+	case len(out.Unresolved) > 0:
+		out.Confidence = float64(len(out.Mappings)) / float64(len(out.Mappings)+len(out.Unresolved))
+		if out.Confidence < 0.5 {
+			out.Status = retrieve.StatusLowConfidence
+		}
+		out.Next = []string{"read the pointers of unresolved symbols with frc_fetch", "after editing, run frc_verify_code with frc_season " + to}
+	default:
+		out.Next = []string{"after editing, run frc_verify_code with frc_season " + to}
+	}
+	return text(render.MigrateMarkdown(out)), out, nil
+}
+
+// migratePointers finds target-season docs and release notes that mention
+// an unresolved symbol (by simple name).
+func (s *Server) migratePointers(ctx context.Context, e *retrieve.Engine, u migrate.Unresolved, to string) []render.MigratePointer {
+	name := index.SimpleName(u.Symbol)
+	if owner := index.OwnerName(u.Symbol); owner != "" {
+		name = owner + " " + name
+	}
+	res, err := e.Search(ctx, retrieve.Query{Text: name, Season: to, Language: u.Language, Kinds: []string{"prose", "release", "code"}, Limit: 3})
+	if err != nil {
+		return nil
+	}
+	var out []render.MigratePointer
+	for _, h := range res.Hits {
+		if h.Chunk == nil || len(out) == 3 {
+			continue
+		}
+		out = append(out, render.MigratePointer{ID: h.Chunk.ID(), Title: h.Chunk.Title, Library: h.Chunk.Library, Kind: h.Chunk.Kind})
+	}
+	return out
+}
+
+// seasonOf accepts a season ("2027") or a library version ("2027.0.0-alpha-7",
+// "2026.2.2"); "" when neither.
+func seasonOf(v string) string {
+	v = strings.TrimSpace(v)
+	if seasonRe.MatchString(v) {
+		return v
+	}
+	return facts.Season(v)
+}
+
+func (s *Server) root() string {
+	if s.opt.ProjectRoot == "" {
+		return "."
+	}
+	return s.opt.ProjectRoot
 }
 
 // callForm renders a factory FQN as a call: "frc::DCMotor#NEO" →
@@ -848,6 +1011,16 @@ func contextSchema() *jsonschema.Schema {
 	enum(d, "language", []string{"java", "cpp", "python"})
 	enum(d, "channel", channels)
 	d.Properties["frc_season"].Pattern = seasonRe.String()
+	return s
+}
+
+func migrateSchema() *jsonschema.Schema {
+	s := infer[MigrateIn]()
+	enum(s, "language", languages)
+	s.Properties["symbol"].MaxLength = ptr(maxSymbolLen)
+	s.Properties["code"].MaxLength = ptr(maxVerifyBytes)
+	s.Properties["from"].MaxLength = ptr(40)
+	s.Properties["to"].MaxLength = ptr(40)
 	return s
 }
 

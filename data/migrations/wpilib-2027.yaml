@@ -1,0 +1,1945 @@
+# Curated migration rules. Every rule cites the upstream change.
+library: wpilib
+from_season: "2026"
+to_season: "2027"
+rules:
+  # --- Kinematics: Speeds -> Velocities (#8479) ---
+  - id: chassisspeeds-to-chassisvelocities
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.ChassisSpeeds
+      cpp: frc::ChassisSpeeds
+      python: wpimath.kinematics.ChassisSpeeds
+    to:
+      java: org.wpilib.math.kinematics.ChassisVelocities
+      cpp: wpi::math::ChassisVelocities
+      python: wpimath.ChassisVelocities
+    notes: ChassisSpeeds was renamed to ChassisVelocities as part of replacing "speed" with "velocity" in wpimath. The fields are vx, vy and omega.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: swervemodulestate-to-swervemodulevelocity
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveModuleState
+      cpp: frc::SwerveModuleState
+      python: wpimath.kinematics.SwerveModuleState
+    to:
+      java: org.wpilib.math.kinematics.SwerveModuleVelocity
+      cpp: wpi::math::SwerveModuleVelocity
+      python: wpimath.SwerveModuleVelocity
+    notes: SwerveModuleState was renamed to SwerveModuleVelocity (#8479 renamed SwerveModuleState.java to SwerveModuleVelocity.java). Its speed field is now named velocity.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: differentialdrivewheelspeeds-to-velocities
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds
+      cpp: frc::DifferentialDriveWheelSpeeds
+      python: wpimath.kinematics.DifferentialDriveWheelSpeeds
+    to:
+      java: org.wpilib.math.kinematics.DifferentialDriveWheelVelocities
+      cpp: wpi::math::DifferentialDriveWheelVelocities
+      python: wpimath.DifferentialDriveWheelVelocities
+    notes: DifferentialDriveWheelSpeeds was renamed to DifferentialDriveWheelVelocities.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: mecanumdrivewheelspeeds-to-velocities
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.MecanumDriveWheelSpeeds
+      cpp: frc::MecanumDriveWheelSpeeds
+      python: wpimath.kinematics.MecanumDriveWheelSpeeds
+    to:
+      java: org.wpilib.math.kinematics.MecanumDriveWheelVelocities
+      cpp: wpi::math::MecanumDriveWheelVelocities
+      python: wpimath.MecanumDriveWheelVelocities
+    notes: MecanumDriveWheelSpeeds was renamed to MecanumDriveWheelVelocities.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: swervekinematics-toswervemodulestates
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveDriveKinematics#toSwerveModuleStates
+      cpp: frc::SwerveDriveKinematics#ToSwerveModuleStates
+    to:
+      java: org.wpilib.math.kinematics.SwerveDriveKinematics#toSwerveModuleVelocities
+      cpp: wpi::math::SwerveDriveKinematics#ToSwerveModuleVelocities
+    notes: Takes a ChassisVelocities and returns SwerveModuleVelocity[] (C++ wpi::util::array of SwerveModuleVelocity).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: swervekinematics-towheelspeeds
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveDriveKinematics#toWheelSpeeds
+      cpp: frc::SwerveDriveKinematics#ToWheelSpeeds
+    to:
+      java: org.wpilib.math.kinematics.SwerveDriveKinematics#toWheelVelocities
+      cpp: wpi::math::SwerveDriveKinematics#ToWheelVelocities
+    notes: Inverse kinematics method renamed; 2027 signature is SwerveModuleVelocity[] toWheelVelocities(ChassisVelocities chassisVelocities).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: swervekinematics-tochassisspeeds
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveDriveKinematics#toChassisSpeeds
+      cpp: frc::SwerveDriveKinematics#ToChassisSpeeds
+    to:
+      java: org.wpilib.math.kinematics.SwerveDriveKinematics#toChassisVelocities
+      cpp: wpi::math::SwerveDriveKinematics#ToChassisVelocities
+    notes: Forward kinematics method renamed; 2027 signature is ChassisVelocities toChassisVelocities(SwerveModuleVelocity... moduleVelocities).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: swervekinematics-desaturatewheelspeeds
+    kind: signature
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveDriveKinematics#desaturateWheelSpeeds
+      cpp: frc::SwerveDriveKinematics#DesaturateWheelSpeeds
+    to:
+      java: org.wpilib.math.kinematics.SwerveDriveKinematics#desaturateWheelVelocities
+      cpp: wpi::math::SwerveDriveKinematics#DesaturateWheelVelocities
+    notes: >-
+      Renamed to desaturateWheelVelocities (#8479) and made immutable in #8274 - it no longer modifies the array in place; it returns a new one, e.g. `public static SwerveModuleVelocity[] desaturateWheelVelocities(SwerveModuleVelocity[] moduleVelocities, double attainableMaxVelocity)`. Use the return value.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8274
+
+  - id: diffkinematics-towheelspeeds
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.DifferentialDriveKinematics#toWheelSpeeds
+      cpp: frc::DifferentialDriveKinematics#ToWheelSpeeds
+    to:
+      java: org.wpilib.math.kinematics.DifferentialDriveKinematics#toWheelVelocities
+      cpp: wpi::math::DifferentialDriveKinematics#ToWheelVelocities
+    notes: 2027 signature is DifferentialDriveWheelVelocities toWheelVelocities(ChassisVelocities chassisVelocities).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: diffkinematics-tochassisspeeds
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.DifferentialDriveKinematics#toChassisSpeeds
+      cpp: frc::DifferentialDriveKinematics#ToChassisSpeeds
+    to:
+      java: org.wpilib.math.kinematics.DifferentialDriveKinematics#toChassisVelocities
+      cpp: wpi::math::DifferentialDriveKinematics#ToChassisVelocities
+    notes: 2027 signature is ChassisVelocities toChassisVelocities(DifferentialDriveWheelVelocities wheelVelocities).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: mecanumkinematics-towheelspeeds
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.MecanumDriveKinematics#toWheelSpeeds
+    to:
+      java: org.wpilib.math.kinematics.MecanumDriveKinematics#toWheelVelocities
+    notes: 2027 signature is MecanumDriveWheelVelocities toWheelVelocities(ChassisVelocities chassisVelocities), with an overload taking a Translation2d centerOfRotation.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: chassisspeeds-fromfieldrelativespeeds
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.ChassisSpeeds#fromFieldRelativeSpeeds
+      cpp: frc::ChassisSpeeds#FromFieldRelativeSpeeds
+    to:
+      java: org.wpilib.math.kinematics.ChassisVelocities#toRobotRelative
+      cpp: wpi::math::ChassisVelocities#ToRobotRelative
+    notes: >-
+      The static factory was replaced by an instance method in #7545; `ChassisSpeeds.fromFieldRelativeSpeeds(speeds, angle)` becomes `velocities.toRobotRelative(angle)` (2027 signature `public ChassisVelocities toRobotRelative(Rotation2d robotAngle)`). The type rename is from #8479.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7545
+
+  - id: chassisspeeds-fromrobotrelativespeeds
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.ChassisSpeeds#fromRobotRelativeSpeeds
+      cpp: frc::ChassisSpeeds#FromRobotRelativeSpeeds
+    to:
+      java: org.wpilib.math.kinematics.ChassisVelocities#toFieldRelative
+      cpp: wpi::math::ChassisVelocities#ToFieldRelative
+    notes: >-
+      The static factory was replaced by an instance method in #7545; `ChassisSpeeds.fromRobotRelativeSpeeds(speeds, angle)` becomes `velocities.toFieldRelative(angle)`.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7545
+
+  - id: chassisspeeds-discretize
+    kind: signature
+    from:
+      java: edu.wpi.first.math.kinematics.ChassisSpeeds#discretize
+      cpp: frc::ChassisSpeeds#Discretize
+    to:
+      java: org.wpilib.math.kinematics.ChassisVelocities#discretize
+      cpp: wpi::math::ChassisVelocities#Discretize
+    notes: discretize is now an instance method (#7545). 2027 Java signature is `public ChassisVelocities discretize(double dt)`; C++ is `constexpr ChassisVelocities Discretize(wpi::units::second_t dt) const`. Replace `ChassisSpeeds.discretize(speeds, dt)` with `velocities.discretize(dt)`.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7545
+
+  - id: chassisspeeds-vxmeterspersecond
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.ChassisSpeeds#vxMetersPerSecond
+    to:
+      java: org.wpilib.math.kinematics.ChassisVelocities#vx
+    notes: Unit suffixes were removed from wpimath field names (#7529); the unit (m/s) is now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: chassisspeeds-vymeterspersecond
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.ChassisSpeeds#vyMetersPerSecond
+    to:
+      java: org.wpilib.math.kinematics.ChassisVelocities#vy
+    notes: Unit suffixes were removed from wpimath field names (#7529); the unit (m/s) is now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: chassisspeeds-omegaradianspersecond
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.ChassisSpeeds#omegaRadiansPerSecond
+    to:
+      java: org.wpilib.math.kinematics.ChassisVelocities#omega
+    notes: Unit suffixes were removed from wpimath field names (#7529); the unit (rad/s) is now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: swervemodulestate-speed-field
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveModuleState#speedMetersPerSecond
+      cpp: frc::SwerveModuleState#speed
+    to:
+      java: org.wpilib.math.kinematics.SwerveModuleVelocity#velocity
+      cpp: wpi::math::SwerveModuleVelocity#velocity
+    notes: >-
+      The module speed field is now `velocity` (m/s) on SwerveModuleVelocity. The Java unit suffix was dropped in #7529 and "speed" became "velocity" in #8479.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+
+  - id: swervemodulestate-optimize
+    kind: signature
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveModuleState#optimize
+      cpp: frc::SwerveModuleState#Optimize
+    to:
+      java: org.wpilib.math.kinematics.SwerveModuleVelocity#optimize
+      cpp: wpi::math::SwerveModuleVelocity#Optimize
+    notes: optimize no longer mutates in place and the deprecated static overload is gone. 2027 signature is `public SwerveModuleVelocity optimize(Rotation2d currentAngle)` (C++ `constexpr SwerveModuleVelocity Optimize(const Rotation2d &currentAngle) const`). Use the return value, e.g. `var v = desired.optimize(angle).cosineScale(angle);`.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8274
+
+  - id: swervemodulestate-cosinescale
+    kind: signature
+    from:
+      java: edu.wpi.first.math.kinematics.SwerveModuleState#cosineScale
+      cpp: frc::SwerveModuleState#CosineScale
+    to:
+      java: org.wpilib.math.kinematics.SwerveModuleVelocity#cosineScale
+      cpp: wpi::math::SwerveModuleVelocity#CosineScale
+    notes: cosineScale now returns a new value instead of mutating (2027 `public SwerveModuleVelocity cosineScale(Rotation2d currentAngle)`). Use the return value.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8274
+
+  - id: differentialwheelspeeds-desaturate
+    kind: signature
+    from:
+      java: edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds#desaturate
+      cpp: frc::DifferentialDriveWheelSpeeds#Desaturate
+    to:
+      java: org.wpilib.math.kinematics.DifferentialDriveWheelVelocities#desaturate
+      cpp: wpi::math::DifferentialDriveWheelVelocities#Desaturate
+    notes: desaturate now returns a new object instead of mutating (2027 `public DifferentialDriveWheelVelocities desaturate(double attainableMaxVelocity)`, annotated @NoDiscard). Use the return value.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8274
+
+  - id: differentialwheelspeeds-leftmeterspersecond
+    kind: rename
+    from:
+      java: edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds#leftMetersPerSecond
+    to:
+      java: org.wpilib.math.kinematics.DifferentialDriveWheelVelocities#left
+    notes: Unit suffixes were removed from wpimath field names (#7529). The same applies to rightMetersPerSecond -> right.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  # --- Geometry ---
+  - id: rotation2d-getradians-wrapped
+    kind: behavior
+    from:
+      java: edu.wpi.first.math.geometry.Rotation2d#getRadians
+    to:
+      java: org.wpilib.math.geometry.Rotation2d#getRadians
+    notes: >-
+      Silent breaking change - getRadians(), getDegrees() and getRotations() now return a wrapped angle (the 2027 changelog points to #7490). Code that relied on accumulated (unwrapped) angles should store a double or an Angle instead of a Rotation2d.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7490
+
+  - id: translation2d-getangle-optional
+    kind: signature
+    from:
+      java: edu.wpi.first.math.geometry.Translation2d#getAngle
+      cpp: frc::Translation2d#Angle
+    to:
+      java: org.wpilib.math.geometry.Translation2d#getAngle
+      cpp: wpi::math::Translation2d#Angle
+    notes: getAngle now returns `Optional<Rotation2d>` (C++ `std::optional<Rotation2d>`), so a zero-length translation no longer produces a Rotation2d that violates its invariants. Handle the empty case explicitly.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9266
+
+  - id: pose2d-exp-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.math.geometry.Pose2d#exp
+      cpp: frc::Pose2d#Exp
+    notes: >-
+      Pose2d.exp(Twist2d) was removed. Use `pose.plus(twist.exp())`, where Twist2d#exp returns a Transform2d (recommendation from #8188 and the 2027 removed-features page).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8188
+
+  - id: pose2d-log-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.math.geometry.Pose2d#log
+    notes: >-
+      Pose2d.log(Pose2d) was removed alongside exp. #8188 replaces it with `Twist2d Transform2d.log()`, so compute the transform between the poses (e.g. `end.minus(start)`) and call log() on it.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8188
+
+  # --- Controllers / trajectories ---
+  - id: holonomicdrivecontroller-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.math.controller.HolonomicDriveController
+      cpp: frc::HolonomicDriveController
+      python: wpimath.controller.HolonomicDriveController
+    notes: >-
+      Removed in #8119, which describes it as "just 3 PID controllers". Use PIDController / ProfiledPIDController directly, or the path follower of Choreo or PathPlanner.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8119
+
+  - id: ramsetecontroller-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.math.controller.RamseteController
+      cpp: frc::RamseteController
+      python: wpimath.controller.RamseteController
+    notes: RamseteController and RamseteCommand were removed. Use LTVUnicycleController (org.wpilib.math.controller.LTVUnicycleController), as the deprecation message and the 2027 removed-features page recommend.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7522
+
+  - id: trajectorygenerator-renamed
+    kind: rename
+    from:
+      java: edu.wpi.first.math.trajectory.TrajectoryGenerator
+      cpp: frc::TrajectoryGenerator
+      python: wpimath.trajectory.TrajectoryGenerator
+    to:
+      java: org.wpilib.math.trajectory.DrivetrainSplineTrajectoryGenerator
+      cpp: wpi::math::DrivetrainSplineTrajectoryGenerator
+      python: wpimath.DrivetrainSplineTrajectoryGenerator
+    notes: Renamed to DrivetrainSplineTrajectoryGenerator because it only applies to spline-based drivetrain trajectories. It now returns a DrivetrainSplineTrajectory.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9086
+
+  - id: trajectorygenerator-generatetrajectory
+    kind: rename
+    from:
+      java: edu.wpi.first.math.trajectory.TrajectoryGenerator#generateTrajectory
+      cpp: frc::TrajectoryGenerator#GenerateTrajectory
+    to:
+      java: org.wpilib.math.trajectory.DrivetrainSplineTrajectoryGenerator#generate
+      cpp: wpi::math::DrivetrainSplineTrajectoryGenerator#Generate
+    notes: '`TrajectoryGenerator.generateTrajectory(...)` becomes `DrivetrainSplineTrajectoryGenerator.generate(...)`, returning DrivetrainSplineTrajectory; the same waypoint/TrajectoryConfig overloads exist.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9086
+
+  - id: trajectoryparameterizer-renamed
+    kind: rename
+    from:
+      java: edu.wpi.first.math.trajectory.TrajectoryParameterizer
+      cpp: frc::TrajectoryParameterizer
+      python: wpimath.trajectory.TrajectoryParameterizer
+    to:
+      java: org.wpilib.math.trajectory.DrivetrainSplineTrajectoryParameterizer
+      cpp: wpi::math::DrivetrainSplineTrajectoryParameterizer
+      python: wpimath.DrivetrainSplineTrajectoryParameterizer
+    notes: Renamed to DrivetrainSplineTrajectoryParameterizer alongside the generator.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9086
+
+  - id: trajectory-state-to-drivetrainsplinesample
+    kind: rename
+    from:
+      java: edu.wpi.first.math.trajectory.Trajectory.State
+    to:
+      java: org.wpilib.math.trajectory.DrivetrainSplineSample
+    notes: >-
+      The Trajectory API rewrite (#8172) made Trajectory generic over a sample type, and SplineSample replaced Trajectory.State. #9078 later renamed SplineSample to DrivetrainSplineSample.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8172
+
+  - id: linearsystemid-to-models
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId
+      cpp: frc::LinearSystemId
+      python: wpimath.system.plant.LinearSystemId
+    to:
+      java: org.wpilib.math.system.Models
+      cpp: wpi::math::Models
+      python: wpimath.Models
+    notes: LinearSystem factories were reorganized into Models with <mechanism>FromPhysicalConstants / <mechanism>FromSysId names. The member rules below list the mappings.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  - id: linearsystemid-createflywheelsystem
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId#createFlywheelSystem
+      cpp: frc::LinearSystemId#FlywheelSystem
+    to:
+      java: org.wpilib.math.system.Models#flywheelFromPhysicalConstants
+      cpp: wpi::math::Models#FlywheelFromPhysicalConstants
+    notes: >-
+      Same arguments (motor, J, gearing), as the examples in #8468 show.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  - id: linearsystemid-createelevatorsystem
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId#createElevatorSystem
+      cpp: frc::LinearSystemId#ElevatorSystem
+    to:
+      java: org.wpilib.math.system.Models#elevatorFromPhysicalConstants
+      cpp: wpi::math::Models#ElevatorFromPhysicalConstants
+    notes: >-
+      Same arguments (motor, mass, drum radius, gearing), as the examples in #8468 show.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  - id: linearsystemid-createsinglejointedarmsystem
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId#createSingleJointedArmSystem
+      cpp: frc::LinearSystemId#SingleJointedArmSystem
+    to:
+      java: org.wpilib.math.system.Models#singleJointedArmFromPhysicalConstants
+      cpp: wpi::math::Models#SingleJointedArmFromPhysicalConstants
+    notes: >-
+      Same arguments (motor, J, gearing), as the examples in #8468 show.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  - id: linearsystemid-createdrivetrainvelocitysystem
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId#createDrivetrainVelocitySystem
+      cpp: frc::LinearSystemId#DrivetrainVelocitySystem
+    to:
+      java: org.wpilib.math.system.Models#differentialDriveFromPhysicalConstants
+      cpp: wpi::math::Models#DifferentialDriveFromPhysicalConstants
+    notes: >-
+      Same arguments (motor, mass, wheel radius, trackwidth/2, J, gearing), as the examples in #8468 show.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  - id: linearsystemid-identifydrivetrainsystem
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId#identifyDrivetrainSystem
+      cpp: frc::LinearSystemId#IdentifyDrivetrainSystem
+    to:
+      java: org.wpilib.math.system.Models#differentialDriveFromSysId
+      cpp: wpi::math::Models#DifferentialDriveFromSysId
+    notes: Same SysId gain arguments (kV/kA linear, kV/kA angular, optional trackwidth).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  - id: linearsystemid-identifyvelocitysystem
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId#identifyVelocitySystem
+    to:
+      java: org.wpilib.math.system.Models#flywheelFromSysId
+    notes: '`identifyVelocitySystem(kV, kA)` becomes `flywheelFromSysId(kV, kA)` (StateSpaceFlywheelSysId example in #8468).'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  # --- Dashboard / telemetry (#7773) ---
+  - id: sendablechooser-to-selectable
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.smartdashboard.SendableChooser
+      cpp: frc::SendableChooser
+    to:
+      java: org.wpilib.tunable.Selectable
+      cpp: wpi::tunables::Selectable
+    notes: SendableChooser was replaced by Selectable in the Tunables API. Publish it with `Tunables.publish("Auto choices", chooser)` instead of `SmartDashboard.putData`.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendablechooser-setdefaultoption
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.smartdashboard.SendableChooser#setDefaultOption
+    to:
+      java: org.wpilib.tunable.Selectable#addDefault
+    notes: '`chooser.setDefaultOption(name, value)` becomes `chooser.addDefault(name, value)` (timed template in #7773).'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendablechooser-addoption
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.smartdashboard.SendableChooser#addOption
+    to:
+      java: org.wpilib.tunable.Selectable#add
+    notes: '`chooser.addOption(name, value)` becomes `chooser.add(name, value)`. getSelected() keeps its name.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: smartdashboard-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.smartdashboard.SmartDashboard
+      cpp: frc::SmartDashboard
+      python: wpilib.SmartDashboard
+    notes: >-
+      SmartDashboard was removed. The migration guide in #7773 says to use `Telemetry.log(...)` (org.wpilib.telemetry.Telemetry) for values that were only displayed, and the Tunable API (`Tunables.addDouble(...)` etc.) for values read back with get*().
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: smartdashboard-putnumber
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.smartdashboard.SmartDashboard#putNumber
+    to:
+      java: org.wpilib.telemetry.Telemetry#log
+    notes: 'Migration guide: `SmartDashboard.putNumber("Drive/leftVelocity", x)` becomes `Telemetry.log("Drive/leftVelocity", x)`, or log through a `Telemetry.getTable("Drive")` table. Call it periodically.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: smartdashboard-putdata
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.smartdashboard.SmartDashboard#putData
+    to:
+      java: org.wpilib.telemetry.Telemetry#log
+    notes: 'Migration guide: objects previously published once with putData must now be logged periodically, e.g. `Telemetry.log("Field", m_field)` in robotPeriodic. Choosers are published with `Tunables.publish` instead.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: smartdashboard-getnumber
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.smartdashboard.SmartDashboard#getNumber
+    to:
+      java: org.wpilib.tunable.Tunables#addDouble
+    notes: 'Migration guide: dashboard-tuned values become Tunables, e.g. `TunableDouble speed = Tunables.addDouble("Intake/speed", 0.65);`, then read `speed.get()`.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendable-to-telemetryloggable
+    kind: rename
+    from:
+      java: edu.wpi.first.util.sendable.Sendable
+      cpp: wpi::Sendable
+    to:
+      java: org.wpilib.telemetry.TelemetryLoggable
+      cpp: wpi::telemetry::TelemetryLoggable
+    notes: '#7773 says TelemetryLoggable is the equivalent of Sendable, but it is immediate rather than callback-based: implement `void logTo(TelemetryTable table)`, which logs the current values, instead of initSendable(SendableBuilder).'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: epiloguebackend-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.epilogue.logging.EpilogueBackend
+    notes: '#7773 removed EpilogueBackend and its implementations (FileBackend, NTEpilogueBackend, NullBackend, ...). Epilogue now logs through TelemetryTable; use a TelemetryBackend such as org.wpilib.telemetry.DiscardTelemetryBackend (epilogue README in #7773).'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: shuffleboard-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.shuffleboard.Shuffleboard
+      cpp: frc::Shuffleboard
+      python: wpilib.shuffleboard.Shuffleboard
+    notes: The Shuffleboard API was removed. The 2027 removed-features page says to use Elastic as a driver dashboard and AdvantageScope for debugging; publish data from robot code with the Telemetry API (#7773).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7730
+
+  - id: livewindow-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.livewindow.LiveWindow
+      cpp: frc::LiveWindow
+      python: wpilib.LiveWindow
+    notes: LiveWindow was removed. The PR says it "will be replaced by a different mechanism"; no replacement exists yet in 2027.0.0-alpha-7.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7733
+
+  # --- Commands v2 ---
+  - id: command-to-command2
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj2.command.Command
+    to:
+      java: org.wpilib.command2.Command
+    notes: The Commands v2 package moved from edu.wpi.first.wpilibj2.command to org.wpilib.command2. org.wpilib.command3 is the new, separate Commands v3 framework (#6518) and is not a drop-in replacement.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: commandxboxcontroller-to-command2
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.CommandXboxController
+    to:
+      java: org.wpilib.command2.button.CommandNiDsXboxController
+    notes: 'Moved to org.wpilib.command2.button by the reorg (#8260), then renamed CommandNiDsXboxController by #8596, which prefixed NI-DS-specific controller classes. A new SDL-based org.wpilib.command2.button.CommandXboxController was added later (#8957) and is not the renamed class. Do not use the command3 variant with v2 code.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8596
+
+  - id: joystickbutton-to-command2
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.JoystickButton
+    to:
+      java: org.wpilib.command2.button.JoystickButton
+    notes: Commands v2 button classes moved to org.wpilib.command2.button; the command3 variant belongs to Commands v3.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: robotmodetriggers-to-command2
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.RobotModeTriggers
+    to:
+      java: org.wpilib.command2.button.RobotModeTriggers
+    notes: Commands v2 button classes moved to org.wpilib.command2.button; the command3 variant belongs to Commands v3.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: commandjoystick-to-command2
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.CommandJoystick
+    to:
+      java: org.wpilib.command2.button.CommandJoystick
+    notes: Commands v2 button classes moved to org.wpilib.command2.button; the command3 variant belongs to Commands v3.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: commandps4controller-renamed
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.CommandPS4Controller
+      cpp: frc2::CommandPS4Controller
+      python: commands2.button.CommandPS4Controller
+    to:
+      java: org.wpilib.command2.button.CommandNiDsPS4Controller
+      cpp: wpi::cmd::CommandNiDsPS4Controller
+      python: commands2.button.CommandNiDsPS4Controller
+    notes: NI-DS-specific controller classes were prefixed with NiDs. SDL-based alternatives (CommandDualShock4Controller, CommandGamepad) also exist in 2027.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8596
+
+  - id: commandps5controller-renamed
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.CommandPS5Controller
+      cpp: frc2::CommandPS5Controller
+    to:
+      java: org.wpilib.command2.button.CommandNiDsPS5Controller
+      cpp: wpi::cmd::CommandNiDsPS5Controller
+    notes: NI-DS-specific controller classes were prefixed with NiDs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8596
+
+  - id: control-commands-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj2.command.PIDCommand
+      cpp: frc2::PIDCommand
+    notes: PIDCommand, PIDSubsystem, ProfiledPIDCommand, ProfiledPIDSubsystem, TrapezoidProfileCommand and TrapezoidProfileSubsystem were removed. The 2027 removed-features page says to use PIDController / ProfiledPIDController / TrapezoidProfile directly inside commands and subsystems.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7921
+
+  - id: pidsubsystem-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj2.command.PIDSubsystem
+      cpp: frc2::PIDSubsystem
+    notes: Removed, as its 2025 deprecation said ("Use a PIDController instead"). Put a PIDController in a regular subsystem.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7921
+
+  - id: trapezoidprofilesubsystem-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj2.command.TrapezoidProfileSubsystem
+      cpp: frc2::TrapezoidProfileSubsystem
+    notes: Removed, as its 2025 deprecation said ("Use a TrapezoidProfile instead"). Compute the profile directly in a regular subsystem.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7921
+
+  - id: swervecontrollercommand-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj2.command.SwerveControllerCommand
+      cpp: frc2::SwerveControllerCommand
+    notes: Removed along with MecanumControllerCommand and HolonomicDriveController. Use PID controllers directly or a path-following library; the 2027 removed-features page recommends Choreo, PathPlanner or Bline for paths.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8119
+
+  # --- HID / driver station ---
+  - id: xboxcontroller-nids
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.XboxController
+      cpp: frc::XboxController
+      python: wpilib.XboxController
+    to:
+      java: org.wpilib.driverstation.NiDsXboxController
+      cpp: wpi::NiDsXboxController
+      python: wpilib.NiDsXboxController
+    notes: '#8596 renamed the NI DS XboxController to NiDsXboxController. The same-named org.wpilib.driverstation.XboxController in 2027 is a new SDL-based gamepad class (#8957) with different button/axis mapping, so a pure package move is not equivalent.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8596
+
+  - id: ps4controller-nids
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.PS4Controller
+      cpp: frc::PS4Controller
+      python: wpilib.PS4Controller
+    to:
+      java: org.wpilib.driverstation.NiDsPS4Controller
+      cpp: wpi::NiDsPS4Controller
+      python: wpilib.NiDsPS4Controller
+    notes: NI-DS-specific controller classes were prefixed with NiDs. An SDL-based DualShock4Controller also exists in 2027.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8596
+
+  - id: ps5controller-nids
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.PS5Controller
+      cpp: frc::PS5Controller
+      python: wpilib.PS5Controller
+    to:
+      java: org.wpilib.driverstation.NiDsPS5Controller
+      cpp: wpi::NiDsPS5Controller
+      python: wpilib.NiDsPS5Controller
+    notes: NI-DS-specific controller classes were prefixed with NiDs. An SDL-based DualSenseController also exists in 2027.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8596
+
+  - id: stadiacontroller-nids
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.StadiaController
+      cpp: frc::StadiaController
+    to:
+      java: org.wpilib.driverstation.NiDsStadiaController
+      cpp: wpi::NiDsStadiaController
+    notes: NI-DS-specific controller classes were prefixed with NiDs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8596
+
+  - id: driverstation-alliance
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation.Alliance
+      python: wpilib.DriverStation.Alliance
+    to:
+      java: org.wpilib.driverstation.Alliance
+      python: wpilib.Alliance
+    notes: DriverStation was split into smaller classes, and the nested Alliance enum became a top-level type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getalliance
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#getAlliance
+      cpp: frc::DriverStation#GetAlliance
+      python: wpilib.DriverStation#getAlliance
+    to:
+      java: org.wpilib.driverstation.MatchState#getAlliance
+      cpp: wpi::MatchState#GetAlliance
+      python: wpilib.MatchState#get_alliance
+    notes: Match information moved to MatchState when DriverStation was split. Java still returns Optional<Alliance>. Python names are snake_case in 2027 (2027 changelog, Alpha 6).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getmatchtime
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#getMatchTime
+      cpp: frc::DriverStation#GetMatchTime
+      python: wpilib.DriverStation#getMatchTime
+    to:
+      java: org.wpilib.driverstation.MatchState#getMatchTime
+      cpp: wpi::MatchState#GetMatchTime
+      python: wpilib.MatchState#get_match_time
+    notes: Moved to MatchState when DriverStation was split.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isenabled
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isEnabled
+      cpp: frc::DriverStation#IsEnabled
+      python: wpilib.DriverStation#isEnabled
+    to:
+      java: org.wpilib.driverstation.RobotState#isEnabled
+      cpp: wpi::RobotState#IsEnabled
+      python: wpilib.RobotState#is_enabled
+    notes: Robot mode queries (isEnabled, isDisabled, isAutonomous, isTeleop) moved to RobotState when DriverStation was split.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isautonomous
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isAutonomous
+      cpp: frc::DriverStation#IsAutonomous
+      python: wpilib.DriverStation#isAutonomous
+    to:
+      java: org.wpilib.driverstation.RobotState#isAutonomous
+      cpp: wpi::RobotState#IsAutonomous
+      python: wpilib.RobotState#is_autonomous
+    notes: Moved to RobotState when DriverStation was split.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-istest-to-isutility
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isTest
+      cpp: frc::DriverStation#IsTest
+    to:
+      java: org.wpilib.driverstation.RobotState#isUtility
+      cpp: wpi::RobotState#IsUtility
+    notes: The "Test" robot mode was renamed "Utility" (#8782); the query also moved from DriverStation to RobotState (#8628).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8782
+
+  # --- Hardware ---
+  - id: motorcontroller-set-to-setthrottle
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.motorcontrol.MotorController#set
+      cpp: frc::MotorController#Set
+    to:
+      java: org.wpilib.hardware.motor.MotorController#setThrottle
+      cpp: wpi::MotorController#SetThrottle
+    notes: '`set(double speed)` became setDutyCycle in #8479 and was then renamed to `setThrottle(double throttle)` in #8720. `get()` is now `getThrottle()`.'
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8720
+
+  - id: motorcontroller-stopmotor-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.motorcontrol.MotorController#stopMotor
+      cpp: frc::MotorController#StopMotor
+    notes: MotorController::StopMotor() was removed. Use disable() (org.wpilib.hardware.motor.MotorController#disable), which the PR says does the same thing in practice.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8483
+
+  - id: relay-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.Relay
+      cpp: frc::Relay
+      python: wpilib.Relay
+    notes: Relay classes were removed; the 2027 changelog lists relay among hardware not supported on Systemcore. The PR names no direct WPILib replacement.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7695
+
+  - id: servo-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.Servo
+      cpp: frc::Servo
+      python: wpilib.Servo
+    notes: Systemcore cannot power servos directly. The PR names REV Servo Hubs as a working replacement.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8270
+
+  - id: adxrs450-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.ADXRS450_Gyro
+      cpp: frc::ADXRS450_Gyro
+      python: wpilib.ADXRS450_Gyro
+    notes: SPI support was removed, so SPI IMUs (ADIS16448, ADIS16470, ADXL345, ADXRS450) are unsupported on Systemcore (2027 removed-features page). The 2027 changelog lists the Systemcore onboard IMU (org.wpilib.hardware.imu.OnboardIMU) among the new hardware support.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7678
+
+  - id: adis16470-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.ADIS16470_IMU
+      cpp: frc::ADIS16470_IMU
+    notes: Removed with SPI support; Systemcore does not support SPI. The 2027 changelog lists the Systemcore onboard IMU (org.wpilib.hardware.imu.OnboardIMU) among the new hardware support.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7678
+
+  - id: ultrasonic-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.Ultrasonic
+      cpp: frc::Ultrasonic
+    notes: Removed because Systemcore does not support that type of counter (#7723; 2027 removed-features page). No WPILib replacement is named.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7723
+
+  # --- Units / AprilTag ---
+  - id: mutablemeasure-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.units.MutableMeasure
+    notes: Mutable Java unit implementations were removed. Use immutable Measure values (e.g. `Meters.of(x)`); the 2027 removed-features page says Systemcore has enough RAM for immutable units.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8115
+
+  - id: apriltagfields-to-fields
+    kind: rename
+    from:
+      java: edu.wpi.first.apriltag.AprilTagFields
+    to:
+      java: org.wpilib.fields.Fields
+    notes: AprilTag layout data was merged into the field JSON and Field class. The 2027 changelog says "AprilTagFields is now part of an integrated Fields class"; load a field with `Field.loadField(Fields)` and use `Field#getTagPose(int)`.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9166
+
+  - id: apriltagfieldlayout-to-vendordep
+    kind: removed
+    from:
+      java: edu.wpi.first.apriltag.AprilTagFieldLayout
+      cpp: frc::AprilTagFieldLayout
+    notes: The apriltag library was converted to a vendordep and is no longer part of core WPILib. Add the AprilTag vendordep to keep using AprilTagFieldLayout; for built-in field tag poses use org.wpilib.fields.Field#getTagPose (#9166).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9203
+
+  # --- Round 2: symbols left unmapped by the 2026 team-repo scan ---
+
+  - id: timer-getfpgatimestamp-to-monotonic
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.Timer#getFPGATimestamp
+      cpp: frc::Timer#GetFPGATimestamp
+    to:
+      java: org.wpilib.system.Timer#getMonotonicTimestamp
+      cpp: wpi::Timer#GetMonotonicTimestamp
+    notes: >-
+      The FPGA clock was renamed the monotonic clock (#8672). getMonotonicTimestamp() still returns seconds as a double. Timer.getTimestamp() is still available and follows the configurable time source (RobotController.setTimeSource).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8672
+
+  - id: robotcontroller-getfpgatime-to-monotonic
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getFPGATime
+      cpp: frc::RobotController#GetFPGATime
+    to:
+      java: org.wpilib.system.RobotController#getMonotonicTime
+      cpp: wpi::RobotController#GetMonotonicTime
+    notes: >-
+      Renamed with the FPGA-to-monotonic clock rename (#8672). Unit change: the 2026 value was microseconds, but since #9335 getMonotonicTime() returns nanoseconds. Divide by 1000 where code expects microseconds.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8672
+
+  - id: timer-cpp-namespace
+    kind: move
+    from:
+      cpp: frc::Timer
+    to:
+      cpp: wpi::Timer
+    notes: >-
+      The C++ frc:: namespace became wpi:: in the 2027 reorg (#8260).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: timer-gettimestamp-cpp-namespace
+    kind: move
+    from:
+      cpp: frc::Timer#GetTimestamp
+    to:
+      cpp: wpi::Timer#GetTimestamp
+    notes: >-
+      Same function; only the namespace changed from frc:: to wpi:: (#8260).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: wpi-event-to-util
+    kind: move
+    from:
+      cpp: wpi::Event
+    to:
+      cpp: wpi::util::Event
+    notes: >-
+      wpiutil C++ types moved into the wpi::util namespace in the 2027 reorg (#8260).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: driverstation-getgamespecificmessage
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#getGameSpecificMessage
+      cpp: frc::DriverStation#GetGameSpecificMessage
+    to:
+      java: org.wpilib.driverstation.MatchState#getGameData
+      cpp: wpi::MatchState#GetGameData
+    notes: >-
+      Renamed to getGameData by #8584 and moved to MatchState by #8628. It now returns Optional<String> (C++ std::optional<std::string>) instead of a String, and game data is limited to 8 bytes.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8584
+
+  - id: driverstationsim-setgamespecificmessage
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setGameSpecificMessage
+      cpp: frc::sim::DriverStationSim#SetGameSpecificMessage
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setGameData
+      cpp: wpi::sim::DriverStationSim#SetGameData
+    notes: >-
+      Renamed along with the switch to the new game data format (#8584).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8584
+
+  - id: driverstation-isdisabled
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isDisabled
+      cpp: frc::DriverStation#IsDisabled
+    to:
+      java: org.wpilib.driverstation.RobotState#isDisabled
+      cpp: wpi::RobotState#IsDisabled
+    notes: >-
+      Moved to RobotState when DriverStation was split into smaller classes. Same name and return type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isautonomousenabled
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isAutonomousEnabled
+      cpp: frc::DriverStation#IsAutonomousEnabled
+    to:
+      java: org.wpilib.driverstation.RobotState#isAutonomousEnabled
+      cpp: wpi::RobotState#IsAutonomousEnabled
+    notes: >-
+      Moved to RobotState when DriverStation was split into smaller classes. Same name and return type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isteleop
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isTeleop
+      cpp: frc::DriverStation#IsTeleop
+    to:
+      java: org.wpilib.driverstation.RobotState#isTeleop
+      cpp: wpi::RobotState#IsTeleop
+    notes: >-
+      Moved to RobotState when DriverStation was split into smaller classes. Same name and return type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isteleopenabled
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isTeleopEnabled
+      cpp: frc::DriverStation#IsTeleopEnabled
+    to:
+      java: org.wpilib.driverstation.RobotState#isTeleopEnabled
+      cpp: wpi::RobotState#IsTeleopEnabled
+    notes: >-
+      Moved to RobotState when DriverStation was split into smaller classes. Same name and return type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isestopped
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isEStopped
+      cpp: frc::DriverStation#IsEStopped
+    to:
+      java: org.wpilib.driverstation.RobotState#isEStopped
+      cpp: wpi::RobotState#IsEStopped
+    notes: >-
+      Moved to RobotState when DriverStation was split into smaller classes. Same name and return type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isfmsattached
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isFMSAttached
+      cpp: frc::DriverStation#IsFMSAttached
+    to:
+      java: org.wpilib.driverstation.RobotState#isFMSAttached
+      cpp: wpi::RobotState#IsFMSAttached
+    notes: >-
+      Moved to RobotState when DriverStation was split into smaller classes. Same name and return type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isdsattached
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isDSAttached
+      cpp: frc::DriverStation#IsDSAttached
+    to:
+      java: org.wpilib.driverstation.RobotState#isDSAttached
+      cpp: wpi::RobotState#IsDSAttached
+    notes: >-
+      Moved to RobotState when DriverStation was split into smaller classes. Same name and return type.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-geteventname
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#getEventName
+      cpp: frc::DriverStation#GetEventName
+    to:
+      java: org.wpilib.driverstation.MatchState#getEventName
+      cpp: wpi::MatchState#GetEventName
+    notes: >-
+      Match information moved to MatchState when DriverStation was split.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getmatchtype
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#getMatchType
+      cpp: frc::DriverStation#GetMatchType
+    to:
+      java: org.wpilib.driverstation.MatchState#getMatchType
+      cpp: wpi::MatchState#GetMatchType
+    notes: >-
+      Match information moved to MatchState when DriverStation was split.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getmatchnumber
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#getMatchNumber
+      cpp: frc::DriverStation#GetMatchNumber
+    to:
+      java: org.wpilib.driverstation.MatchState#getMatchNumber
+      cpp: wpi::MatchState#GetMatchNumber
+    notes: >-
+      Match information moved to MatchState when DriverStation was split.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getreplaynumber
+    kind: move
+    from:
+      cpp: frc::DriverStation#GetReplayNumber
+    to:
+      cpp: wpi::MatchState#GetReplayNumber
+    notes: >-
+      Match information moved to MatchState when DriverStation was split.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-matchtype
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation.MatchType
+    to:
+      java: org.wpilib.driverstation.MatchType
+    notes: >-
+      The nested MatchType enum became the top-level org.wpilib.driverstation.MatchType (#8628). Its constants are ALL_CAPS in 2027 (NONE, PRACTICE, QUALIFICATION, ELIMINATION).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-reporterror
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#reportError
+    to:
+      java: org.wpilib.driverstation.DriverStationErrors#reportError
+    notes: >-
+      Moved to DriverStationErrors when DriverStation was split; the (String, boolean printTrace) and (String, StackTraceElement[]) overloads are unchanged.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-reportwarning
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#reportWarning
+    to:
+      java: org.wpilib.driverstation.DriverStationErrors#reportWarning
+    notes: >-
+      Moved to DriverStationErrors when DriverStation was split; the (String, boolean printTrace) and (String, StackTraceElement[]) overloads are unchanged.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isjoystickconnected
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#isJoystickConnected
+    to:
+      java: org.wpilib.driverstation.internal.DriverStationBackend#isJoystickConnected
+    notes: >-
+      #8628 moved the raw joystick queries into the internal DriverStationBackend class. In user code prefer GenericHID.isConnected() on the controller object.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-isjoystickconnected-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#IsJoystickConnected
+    notes: >-
+      #8628 moved the raw joystick queries into the internal wpi::internal::DriverStationBackend class. Use GenericHID::IsConnected() on the controller object instead.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-silencejoystickconnectionwarning
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.DriverStation#silenceJoystickConnectionWarning
+    to:
+      java: org.wpilib.driverstation.internal.DriverStationBackend#silenceJoystickConnectionAlert
+    notes: >-
+      Moved to the internal DriverStationBackend class by #8628, then renamed by #9201 because joystick warnings are now reported as Alerts.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9201
+
+  - id: driverstation-silencejoystickconnectionwarning-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#SilenceJoystickConnectionWarning
+    notes: >-
+      No longer public API: #8628 moved it to the internal wpi::internal::DriverStationBackend class and #9201 renamed it SilenceJoystickConnectionAlert, since joystick warnings are now Alerts.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9201
+
+  - id: driverstation-getstickaxis-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetStickAxis
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getstickaxiscount-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetStickAxisCount
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getstickbutton-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetStickButton
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getstickbuttons-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetStickButtons
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getstickbuttoncount-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetStickButtonCount
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getstickpov-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetStickPOV
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getstickpovcount-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetStickPOVCount
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getjoystickname-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetJoystickName
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getjoysticktype-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetJoystickType
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getjoystickisxbox-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetJoystickIsXbox
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: driverstation-getjoystickaxistype-cpp
+    kind: removed
+    from:
+      cpp: frc::DriverStation#GetJoystickAxisType
+    notes: >-
+      #8628 moved the raw joystick getters from DriverStation into the internal wpi::internal::DriverStationBackend class. Read controllers through GenericHID instead, e.g. wpi::DriverStation::GetGenericHID(port).GetRawAxis(axis). Button, axis and POV indices start at 0 since #8302.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8628
+
+  - id: alert-alerttype-to-level
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.Alert.AlertType
+      cpp: frc::Alert#AlertType
+    to:
+      java: org.wpilib.util.Alert.Level
+      cpp: wpi::util::Alert#Level
+    notes: >-
+      Alert.AlertType was replaced by Alert.Level (#8646): kError becomes HIGH, kWarning becomes MEDIUM, kInfo becomes LOW (the ERROR/WARNING/INFO aliases were removed by #8744). Alert moved to org.wpilib.util / wpi::util in #9025, whose constructors now take an id: Alert(String id, String text, Alert.Level level) or Alert(String group, String id, String text, Alert.Level level).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8646
+
+  - id: mathutil-clamp-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.math.MathUtil#clamp
+    notes: >-
+      MathUtil.clamp() was removed; #8186 replaces it with Java 21's Math.clamp(value, low, high).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8186
+
+  - id: mathutil-interpolate-to-lerp
+    kind: rename
+    from:
+      java: edu.wpi.first.math.MathUtil#interpolate
+    to:
+      java: org.wpilib.math.util.MathUtil#lerp
+    notes: >-
+      Behavior change: lerp(a, b, t) extrapolates when t is outside [0, 1], while interpolate() clamped t (#8232). Clamp t with Math.clamp(t, 0, 1) to keep the old behavior.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8232
+
+  - id: mathutil-inverseinterpolate-to-inverselerp
+    kind: rename
+    from:
+      java: edu.wpi.first.math.MathUtil#inverseInterpolate
+    to:
+      java: org.wpilib.math.util.MathUtil#inverseLerp
+    notes: >-
+      Renamed by #8232. Behavior change: inverseLerp(a, b, q) returns t such that q = a + (b - a)t without clamping, while inverseInterpolate() clamped the result to [0, 1]. It returns 0 if a = b.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8232
+
+  - id: mathusageid-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.math.MathUsageId
+    notes: >-
+      Usage reporting became string-based in #7763, which removed MathUsageId. Report usage with org.wpilib.util.UsageReporting.reportUsage(String resource, String data) (#9339).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7763
+
+  - id: rotation3d-plus-to-rotateby
+    kind: rename
+    from:
+      java: edu.wpi.first.math.geometry.Rotation3d#plus
+    to:
+      java: org.wpilib.math.geometry.Rotation3d#rotateBy
+    notes: >-
+      #8529 removed Rotation3d arithmetic operators because rotation composition is not commutative. a.plus(b) was implemented as a.rotateBy(b).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8529
+
+  - id: rotation3d-minus-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.math.geometry.Rotation3d#minus
+    notes: >-
+      #8529 removed Rotation3d arithmetic operators. a.minus(b) was implemented as a.rotateBy(b.unaryMinus()); in 2027 write a.rotateBy(b.inverse()).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8529
+
+  - id: rotation3d-unaryminus-to-inverse
+    kind: rename
+    from:
+      java: edu.wpi.first.math.geometry.Rotation3d#unaryMinus
+    to:
+      java: org.wpilib.math.geometry.Rotation3d#inverse
+    notes: >-
+      Renamed to inverse() by #8529; it still returns the inverse rotation.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8529
+
+  - id: linearsystemid-createdcmotorsystem
+    kind: rename
+    from:
+      java: edu.wpi.first.math.system.plant.LinearSystemId#createDCMotorSystem
+      cpp: frc::LinearSystemId#DCMotorSystem
+    to:
+      java: org.wpilib.math.system.Models#singleJointedArmFromPhysicalConstants
+      cpp: wpi::math::Models#SingleJointedArmFromPhysicalConstants
+    notes: >-
+      #8468 has no DC motor factory; its DCMotorSim tests and docs use singleJointedArmFromPhysicalConstants(motor, J, gearing), which returns the same 2-state position/velocity system. For the (kV, kA) overload use Models.singleJointedArmFromSysId(kV, kA).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8468
+
+  - id: dcmotorsim-getangularvelocityradpersec
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DCMotorSim#getAngularVelocityRadPerSec
+    to:
+      java: org.wpilib.simulation.DCMotorSim#getAngularVelocity
+    notes: >-
+      #7529 removed unit suffixes from wpimath and simulation names; units are now in the API docs. In 2026 the unsuffixed name returned a unit Measure; in 2027 it returns a double in SI units (radians or rad/s).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: dcmotorsim-getangularpositionrad
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DCMotorSim#getAngularPositionRad
+    to:
+      java: org.wpilib.simulation.DCMotorSim#getAngularPosition
+    notes: >-
+      #7529 removed unit suffixes from wpimath and simulation names; units are now in the API docs. In 2026 the unsuffixed name returned a unit Measure; in 2027 it returns a double in SI units (radians or rad/s).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: dcmotorsim-getcurrentdrawamps
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DCMotorSim#getCurrentDrawAmps
+    to:
+      java: org.wpilib.simulation.DCMotorSim#getCurrentDraw
+    notes: >-
+      #7529 removed unit suffixes from wpimath and simulation names; units are now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: singlejointedarmsim-getvelocityradpersec
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.SingleJointedArmSim#getVelocityRadPerSec
+    to:
+      java: org.wpilib.simulation.SingleJointedArmSim#getVelocity
+    notes: >-
+      #7529 removed unit suffixes from wpimath and simulation names; units are now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: singlejointedarmsim-getanglerads
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.SingleJointedArmSim#getAngleRads
+    to:
+      java: org.wpilib.simulation.SingleJointedArmSim#getAngle
+    notes: >-
+      #7529 removed unit suffixes from wpimath and simulation names; units are now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: singlejointedarmsim-getcurrentdrawamps
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.SingleJointedArmSim#getCurrentDrawAmps
+    to:
+      java: org.wpilib.simulation.SingleJointedArmSim#getCurrentDraw
+    notes: >-
+      #7529 removed unit suffixes from wpimath and simulation names; units are now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: flywheelsim-getcurrentdrawamps
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.FlywheelSim#getCurrentDrawAmps
+    to:
+      java: org.wpilib.simulation.FlywheelSim#getCurrentDraw
+    notes: >-
+      #7529 removed unit suffixes from wpimath and simulation names; units are now in the API docs.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: dcmotorsim-getangularvelocityrpm-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DCMotorSim#getAngularVelocityRPM
+    notes: >-
+      #7529 removed the RPM and rotations variants. Call getAngularVelocity() (rad/s) or getAngularPosition() (radians) and convert.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: dcmotorsim-getangularpositionrotations-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DCMotorSim#getAngularPositionRotations
+    notes: >-
+      #7529 removed the RPM and rotations variants. Call getAngularVelocity() (rad/s) or getAngularPosition() (radians) and convert.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7529
+
+  - id: sendablebuilder-to-telemetrytable
+    kind: rename
+    from:
+      java: edu.wpi.first.util.sendable.SendableBuilder
+    to:
+      java: org.wpilib.telemetry.TelemetryTable
+    notes: >-
+      #7773 removed SendableBuilder. A TelemetryLoggable implements logTo(TelemetryTable table) and logs its current values to the table immediately, instead of registering getter/setter callbacks in initSendable(SendableBuilder). Values the dashboard should change go through the Tunables API.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendablebuilder-adddoubleproperty
+    kind: rename
+    from:
+      java: edu.wpi.first.util.sendable.SendableBuilder#addDoubleProperty
+    to:
+      java: org.wpilib.telemetry.TelemetryTable#log
+    notes: >-
+      Inside logTo(TelemetryTable table) call table.log(name, value) with the current value on every update (#7773 telemetry design doc). Telemetry is write-only; for a dashboard-writable value (the setter argument) use Tunables instead.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendablebuilder-addstringproperty
+    kind: rename
+    from:
+      java: edu.wpi.first.util.sendable.SendableBuilder#addStringProperty
+    to:
+      java: org.wpilib.telemetry.TelemetryTable#log
+    notes: >-
+      Inside logTo(TelemetryTable table) call table.log(name, value) with the current value on every update (#7773 telemetry design doc). Telemetry is write-only; for a dashboard-writable value (the setter argument) use Tunables instead.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendablebuilder-publishconstinteger
+    kind: rename
+    from:
+      java: edu.wpi.first.util.sendable.SendableBuilder#publishConstInteger
+    to:
+      java: org.wpilib.telemetry.TelemetryTable#log
+    notes: >-
+      Inside logTo(TelemetryTable table) call table.log(name, value) with the current value on every update (#7773 telemetry design doc). Telemetry is write-only; for a dashboard-writable value (the setter argument) use Tunables instead.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendablebuilder-setsmartdashboardtype
+    kind: rename
+    from:
+      java: edu.wpi.first.util.sendable.SendableBuilder#setSmartDashboardType
+    to:
+      java: org.wpilib.telemetry.TelemetryLoggable#getTelemetryType
+    notes: >-
+      Override getTelemetryType() in the TelemetryLoggable to return the type string; the target table records it via setType() (#7773 telemetry design doc).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendablebuilder-setactuator-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.util.sendable.SendableBuilder#setActuator
+    notes: >-
+      SendableBuilder was removed by #7773 and TelemetryLoggable has no actuator flag. LiveWindow, which used it, was removed by #7733.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendableregistry-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.util.sendable.SendableRegistry
+    notes: >-
+      #7773 deleted SendableRegistry along with Sendable. There is no registry: log objects by name with Telemetry.log(name, obj) or a TelemetryTable each loop.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendableregistry-setname-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.util.sendable.SendableRegistry#setName
+    notes: >-
+      #7773 deleted SendableRegistry. Names now come from the Telemetry path: Telemetry.log("Name", obj) or table.log("Name", obj).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: sendableregistry-addlw-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.util.sendable.SendableRegistry#addLW
+    notes: >-
+      #7773 deleted SendableRegistry. Names now come from the Telemetry path: Telemetry.log("Name", obj) or table.log("Name", obj).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7773
+
+  - id: shuffleboardtab-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab
+      cpp: frc::ShuffleboardTab
+    notes: >-
+      The Shuffleboard API was removed by #7730. Publish values with the Telemetry API (#7773) and lay them out in a dashboard such as Elastic.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7730
+
+  - id: shuffleboardtab-add-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab#add
+    notes: >-
+      The Shuffleboard API was removed by #7730. Log the value each loop with Telemetry.log(name, value) (#7773).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7730
+
+  - id: shuffleboardtab-addstring-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab#addString
+    notes: >-
+      The Shuffleboard API was removed by #7730. Log the value each loop with Telemetry.log(name, value) (#7773).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7730
+
+  - id: hal-report-to-usagereporting
+    kind: rename
+    from:
+      java: edu.wpi.first.hal.HAL#report
+    to:
+      java: org.wpilib.util.UsageReporting#reportUsage
+    notes: >-
+      #7763 made usage reporting string-based: HAL.report(tResourceType, instance, ...) became HAL.reportUsage(String resource, String data), and #9339 moved the API to org.wpilib.util.UsageReporting (overloads (resource, data) and (resource, instanceNumber, data)).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7763
+
+  - id: frcnetcomm-tresourcetype-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.hal.FRCNetComm.tResourceType
+    notes: >-
+      #7763 deleted FRCNetComm when usage reporting became string-based. Pass a resource name string to UsageReporting.reportUsage(String resource, String data) instead (#9339).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7763
+
+  - id: frcnetcomm-tinstances-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.hal.FRCNetComm.tInstances
+    notes: >-
+      #7763 deleted FRCNetComm when usage reporting became string-based. Pass a resource name string to UsageReporting.reportUsage(String resource, String data) instead (#9339).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7763
+
+  - id: hal-getport-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.hal.HAL#getPort
+    notes: >-
+      HAL_GetPort was removed by #7754. The JNI initialize functions now take the channel number directly, e.g. PWMJNI.initializePWMPort(port).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7754
+
+  - id: pubsuboption-sendall
+    kind: rename
+    from:
+      java: edu.wpi.first.networktables.PubSubOption#sendAll
+    to:
+      java: org.wpilib.networktables.PubSubOption#SEND_ALL
+    notes: >-
+      PubSubOption became a sealed interface of records (#8659). sendAll(true) becomes the constant PubSubOption.SEND_ALL; for an explicit value use new PubSubOption.SendAll(enabled).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8659
+
+  - id: pubsuboption-keepduplicates
+    kind: rename
+    from:
+      java: edu.wpi.first.networktables.PubSubOption#keepDuplicates
+    to:
+      java: org.wpilib.networktables.PubSubOption#KEEP_DUPLICATES
+    notes: >-
+      PubSubOption became a sealed interface of records (#8659). keepDuplicates(true) becomes the constant PubSubOption.KEEP_DUPLICATES; for an explicit value use new PubSubOption.KeepDuplicates(enabled).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8659
+
+  - id: robotcontroller-setbrownoutvoltage
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#setBrownoutVoltage
+      cpp: frc::RobotController#SetBrownoutVoltage
+    to:
+      java: org.wpilib.system.RobotController#setBrownoutVoltages
+      cpp: wpi::RobotController#SetBrownoutVoltages
+    notes: >-
+      Systemcore has a configurable brownout and recovery voltage, so #9238 replaced setBrownoutVoltage(v) with setBrownoutVoltages(brownoutVoltage, recoveryVoltage).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9238
+
+  - id: robotcontroller-getvoltage5v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getVoltage5V
+      cpp: frc::RobotController#GetVoltage5V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getcurrent5v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getCurrent5V
+      cpp: frc::RobotController#GetCurrent5V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getenabled5v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getEnabled5V
+      cpp: frc::RobotController#GetEnabled5V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-setenabled5v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#setEnabled5V
+      cpp: frc::RobotController#SetEnabled5V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getfaultcount5v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getFaultCount5V
+      cpp: frc::RobotController#GetFaultCount5V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getvoltage6v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getVoltage6V
+      cpp: frc::RobotController#GetVoltage6V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getcurrent6v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getCurrent6V
+      cpp: frc::RobotController#GetCurrent6V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getenabled6v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getEnabled6V
+      cpp: frc::RobotController#GetEnabled6V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-setenabled6v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#setEnabled6V
+      cpp: frc::RobotController#SetEnabled6V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getfaultcount6v-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getFaultCount6V
+      cpp: frc::RobotController#GetFaultCount6V
+    notes: >-
+      Systemcore has no 5V or 6V user rail, so #7861 removed these functions. The only remaining user rail is 3.3V (get/setEnabled3V3, getVoltage3V3, getCurrent3V3, getFaultCount3V3).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: robotcontroller-getinputcurrent-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.RobotController#getInputCurrent
+      cpp: frc::RobotController#GetInputCurrent
+    notes: >-
+      Systemcore cannot read its input current, so #7861 removed this. getInputVoltage() still exists; for total robot current use the PowerDistribution class.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: roboriosim-setvincurrent-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.simulation.RoboRioSim#setVInCurrent
+    notes: >-
+      Removed with the input current reading by #7861. RoboRioSim.setVInVoltage() still exists.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7861
+
+  - id: addressableled-start-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.AddressableLED#start
+      cpp: frc::AddressableLED#Start
+    notes: >-
+      #8100 removed start() and stop(): the updated example just calls setLength() and setData(). Note that the 2027 setStart(int) sets the start index in the global LED buffer; it is not a replacement for start().
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8100
+
+  - id: addressableledjni-start-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.hal.AddressableLEDJNI#start
+    notes: >-
+      #8100 removed the JNI start/stop calls with the new global-buffer LED design; output is driven by AddressableLEDJNI.setData.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8100
+
+  - id: notifier-sethalthreadpriority-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.Notifier#setHALThreadPriority
+      cpp: frc::Notifier#SetHALThreadPriority
+    notes: >-
+      #8701 removed the HAL notifier thread priority setter; the priority is now set in the thread itself. Threads.setCurrentThreadPriority(int) exists but is deprecated because only experts should use it.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8701
+
+  - id: notifierjni-initializenotifier
+    kind: rename
+    from:
+      java: edu.wpi.first.hal.NotifierJNI#initializeNotifier
+    to:
+      java: org.wpilib.hardware.hal.NotifierJNI#createNotifier
+    notes: >-
+      Renamed in the notifier revamp (#8424).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8424
+
+  - id: notifierjni-cleannotifier
+    kind: rename
+    from:
+      java: edu.wpi.first.hal.NotifierJNI#cleanNotifier
+    to:
+      java: org.wpilib.hardware.hal.NotifierJNI#destroyNotifier
+    notes: >-
+      #8424 replaced stop/clean with destroyNotifier, which frees the notifier and wakes any waiters.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8424
+
+  - id: notifierjni-stopnotifier-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.hal.NotifierJNI#stopNotifier
+    notes: >-
+      #8424 removed stopNotifier. Use cancelNotifierAlarm to stop alarms, or destroyNotifier (which wakes waiters) when done.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8424
+
+  - id: notifierjni-updatenotifieralarm
+    kind: signature
+    from:
+      java: edu.wpi.first.hal.NotifierJNI#updateNotifierAlarm
+    to:
+      java: org.wpilib.hardware.hal.NotifierJNI#setNotifierAlarm
+    notes: >-
+      #8424 replaced updateNotifierAlarm(handle, triggerTime) with setNotifierAlarm(handle, alarmTime, intervalTime, absolute), which supports periodic alarms at the HAL level; #8457 added a final boolean ack parameter. Handlers must now acknowledge each alarm with acknowledgeNotifierAlarm.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8424
+
+  - id: notifierjni-waitfornotifieralarm-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.hal.NotifierJNI#waitForNotifierAlarm
+    notes: >-
+      #8424 moved notifiers to wpiutil signal objects: wait on the handle with WPIUtilJNI.waitForObject(handle), then call NotifierJNI.acknowledgeNotifierAlarm(handle).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8424
+
+  - id: mutcurrent-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.units.measure.MutCurrent
+    notes: >-
+      #8115 removed the mutable measure implementations. Use the immutable Current type, e.g. Amps.of(x).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8115
+
+  - id: measure-copy-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.units.measure.LinearVelocity#copy
+    notes: >-
+      #8115 made all measures immutable and removed copy() and mutableCopy(). An immutable measure can be shared as is.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8115
+
+  - id: spi-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.SPI
+      cpp: frc::SPI
+    notes: >-
+      Systemcore has no SPI port, so #7678 removed SPI support (and the SPI gyros and IMUs). Use an I2C, CAN or onboard IMU device instead.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7678
+
+  - id: digitalglitchfilter-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.DigitalGlitchFilter
+      cpp: frc::DigitalGlitchFilter
+    notes: >-
+      Removed by #7725; Systemcore has no digital glitch filter. The 2027 changelog lists it with the other removed roboRIO-only hardware. There is no replacement.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7725
+
+  - id: digitalglitchfilter-add-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.DigitalGlitchFilter#add
+    notes: >-
+      DigitalGlitchFilter was removed by #7725 with no replacement.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7725
+
+  - id: digitalglitchfilter-setperiodnanoseconds-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.DigitalGlitchFilter#setPeriodNanoSeconds
+    notes: >-
+      DigitalGlitchFilter was removed by #7725 with no replacement.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7725
+
+  - id: counter-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.Counter
+      cpp: frc::Counter
+    notes: >-
+      #7723 removed the general Counter class in the initial Systemcore counter implementation. Use org.wpilib.hardware.counter.EdgeCounter (EdgeCounter(int channel, EdgeConfiguration configuration)) or Tachometer.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7723
+
+  - id: driverstationsim-setautonomous
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setAutonomous
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setRobotMode
+    notes: >-
+      #7744 replaced the separate autonomous/test flags with setRobotMode(RobotMode). setAutonomous(true) becomes setRobotMode(RobotMode.AUTONOMOUS) (org.wpilib.hardware.hal.RobotMode).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7744
+
+  - id: driverstationsim-settest
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setTest
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setRobotMode
+    notes: >-
+      #7744 replaced the mode flags with setRobotMode(RobotMode). The Test mode is now called Utility (#8782), so setTest(true) becomes setRobotMode(RobotMode.UTILITY).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7744
+
+  - id: driverstationsim-setjoystickisxbox
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickIsXbox
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setJoystickIsGamepad
+    notes: >-
+      Renamed when the DS API was updated to the new format (#7977).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/7977
+
+  - id: driverstationsim-setjoysticktype
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickType
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setJoystickGamepadType
+    notes: >-
+      Renamed by #8385, which added joystick outputs support.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8385
+
+  - id: driverstationsim-getjoystickoutputs-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#getJoystickOutputs
+    notes: >-
+      #8385 replaced the packed outputs value with getJoystickLeds(stick) and getJoystickRumble(stick, rumbleNum).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8385
+
+  - id: driverstationsim-setjoystickaxiscount
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickAxisCount
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setJoystickAxesAvailable
+    notes: >-
+      #8302 replaced max counts with availability masks, since future DS versions may leave holes in the available axes, buttons and POVs. Indices also start at 0 instead of 1.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8302
+
+  - id: driverstationsim-setjoystickbuttoncount
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickButtonCount
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setJoystickButtonsAvailable
+    notes: >-
+      #8302 replaced max counts with availability masks, since future DS versions may leave holes in the available axes, buttons and POVs. Indices also start at 0 instead of 1.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8302
+
+  - id: driverstationsim-setjoystickpovcount
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickPOVCount
+    to:
+      java: org.wpilib.simulation.DriverStationSim#setJoystickPOVsAvailable
+    notes: >-
+      #8302 replaced max counts with availability masks, since future DS versions may leave holes in the available axes, buttons and POVs. Indices also start at 0 instead of 1.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8302
+
+  - id: driverstationsim-setjoystickbuttons-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickButtons
+    notes: >-
+      #8302 removed the packed button setter. Set each button with setJoystickButton(stick, button, state); button indices start at 0 in 2027.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8302
+
+  - id: driverstationsim-setjoystickaxistype-removed
+    kind: removed
+    from:
+      java: edu.wpi.first.wpilibj.simulation.DriverStationSim#setJoystickAxisType
+    notes: >-
+      #8302 removed joystick axis types from the DS API; there is no replacement.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8302
+
+  - id: commandgenerichid-to-command2
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.CommandGenericHID
+    to:
+      java: org.wpilib.command2.button.CommandGenericHID
+    notes: >-
+      Commands v2 button classes moved to org.wpilib.command2.button (#8260); the command3 variant belongs to Commands v3.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8260
+
+  - id: commandgenerichid-button
+    kind: move
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.CommandGenericHID#button
+    to:
+      java: org.wpilib.command2.button.CommandGenericHID#button
+    notes: >-
+      Moved with the class (#8260). Behavior change: joystick button indices start at 0 instead of 1 since #8302, so button(1) in 2026 is button(0) in 2027.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8302
+
+  - id: robotmodetriggers-test-to-utility
+    kind: rename
+    from:
+      java: edu.wpi.first.wpilibj2.command.button.RobotModeTriggers#test
+    to:
+      java: org.wpilib.command2.button.RobotModeTriggers#utility
+    notes: >-
+      The Test robot mode was renamed Utility (#8782).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8782
+
+  - id: apriltag-to-vendordep
+    kind: removed
+    from:
+      java: edu.wpi.first.apriltag.AprilTag
+    notes: >-
+      The apriltag library was converted to a vendordep (#9203) and is no longer part of core WPILib. Add the AprilTag vendordep to keep using it; for built-in field tag poses use org.wpilib.fields.Field#getTagPose (#9166).
+    citation: https://github.com/wpilibsuite/allwpilib/pull/9203
+
+  - id: python-networktableinstance-getdefault
+    kind: rename
+    from:
+      python: ntcore.NetworkTableInstance#getDefault
+    to:
+      python: ntcore.NetworkTableInstance#get_default
+    notes: >-
+      Python functions were renamed to snake_case in 2027 Alpha 6 (2027 changelog, Major Changes).
+    citation: https://docs.wpilib.org/en/latest/docs/yearly-overview/yearly-changelog.html

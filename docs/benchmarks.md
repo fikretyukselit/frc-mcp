@@ -1,5 +1,35 @@
 # Benchmarks
 
+## Migration and verification on real team code (M4, 2026-09-29)
+
+12 public 2026 team repositories (Java, plus 6328's C++ tools), shallow-cloned from GitHub: 6328 Mechanical Advantage,
+StuyPulse, Spartronics 4915, 5427, 4533, 102, 3082, Salem, 166, hammerheads5000, Earl of March 7476 and Oakville
+Dynamics. 1,001 source files, 139,402 lines.
+
+| Measurement | Result |
+|---|---|
+| `frc-mcp verify`, each repository pinned to its own season (2026), Java + C++ | **0 errors** · 19 warnings (0.000 errors/kLOC; gate ≤ 1.0) |
+| `frc-mcp migrate --to 2027`, API references mapped | **11,535 of 11,789 (97.8%)** |
+| … of the 254 unresolved | 251 belong to libraries with no 2027 table yet (PathPlannerLib, YAGSL); 3 have no cited mapping |
+| Curated rules | 238 rules, 366 per language (WPILib, Phoenix 6, REVLib, PhotonLib, AdvantageKit, ChoreoLib), each citing its upstream change |
+
+How the mapping rate was reached, and what it says about each source of mappings:
+
+1. **Generated moves alone:** 80% (8,106 of 10,133). Same-name package moves (`edu.wpi.first.*` → `org.wpilib.*`,
+   `frc::` → `wpi::`) are most of a 2027 port, but the rest is renames the diff cannot guess.
+2. **Resolution fix:** the index's case-insensitive simple-name fallback made `Command` resolve to
+   `EventMarker#command`; migration lookups are now exact and case-sensitive.
+3. **Members through their type** (`CommandXboxController#a` → `CommandNiDsXboxController#a`) and a separate
+   "no target table" reason: 92.7%.
+4. **120 curated rules** (kinematics Speeds → Velocities, Commands v2 package, SmartDashboard/SendableChooser →
+   Telemetry/Tunables, Phoenix 6 26.50 constructors and renames, AdvantageKit's LoggedNetworkChooser, …), then **118
+   more** written from the list of references still unresolved (the DriverStation split, monotonic time, game data,
+   MathUtil, alerts, Sendable, HAL usage reporting, simulation getters, …): 97.8%.
+
+The verifier gate ran after the M4 additions (C++, Python, Java call shapes) and after a Doxygen fix: `deprecated.html`
+had marked the classes of a deprecated member's *parameter types* deprecated (`frc::Rotation2d`, because
+`EllipticalRegionConstraint`'s old constructor takes one), which produced 11 of the 30 warnings before the fix.
+
 ## Real index with vendors (M3, 2026-09-29)
 
 The M3 index has 12 shards: per season it holds WPILib docs, the WPILib Java API, the vendordep catalog, vendor docs,

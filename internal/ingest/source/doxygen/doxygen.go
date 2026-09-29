@@ -270,9 +270,12 @@ func parseDeprecated(b []byte) map[string]string {
 		return out
 	}
 	for _, dt := range findAll(doc, func(n *html.Node) bool { return n.DataAtom == atom.Dt }) {
+		// The first link is the deprecated entity ("Member <a>ns::T::m</a>
+		// (const <a>Rotation2d</a> &r)"); later links are parameter types
+		// and must not mark those classes deprecated.
 		var href string
-		for _, a := range findAll(dt, func(n *html.Node) bool { return n.DataAtom == atom.A && hasClass(attr(n, "class"), "el") }) {
-			href = attr(a, "href") // the last link is the member itself
+		if links := findAll(dt, func(n *html.Node) bool { return n.DataAtom == atom.A && hasClass(attr(n, "class"), "el") }); len(links) > 0 {
+			href = attr(links[0], "href")
 		}
 		if href == "" {
 			continue

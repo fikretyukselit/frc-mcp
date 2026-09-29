@@ -1,0 +1,48 @@
+# Curated migration rules. Every rule cites the upstream change.
+library: advantagekit
+from_season: "2026"
+to_season: "2027"
+rules:
+  - id: loggeddashboardchooser-to-loggednetworkchooser
+    kind: rename
+    from:
+      java: org.littletonrobotics.junction.networktables.LoggedDashboardChooser
+    to:
+      java: org.littletonrobotics.junction.networktables.LoggedNetworkChooser
+    notes: LoggedDashboardChooser was replaced by LoggedNetworkChooser for WPILib 2027 alpha 7. The wrapping constructor now takes an org.wpilib.tunable.Selectable instead of a SendableChooser (`LoggedNetworkChooser(String key, Selectable<V> selectable)`).
+    citation: https://github.com/Mechanical-Advantage/AdvantageKit/pull/277
+
+  - id: loggeddashboardchooser-adddefaultoption
+    kind: rename
+    from:
+      java: org.littletonrobotics.junction.networktables.LoggedDashboardChooser#addDefaultOption
+    to:
+      java: org.littletonrobotics.junction.networktables.LoggedNetworkChooser#addDefault
+    notes: 'Matches the WPILib Selectable API: `addDefaultOption(key, value)` becomes `addDefault(name, object)`.'
+    citation: https://github.com/Mechanical-Advantage/AdvantageKit/pull/277
+
+  - id: loggeddashboardchooser-addoption
+    kind: rename
+    from:
+      java: org.littletonrobotics.junction.networktables.LoggedDashboardChooser#addOption
+    to:
+      java: org.littletonrobotics.junction.networktables.LoggedNetworkChooser#add
+    notes: '`addOption(key, value)` becomes `add(name, object)`. get() is still available, and getSelected() was added.'
+    citation: https://github.com/Mechanical-Advantage/AdvantageKit/pull/277
+
+  - id: logtable-get-measure
+    kind: rename
+    from:
+      java: org.littletonrobotics.junction.LogTable#get
+    to:
+      java: org.littletonrobotics.junction.LogTable#getMeasure
+    notes: The Measure overload of LogTable.get was renamed to getMeasure (`public <U extends Unit, M extends Measure<U>> M getMeasure(String key, M defaultValue)`), and the MutableMeasure overload was removed along with mutable units. Only the Measure overload of get is affected; other get overloads keep their name.
+    citation: https://github.com/Mechanical-Advantage/AdvantageKit/pull/271
+
+  - id: loggeddashboardchooser-getsendablechooser-removed
+    kind: removed
+    from:
+      java: org.littletonrobotics.junction.networktables.LoggedDashboardChooser#getSendableChooser
+    notes: >-
+      LoggedNetworkChooser, which replaced LoggedDashboardChooser, has no accessor for the underlying chooser. Build your own org.wpilib.tunable.Selectable, pass it to LoggedNetworkChooser(String key, Selectable<V> selectable) and keep the reference.
+    citation: https://github.com/Mechanical-Advantage/AdvantageKit/pull/277

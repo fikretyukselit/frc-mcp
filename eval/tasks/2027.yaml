@@ -1,0 +1,212 @@
+# Agent-level eval tasks, 2027 season (WPILib 2027.0.0-alpha-7). Prompts are
+# what a student would ask in a 2027 project: they name the season and the
+# library versions (as the project's build files do) but never the API names
+# under test. Each task has a compiling reference solution in
+# reference/<id>/ (checked by `agenteval references`).
+- id: swerve-module-targets-2027
+  season: "2027"
+  tags: [kinematics, swerve]
+  files: [src/main/java/frc/robot/SwerveMath.java]
+  prompt: |
+    This is a WPILib 2027 (alpha 7) Java robot project. Write src/main/java/frc/robot/SwerveMath.java: a class
+    SwerveMath whose constructor takes the drivetrain's track width and wheelbase in meters (modules at the four
+    corners, front-left first). Add a method that takes a field-relative desired velocity (vx and vy in m/s, omega in
+    rad/s) and the robot's current heading in radians, and returns the four module targets for WPILib's swerve
+    kinematics, desaturated to 4.5 m/s. Use WPILib's own kinematics classes.
+
+- id: robot-skeleton-2027
+  season: "2027"
+  tags: [framework, commands]
+  files: [src/main/java/frc/robot/Main.java, src/main/java/frc/robot/Robot.java, src/main/java/frc/robot/RobotContainer.java]
+  prompt: |
+    Set up a new WPILib 2027 (alpha 7) command-based Java robot project: write Main.java, Robot.java and
+    RobotContainer.java in src/main/java/frc/robot. Robot runs the command scheduler every loop, schedules the
+    autonomous command from RobotContainer when autonomous starts and cancels it when teleop starts.
+    RobotContainer.getAutonomousCommand() can return a command that does nothing for now. Use Commands v2.
+
+- id: auto-chooser-2027
+  season: "2027"
+  tags: [dashboard, commands]
+  files: [src/main/java/frc/robot/AutoSelector.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2. Write src/main/java/frc/robot/AutoSelector.java: a class that offers
+    three autonomous routines on the dashboard for the drive team to pick from before the match ("Do nothing" as the
+    default, "Taxi" which prints "taxi", "Two piece" which prints "two piece"), and has a method
+    `Command getSelected()` that returns the chosen routine. Publish the chooser under the name "Auto".
+
+- id: telemetry-publish-2027
+  season: "2027"
+  tags: [dashboard, telemetry]
+  files: [src/main/java/frc/robot/subsystems/Status.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2. Write src/main/java/frc/robot/subsystems/Status.java: a subsystem that
+    every loop publishes to the dashboard the battery voltage, the remaining match time, whether the robot is enabled,
+    and a robot Pose2d that other code sets with `setPose(Pose2d pose)`.
+
+- id: tunable-elevator-pid-2027
+  season: "2027"
+  tags: [dashboard, tunables, control]
+  files: [src/main/java/frc/robot/subsystems/Elevator.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2. Write src/main/java/frc/robot/subsystems/Elevator.java: an elevator
+    subsystem with one PWM Spark MAX motor controller on PWM channel 0 and a quadrature encoder on DIO 0 and 1
+    (0.01 m per pulse). It holds a height setpoint with a WPILib PID controller whose kP, kI and kD can be tuned from
+    the dashboard while the robot runs (defaults 4, 0, 0.1). Add `void setHeight(double meters)` and
+    `boolean atSetpoint()`.
+
+- id: xbox-bindings-2027
+  season: "2027"
+  tags: [commands, controllers]
+  files: [src/main/java/frc/robot/Bindings.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2, driver uses an Xbox controller on port 0 plugged into the Driver
+    Station. Write src/main/java/frc/robot/Bindings.java with a static method
+    `void configure(Command intake, Command shoot, Command stow)`: intake runs while the A button is held, stow runs
+    once when B is pressed, and shoot runs while the right trigger is pressed past halfway. Use command-based
+    trigger bindings.
+
+- id: flywheel-talonfx-2027
+  season: "2027"
+  vendordeps: ["CTRE-Phoenix (v6)"]
+  tags: [phoenix6, control]
+  files: [src/main/java/frc/robot/subsystems/Flywheel.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2, CTRE Phoenix 6 26.70.0-alpha-2. Write
+    src/main/java/frc/robot/subsystems/Flywheel.java: a shooter flywheel subsystem driven by one Kraken X60 (TalonFX)
+    with CAN id 5 on the CANivore bus named "canivore". Configure velocity gains (kS 0.1, kV 0.12, kP 0.2) and
+    coast mode once in the constructor, and add `void setRPM(double rpm)` using closed-loop velocity control,
+    `double getRPM()` and `boolean atSpeed(double toleranceRpm)`.
+
+- id: arm-sparkmax-2027
+  season: "2027"
+  vendordeps: [REVLib]
+  tags: [revlib, control]
+  files: [src/main/java/frc/robot/subsystems/Arm.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2, REVLib 2027.0.0-alpha-7. Write src/main/java/frc/robot/subsystems/Arm.java:
+    an arm subsystem with a SPARK MAX (CAN id 9 on the robot controller's first built-in CAN port, brushless NEO).
+    Configure it once in the constructor: brake mode,
+    40 A smart current limit, and the on-controller position PID (kP 0.8) using the built-in encoder. Add
+    `void setAngleRotations(double rotations)` using the controller's closed-loop position control and
+    `double getAngleRotations()`.
+
+- id: units-wheel-speed-2027
+  season: "2027"
+  tags: [units]
+  files: [src/main/java/frc/robot/util/WheelMath.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java. Write src/main/java/frc/robot/util/WheelMath.java with a static method that takes a
+    wheel's angular velocity as a WPILib units AngularVelocity measure and the wheel diameter as a Distance measure
+    and returns the wheel's linear velocity as a LinearVelocity measure, plus a second static method that returns the
+    same value as a plain double in meters per second. Use the WPILib units library throughout.
+
+- id: trajectory-sample-2027
+  season: "2027"
+  tags: [trajectory]
+  files: [src/main/java/frc/robot/util/Paths.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java. Write src/main/java/frc/robot/util/Paths.java with a static method that generates a
+    smooth spline trajectory from (0, 0, 0°) through the interior point (1.5, 0.5) to (3, 1, 0°) with a max velocity of
+    3 m/s and max acceleration of 2 m/s², and a static method `Pose2d poseAt(double seconds)` that samples that
+    trajectory. Use WPILib's own trajectory generator.
+
+- id: arm-pid-command-2027
+  season: "2027"
+  tags: [commands, control]
+  files: [src/main/java/frc/robot/commands/ArmToAngle.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2. Write src/main/java/frc/robot/commands/ArmToAngle.java: a command that
+    drives an arm to a target angle with a WPILib PID controller (kP 5, kI 0, kD 0.2, tolerance 0.02 rad) and ends
+    when it reaches the setpoint. Its constructor takes a `DoubleSupplier angleRad` (measurement), a
+    `DoubleConsumer setVoltage` (output), the target angle in radians and the arm Subsystem it requires.
+
+- id: swerve-pose-estimator-2027
+  season: "2027"
+  tags: [kinematics, estimation]
+  files: [src/main/java/frc/robot/Localizer.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java. Write src/main/java/frc/robot/Localizer.java: it keeps the robot's field pose for a
+    four-module swerve drive (modules at (±0.3, ±0.3) m) using WPILib's swerve pose estimator. Add
+    `void update(Rotation2d gyroAngle, SwerveModulePosition[] modules)`, `void addVision(Pose2d pose, double
+    timestampSeconds)` and `Pose2d getPose()`.
+
+- id: advantagekit-chooser-2027
+  season: "2027"
+  vendordeps: [AdvantageKit]
+  tags: [advantagekit, dashboard]
+  files: [src/main/java/frc/robot/AutoRoutines.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2, AdvantageKit 27.0.0-alpha-6. Write src/main/java/frc/robot/AutoRoutines.java:
+    an autonomous chooser that AdvantageKit logs and replays (key "Auto Choices"), with "None" as the default option
+    and a "Leave" option that runs a given `Command`. Constructor `AutoRoutines(Command leave)`, and
+    `Command get()` returns the selected routine.
+
+- id: choreo-follow-2027
+  season: "2027"
+  vendordeps: [ChoreoLib]
+  tags: [choreo, trajectory]
+  files: [src/main/java/frc/robot/auto/ChoreoAuto.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2, ChoreoLib 2027.0.0-alpha-3. Write src/main/java/frc/robot/auto/ChoreoAuto.java
+    with a static method that loads the swerve trajectory named "leave" from the deploy directory and returns an
+    `Optional` of it, and a static method that, given the loaded trajectory and a time in seconds, returns the robot
+    pose the trajectory wants at that time (use the alliance-flipped sample when the robot is on the red alliance).
+
+- id: endgame-rumble-2027
+  season: "2027"
+  tags: [commands, controllers, match]
+  files: [src/main/java/frc/robot/commands/EndgameRumble.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2, driver uses an Xbox controller on port 0 plugged into the Driver
+    Station. Write src/main/java/frc/robot/commands/EndgameRumble.java: a static factory returning a command that
+    waits until the robot is enabled in teleop with 20 seconds or less left in the match, then rumbles the driver's
+    controller at full strength for one second.
+
+- id: led-rainbow-2027
+  season: "2027"
+  tags: [hardware, leds]
+  files: [src/main/java/frc/robot/subsystems/Leds.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2. Write src/main/java/frc/robot/subsystems/Leds.java: a subsystem driving a
+    60-LED addressable strip on PWM port 0 that shows a scrolling rainbow by default, and a method
+    `Command solid(Color color)` that returns a command showing a solid color while it runs.
+
+- id: motor-alerts-2027
+  season: "2027"
+  vendordeps: ["CTRE-Phoenix (v6)"]
+  tags: [phoenix6, alerts]
+  files: [src/main/java/frc/robot/subsystems/DriveMotors.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2, CTRE Phoenix 6 26.70.0-alpha-2. Write
+    src/main/java/frc/robot/subsystems/DriveMotors.java: a subsystem owning two TalonFX motors (CAN ids 1 and 2 on the
+    robot controller's first built-in CAN port). Every loop it refreshes their status and raises a high-severity WPILib
+    dashboard alert for each motor that is not connected, and `void drive(double left, double right)` sets their
+    duty cycle.
+
+- id: field-display-2027
+  season: "2027"
+  tags: [dashboard, telemetry]
+  files: [src/main/java/frc/robot/FieldView.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java. Write src/main/java/frc/robot/FieldView.java: shows the robot on a 2D field widget on
+    the dashboard. `void update(Pose2d robot)` moves the robot, and `void showTarget(Pose2d target)` draws a second
+    object named "Target".
+
+- id: differential-drive-2027
+  season: "2027"
+  tags: [drive, commands]
+  files: [src/main/java/frc/robot/subsystems/TankDrive.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java, Commands v2. Write src/main/java/frc/robot/subsystems/TankDrive.java: a differential
+    drivetrain subsystem with two PWM Spark MAX motor controllers (left on PWM 0, right on PWM 1, right side inverted)
+    and a factory `Command arcade(DoubleSupplier forward, DoubleSupplier turn)` that drives with WPILib's arcade drive
+    until interrupted.
+
+- id: wheel-speeds-diff-2027
+  season: "2027"
+  tags: [kinematics]
+  files: [src/main/java/frc/robot/util/TankMath.java]
+  prompt: |
+    WPILib 2027 (alpha 7), Java. Write src/main/java/frc/robot/util/TankMath.java with a static method that converts a
+    robot velocity (forward m/s and rotation rad/s) into left and right wheel velocities for a 0.6 m track width using
+    WPILib's differential drive kinematics, desaturated to 3.5 m/s, and returns them as WPILib's wheel velocity type.

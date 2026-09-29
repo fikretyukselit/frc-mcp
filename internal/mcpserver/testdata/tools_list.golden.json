@@ -1029,6 +1029,308 @@
       "idempotentHint": true,
       "openWorldHint": false,
       "readOnlyHint": true,
+      "title": "Map FRC APIs across seasons"
+    },
+    "description": "Map FRC APIs from one season to another (e.g. a 2026 robot project to 2027): renamed, moved and removed classes and methods, with the exact target-season name, a confidence and where the mapping comes from. Pass one symbol or a whole source file (Java, C++ or Python); it returns mappings only and never rewrites code.\n\nUse when: porting robot code to a new season or vendor major version; a symbol from a tutorial or an old project does not exist in the pinned season (frc_api or frc_verify_code said version_mismatch).\nDon't use when: you need docs for a symbol that exists — use frc_api.\n\nSources, most reliable first: curated (a cited upstream change, e.g. ChassisSpeeds → ChassisVelocities), upstream (the library's own deprecation note), generated (the same class in a new package, e.g. edu.wpi.first.* → org.wpilib.*). Unresolved symbols come with pointers to target-season docs and release notes; read them with frc_fetch. After applying the mappings, run frc_verify_code for the target season. Examples:\n{\"symbol\": \"ChassisSpeeds\", \"from\": \"2026\", \"to\": \"2027\"}\n{\"path\": \"src/main/java/frc/robot/subsystems/Drive.java\", \"to\": \"2027\"}",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "description": "a whole source file (Java, C++ or Python) to map every API reference in it",
+          "maxLength": 524288,
+          "type": "string"
+        },
+        "from": {
+          "description": "source season or library version, e.g. 2026 or 2026.2.2 (default: pin, then the current stable season)",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "include_members": {
+          "description": "symbol mode: also list curated rules for the type's members",
+          "type": "boolean"
+        },
+        "language": {
+          "description": "java, cpp or python (default: every language for symbol, detected for code)",
+          "enum": [
+            "java",
+            "cpp",
+            "python",
+            "any"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "description": "alternative to code: a source file under the project root (local servers only)",
+          "type": "string"
+        },
+        "pin": {
+          "description": "pin handle from frc_context (supplies from)",
+          "type": "string"
+        },
+        "symbol": {
+          "description": "one API symbol: simple name (ChassisSpeeds), FQN, Type#member or Type.member",
+          "maxLength": 300,
+          "type": "string"
+        },
+        "to": {
+          "description": "target season or version, e.g. 2027 (default: the newest indexed season after from)",
+          "maxLength": 40,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "frc_migrate",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "already_in_target": {
+          "description": "symbols that already belong to the target season",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "checked": {
+          "description": "symbols or code references examined",
+          "type": "integer"
+        },
+        "confidence": {
+          "description": "0..1 confidence in the top result",
+          "type": "number"
+        },
+        "degraded": {
+          "description": "retrievers that were unavailable for this call",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "frc_season": {
+          "description": "effective FRC season the results are pinned to",
+          "type": "string"
+        },
+        "freshness": {
+          "description": "shard (served from the local index) | live",
+          "type": "string"
+        },
+        "from_season": {
+          "type": "string"
+        },
+        "index_age": {
+          "description": "age of the newest loaded index shard",
+          "type": "string"
+        },
+        "index_stale": {
+          "description": "true when the index manifest is past its expiry",
+          "type": "boolean"
+        },
+        "language": {
+          "description": "effective language filter",
+          "type": "string"
+        },
+        "mappings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "citation": {
+                "description": "upstream change the curated rule cites",
+                "type": "string"
+              },
+              "confidence": {
+                "description": "high | medium | low",
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "from_season": {
+                "type": "string"
+              },
+              "kind": {
+                "description": "rename | move | removed | signature | behavior | unchanged",
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "library": {
+                "type": "string"
+              },
+              "line": {
+                "description": "code mode: line of first use",
+                "type": "integer"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "rule_id": {
+                "type": "string"
+              },
+              "source": {
+                "description": "curated (cited rule) | upstream (library deprecation note) | generated (same-name move between seasons) | unchanged",
+                "type": "string"
+              },
+              "to": {
+                "description": "counterpart in the target season; empty for removed APIs (read notes)",
+                "type": "string"
+              },
+              "to_season": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from",
+              "from_season",
+              "to_season",
+              "language",
+              "library",
+              "kind",
+              "confidence",
+              "source"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "next": {
+          "description": "suggested next tool calls",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "next_cursor": {
+          "description": "pass back as cursor to get the next page",
+          "type": "string"
+        },
+        "not_found": {
+          "description": "inputs that are not symbols of the from season (team code or a typo)",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "omitted": {
+          "description": "number of results left out by truncation",
+          "type": "integer"
+        },
+        "pin_source": {
+          "description": "where the season came from: arg | query | default",
+          "type": "string"
+        },
+        "status": {
+          "description": "ok | low_confidence | no_match | version_mismatch | syncing",
+          "type": "string"
+        },
+        "to_season": {
+          "type": "string"
+        },
+        "truncated": {
+          "description": "true when results were cut to fit the token budget",
+          "type": "boolean"
+        },
+        "unresolved": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "language": {
+                "type": "string"
+              },
+              "library": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer"
+              },
+              "pointers": {
+                "description": "target-season docs or release notes mentioning the symbol",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "description": "chunk id; pass to frc_fetch",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "library": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "library",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "symbol": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "symbol",
+              "language",
+              "reason"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "confidence",
+        "freshness",
+        "truncated",
+        "from_season",
+        "to_season",
+        "mappings",
+        "unresolved",
+        "checked"
+      ],
+      "type": "object"
+    },
+    "title": "Map FRC APIs across seasons"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
       "title": "Search FRC docs"
     },
     "description": "Search FRC documentation, API references and release notes, pinned to one FRC season.\n\nUse when: you need to know how to do something with WPILib or a vendor library (e.g. \"configure Motion Magic on a TalonFX\", \"swerve odometry with PhotonVision\"), or what changed between versions.\nDon't use when: you already know the exact class or method name and need its signature — call frc_api. To read a whole section, call frc_fetch with a hit's id.\n\nResults carry citations, trust tiers and the effective season. Forum content is excluded unless kinds includes \"forum\" or the query describes an error. Examples:\n{\"query\": \"How do I configure Motion Magic on a TalonFX?\", \"language\": \"java\"}\n{\"query\": \"SwerveDriveKinematics toSwerveModuleStates\", \"frc_season\": \"2027\"}",
@@ -1762,12 +2064,12 @@
       "readOnlyHint": true,
       "title": "Verify robot code against the season API"
     },
-    "description": "Check Java robot code against the pinned FRC season's real API before you build or deploy it. It catches imports and calls that belong to a different season (e.g. edu.wpi.first.* in a 2027 project, org.wpilib.* in 2026) with the exact replacement, and flags deprecated APIs (e.g. XboxController.getLeftBumper → getLeftBumperButton).\n\nUse when: you wrote or changed robot code that uses WPILib, before telling the user it is done; when a build fails with \"cannot find symbol\" after a season update.\nDon't use when: you want documentation — use frc_search / frc_api.\n\nSeverity: error = wrong-season API with a known counterpart (fix it); warning = deprecated or no equivalent in this season; info = not resolvable (team code, inherited member, or a library not indexed yet). Read `coverage`: libraries marked none were not checked. Examples:\n{\"code\": \"import edu.wpi.first.wpilibj.XboxController;\\n…\", \"frc_season\": \"2027\"}\n{\"path\": \"src/main/java/frc/robot/RobotContainer.java\", \"pin\": \"pin1.…\"}",
+    "description": "Check robot code (Java, C++ or Python) against the pinned FRC season's real API before you build or deploy it. It catches imports, types and calls that belong to a different season (e.g. edu.wpi.first.* in a 2027 project, frc::ChassisSpeeds where 2027 has wpi::math::ChassisVelocities) with the exact replacement, calls whose literal arguments fit no overload of that season (e.g. new TalonFX(1, \"canivore\") in 2027), and deprecated APIs (e.g. XboxController.getLeftBumper → getLeftBumperButton).\n\nUse when: you wrote or changed robot code that uses WPILib or a vendor library, before telling the user it is done; when a build fails with \"cannot find symbol\" after a season update.\nDon't use when: you want documentation — use frc_search / frc_api; you are porting a whole project — use frc_migrate first.\n\nSeverity: error = wrong-season API with a known counterpart, or a call no overload of the season accepts (fix it); warning = deprecated, no equivalent in this season, or a vendor version that differs from the indexed one; info = not resolvable (team code, or a library not indexed). Read `coverage`: libraries marked none were not checked. Examples:\n{\"code\": \"import edu.wpi.first.wpilibj.XboxController;\\n…\", \"frc_season\": \"2027\"}\n{\"path\": \"src/main/cpp/Robot.cpp\", \"pin\": \"pin1.…\"}",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
         "code": {
-          "description": "Java source to check",
+          "description": "source file to check (Java, C++ or Python)",
           "maxLength": 524288,
           "type": "string"
         },
@@ -1777,7 +2079,7 @@
           "type": "string"
         },
         "language": {
-          "description": "java (C++ and Python arrive in M3)",
+          "description": "java, cpp or python (default: from the path extension, else detected from the code)",
           "enum": [
             "java",
             "cpp",
@@ -1786,7 +2088,7 @@
           "type": "string"
         },
         "path": {
-          "description": "alternative to code: a .java file under the project root (local servers only)",
+          "description": "alternative to code: a .java, .cpp/.h or .py file under the project root (local servers only)",
           "type": "string"
         },
         "pin": {

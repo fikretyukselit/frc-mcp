@@ -81,6 +81,13 @@ type Engine struct {
 
 	releases []index.Release // every shard's release facts, newest first
 	hwspecs  []index.HWSpec  // hardware rows, by category/part/source/season
+
+	// Curated migration rules (a few hundred rows), keyed by source and
+	// target FQN; symbolSeasons are the seasons that have API tables.
+	migrations    []index.Migration
+	migFrom       map[string][]int
+	migTo         map[string][]int
+	symbolSeasons []string
 }
 
 // Options configures an Engine.
@@ -169,6 +176,31 @@ func New(shards []*index.Reader, opt Options) *Engine {
 		}
 		e.hwspecs = append(e.hwspecs, hs...)
 	}
+	e.migFrom, e.migTo = map[string][]int{}, map[string][]int{}
+	symSeasons := map[string]bool{}
+	for i, s := range shards {
+		if e.hasSymbols[i] {
+			for se := range e.seasons[i] {
+				symSeasons[se] = true
+			}
+		}
+		ms, err := s.AllMigrations(context.Background())
+		if err != nil {
+			e.warnings = append(e.warnings, "migration:"+s.Meta().Name+": "+err.Error())
+			continue
+		}
+		for _, m := range ms {
+			e.migFrom[m.From] = append(e.migFrom[m.From], len(e.migrations))
+			if m.To != "" {
+				e.migTo[m.To] = append(e.migTo[m.To], len(e.migrations))
+			}
+			e.migrations = append(e.migrations, m)
+		}
+	}
+	for se := range symSeasons {
+		e.symbolSeasons = append(e.symbolSeasons, se)
+	}
+	slices.Sort(e.symbolSeasons)
 	slices.SortStableFunc(e.releases, func(a, b index.Release) int {
 		if c := b.PublishedAt.Compare(a.PublishedAt); c != 0 {
 			return c
@@ -1069,6 +1101,46 @@ func (e *Engine) SymbolsReplacedBy(ctx context.Context, fqn, season string) []in
 	}
 	return out
 }
+
+// MigrationsFrom returns curated rules whose source is fqn (and, with
+// members, rules on members "fqn#…"), for a language ("" = any).
+func (e *Engine) MigrationsFrom(_ context.Context, fqn, language string, members bool) []index.Migration {
+	var out []index.Migration
+	pick := func(idx []int) {
+		for _, i := range idx {
+			if m := e.migrations[i]; language == "" || m.Language == language {
+				out = append(out, m)
+			}
+		}
+	}
+	pick(e.migFrom[fqn])
+	if members {
+		for from, idx := range e.migFrom {
+			if strings.HasPrefix(from, fqn+"#") {
+				pick(idx)
+			}
+		}
+		slices.SortFunc(out, func(a, b index.Migration) int { return strings.Compare(a.From+a.RuleID, b.From+b.RuleID) })
+	}
+	return out
+}
+
+// MigrationsTo returns curated rules whose target is fqn.
+func (e *Engine) MigrationsTo(_ context.Context, fqn, language string) []index.Migration {
+	var out []index.Migration
+	for _, i := range e.migTo[fqn] {
+		if m := e.migrations[i]; language == "" || m.Language == language {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// Migrations returns every curated rule (coverage listing).
+func (e *Engine) Migrations() []index.Migration { return e.migrations }
+
+// SymbolSeasons lists the seasons that have API symbol tables, oldest first.
+func (e *Engine) SymbolSeasons() []string { return e.symbolSeasons }
 
 // HasSeason reports whether any shard contains the season.
 func (e *Engine) HasSeason(season string) bool {

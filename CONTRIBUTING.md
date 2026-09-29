@@ -30,16 +30,18 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Project detection + pin handles (`internal/project`) | ✅ implemented |
 | Eval harness + judged queries + CI gate (`internal/eval`, `eval/`) | ✅ 184 queries; a human-written holdout is still needed |
 | Egress guard, sanitizer (`internal/netguard`, `internal/ingest/sanitize`) | ✅ implemented |
-| Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context`, `frc_vendordep`, `frc_verify_code` (Java), `frc_whats_new`, `frc_hardware` | ✅ implemented |
+| Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context`, `frc_vendordep`, `frc_verify_code`, `frc_whats_new`, `frc_hardware`, `frc_migrate` | ✅ implemented (9 tools) |
 | Release facts (`github-releases` adapter, `release` table) | ✅ WPILib + 7 vendors, seasons ≥ 2025 |
 | Hardware facts (`wpilib-dcmotor` adapter, `hw_spec` table, `frc_hardware`) | ✅ 20 motors from WPILib DCMotor (2026 + 2027), sim factories per language |
 | Vendordep catalog facts (`internal/facts`, `source/vendordeps`) | ✅ WPILib vendor-json-repo, 2026 + 2027-alpha |
-| Verifier (`internal/verify`, `frc-mcp verify`) | ✅ Java, WPILib + 7 vendor libraries (checked only when that season's table is indexed; version skew caps findings at warning): 0 false errors on 128k LOC of public 2026 team code |
+| Verifier (`internal/verify`, `frc-mcp verify`) | ✅ Java (incl. call shapes), C++ and Python; WPILib + 7 vendor libraries (checked only when that season's table is indexed; version skew caps findings at warning): 0 false errors on 139k lines of public 2026 team code |
+| Migration (`internal/migrate`, `data/migrations/`, `frc_migrate`, `frc-mcp migrate`) | ✅ 238 curated 2026 → 2027 rules (366 per language) with citations, plus upstream and generated mappings: 97.8% of API references in 12 team repositories map to 2027 |
+| Agent eval (`internal/agenteval`, `cmd/agenteval`, `eval/tasks/`) | ✅ 26 tasks with compiling reference solutions; compile check on the GradleRIO classpath |
 | Vendor Java APIs (Javadoc jars from vendor Maven repos) | ✅ Phoenix 6, REVLib, PhotonLib, PathPlannerLib, ChoreoLib, AdvantageKit, YAGSL (2026 + 2027-alpha where released) |
 | Python APIs (`pypi-wheel` + `pystub`: RobotPy and vendor wheels) | ✅ wpilib, wpimath, wpiutil, ntcore, hal, commands2, apriltag; phoenix6, robotpy-rev, photonlibpy, pathplannerlib, choreolib (2026 + 2027-alpha) — about 35k symbols |
 | Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
 | WPILib C++ API (`doxygen-zip`) | ✅ 2026 + 2027-alpha, ~20k symbols; 5,962 `frc::`→`wpi::` moves mapped automatically |
-| `frc_migrate`, vendor C++ APIs, C++/Python verification, more hardware sources | ⏳ M3–M4 |
+| Vendor C++ APIs, more hardware sources, opt-in forum | ⏳ M3 leftovers |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -117,7 +119,33 @@ Most M3 work is "teach the indexer a new upstream". The steps:
    `eval/queries.jsonl`; the gate in `eval/baseline.json` must not regress (update the baseline in the same PR only when
    metrics improve).
 
-## 8. Open work (pick one, open an issue first so two people don't take the same item)
+## 8. Adding a migration rule
+
+`frc-mcp migrate --from 2026 --to 2027 path/to/robot` over real team code prints `UNRESOLVED` for every reference
+it cannot map; those are the rules worth writing. A rule lives in `data/migrations/<library>-<to season>.yaml`:
+
+```yaml
+  - id: chassisspeeds-to-chassisvelocities   # unique kebab-case within the file
+    kind: rename                             # rename | move | removed | signature | behavior
+    from: {java: edu.wpi.first.math.kinematics.ChassisSpeeds, cpp: frc::ChassisSpeeds}
+    to:   {java: org.wpilib.math.kinematics.ChassisVelocities, cpp: wpi::math::ChassisVelocities}
+    notes: >-
+      What changed and what to do, in one or two sentences. PR numbers like #8479 are safe in a block scalar.
+    citation: https://github.com/wpilibsuite/allwpilib/pull/8479
+```
+
+- **Cite what you read.** The citation is the PR, changelog entry or docs page that states the change. No citation, no
+  rule.
+- **Exact FQNs.** `from` must exist in the from-season table and `to` in the to-season table, per language; the index
+  build fails otherwise. Members are `Type#member`. Check with `sqlite3 <shard>.sqlite "select fqn from symbol where
+  fqn = '…'"` or `frc-mcp migrate --symbol …`.
+- **`removed`** has no `to`; its notes say what to use instead and where that advice comes from.
+- **Notes are block scalars (`>-`).** In a plain YAML value, ` #` starts a comment and silently cuts the text;
+  `go test ./internal/migrate` rejects that.
+- Run `go test ./internal/migrate` and `make index` (the build validates every rule), then re-run `frc-mcp migrate`
+  on the code that needed the rule.
+
+## 9. Open work (pick one, open an issue first so two people don't take the same item)
 
 | Item | Size | Where |
 |---|---|---|
@@ -126,10 +154,10 @@ Most M3 work is "teach the indexer a new upstream". The steps:
 | More vendor docs: ReduxLib, Studica, Limelight, maple-sim; CTRE 2027 docs | S–M each | §7, `data/sources.yaml` |
 | Ask CTRE, REV and YAGSL for permission to redistribute doc/API excerpts (`docs/sources.md` §0.2) | S, no code | email |
 | Vendor C++ APIs (Phoenix 6, REVLib, PhotonLib Doxygen bundles) with `doxygen-zip` | M each | `data/sources.yaml` |
-| `frc_verify_code` for Python and C++ (imports/includes against the new tables) | M | `internal/verify` |
+| Migration rules for the few references still unresolved, and for PathPlannerLib / YAGSL / PhotonLib once their 2027 tables exist | S each | §8, `data/migrations/` |
+| More agent-eval tasks (C++ and Python tasks need a compile step per language) | M | `eval/tasks/`, `internal/agenteval` |
 | Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |
 | More `frc_hardware` sources: CTRE/REV dyno pages, ReCalc (MIT) motor data, encoders/IMUs/swerve modules — each its own labeled source | M each | `internal/ingest/source`, `hw_spec` |
 | `frc_whats_new` `live` probe (allowlisted GitHub API call at query time) | M | `internal/mcpserver`, `internal/netguard` |
 | MCP conformance suite and goreleaser snapshot in CI; sync check on all 3 OSes | M | `.github/workflows/` |
 | Packaging: Homebrew, Scoop, Winget | M | `.goreleaser.yaml` |
-| M4: `frc_migrate`, Java member-level verification, agent compile-pass eval | L | `CLAUDE.md` §9 |

@@ -55,6 +55,8 @@ func run() int {
 		err = evalCmd(ctx, args)
 	case "verify":
 		err = verifyCmd(ctx, args)
+	case "migrate":
+		err = migrateCmd(ctx, args)
 	case "sync":
 		err = syncCmd(ctx, args)
 	case "version":
@@ -86,6 +88,7 @@ Usage:
   frc-mcp doctor [flags]         check the local index and measure latency
   frc-mcp eval [flags]           retrieval metrics on eval/queries.jsonl
   frc-mcp verify [flags] DIR     check a robot project's Java code against its season's API
+  frc-mcp migrate [flags] DIR    list the API changes to port a robot project to another season
   frc-mcp version                print the version
 
 Run "frc-mcp <command> -h" for flags.

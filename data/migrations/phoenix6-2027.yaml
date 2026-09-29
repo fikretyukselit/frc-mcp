@@ -1,0 +1,210 @@
+# Curated migration rules. Every rule cites the upstream change.
+library: phoenix6
+from_season: "2026"
+to_season: "2027"
+rules:
+  - id: talonfx-constructor-canbus
+    kind: signature
+    from:
+      java: com.ctre.phoenix6.hardware.TalonFX#TalonFX
+      python: phoenix6.hardware.TalonFX#TalonFX
+    to:
+      java: com.ctre.phoenix6.hardware.TalonFX#TalonFX
+      python: phoenix6.hardware.TalonFX#TalonFX
+    notes: 'The CAN-bus-string constructor (deprecated in 2026) and the ID-only constructor were removed in 26.50.0-alpha-1. The only 2027 constructor is `public TalonFX(int deviceId, CANBus canbus)` (Python `__init__(self, device_id: int, canbus: CANBus)`). Create one CANBus object and pass it to every device.'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: cancoder-constructor-canbus
+    kind: signature
+    from:
+      java: com.ctre.phoenix6.hardware.CANcoder#CANcoder
+      python: phoenix6.hardware.CANcoder#CANcoder
+    to:
+      java: com.ctre.phoenix6.hardware.CANcoder#CANcoder
+      python: phoenix6.hardware.CANcoder#CANcoder
+    notes: 'String-bus and ID-only constructors were removed. 2027 signature: `public CANcoder(int deviceId, CANBus canbus)`.'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: pigeon2-constructor-canbus
+    kind: signature
+    from:
+      java: com.ctre.phoenix6.hardware.Pigeon2#Pigeon2
+      python: phoenix6.hardware.Pigeon2#Pigeon2
+    to:
+      java: com.ctre.phoenix6.hardware.Pigeon2#Pigeon2
+      python: phoenix6.hardware.Pigeon2#Pigeon2
+    notes: 'String-bus and ID-only constructors were removed. 2027 signature: `public Pigeon2(int deviceId, CANBus canbus)`.'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: talonfxs-constructor-canbus
+    kind: signature
+    from:
+      java: com.ctre.phoenix6.hardware.TalonFXS#TalonFXS
+      python: phoenix6.hardware.TalonFXS#TalonFXS
+    to:
+      java: com.ctre.phoenix6.hardware.TalonFXS#TalonFXS
+      python: phoenix6.hardware.TalonFXS#TalonFXS
+    notes: 'String-bus and ID-only constructors were removed. 2027 signature: `public TalonFXS(int deviceId, CANBus canbus)`.'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: canrange-constructor-canbus
+    kind: signature
+    from:
+      java: com.ctre.phoenix6.hardware.CANrange#CANrange
+      python: phoenix6.hardware.CANrange#CANrange
+    to:
+      java: com.ctre.phoenix6.hardware.CANrange#CANrange
+      python: phoenix6.hardware.CANrange#CANrange
+    notes: 'String-bus and ID-only constructors were removed. 2027 signature: `public CANrange(int deviceId, CANBus canbus)`.'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: candi-constructor-canbus
+    kind: signature
+    from:
+      java: com.ctre.phoenix6.hardware.CANdi#CANdi
+      python: phoenix6.hardware.CANdi#CANdi
+    to:
+      java: com.ctre.phoenix6.hardware.CANdi#CANdi
+      python: phoenix6.hardware.CANdi#CANdi
+    notes: 'String-bus and ID-only constructors were removed. 2027 signature: `public CANdi(int deviceId, CANBus canbus)`.'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: canbus-canport-constructor
+    kind: signature
+    from:
+      java: com.ctre.phoenix6.CANBus#CANBus
+    to:
+      java: com.ctre.phoenix6.CANBus#CANBus
+    notes: '26.70.0-alpha-2 replaced `CANBus.systemcore(int)` with `new CANBus(CANPort)` (2027 signature `public CANBus(org.wpilib.hardware.bus.CANPort canPort)`) and removed the CANBus constructors that took a hoot replay file; construct a HootReplay before any devices instead. On Systemcore, an empty-string CANBus defaults to "can_s1".'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: talonfx-set-to-setthrottle
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.hardware.TalonFX#set
+      python: phoenix6.hardware.TalonFX#set
+    to:
+      java: com.ctre.phoenix6.hardware.TalonFX#setThrottle
+      python: phoenix6.hardware.TalonFX#set_throttle
+    notes: TalonFX/TalonFXS `set` was renamed to `setThrottle` in 26.50.0-alpha-1, matching WPILib's MotorController rename.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: talonfx-get-to-getthrottle
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.hardware.TalonFX#get
+      python: phoenix6.hardware.TalonFX#get
+    to:
+      java: com.ctre.phoenix6.hardware.TalonFX#getThrottle
+      python: phoenix6.hardware.TalonFX#get_throttle
+    notes: TalonFX/TalonFXS `get` was renamed to `getThrottle` in 26.50.0-alpha-1.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: talonfx-setneutralmode-to-configneutralmode
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.hardware.TalonFX#setNeutralMode
+      python: phoenix6.hardware.TalonFX#setNeutralMode
+    to:
+      java: com.ctre.phoenix6.hardware.TalonFX#configNeutralMode
+      python: phoenix6.hardware.TalonFX#config_neutral_mode
+    notes: '`setNeutralMode` was renamed to `configNeutralMode` in 26.50.0-alpha-1 (same arguments: NeutralModeValue and optional timeoutSeconds).'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: utils-getsystemtimeseconds
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.Utils#getSystemTimeSeconds
+      python: phoenix6.utils#get_system_time_seconds
+    to:
+      java: com.ctre.phoenix6.Utils#getMonotonicTimeSeconds
+      python: phoenix6.utils#get_monotonic_time_seconds
+    notes: Renamed in 26.70.0-alpha-2.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: utils-fpgatocurrenttime-removed
+    kind: removed
+    from:
+      java: com.ctre.phoenix6.Utils#fpgaToCurrentTime
+    notes: Utils.fpgaToCurrentTime() and currentTimeToFPGATime() were removed in 26.50.0-alpha-1. The changelog names no replacement; the related time source is Utils.getMonotonicTimeSeconds() (renamed from getSystemTimeSeconds in 26.70.0-alpha-2).
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swerverequest-applyrobotspeeds
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveRequest.ApplyRobotSpeeds
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveRequest.ApplyRobotVelocity
+    notes: Renamed in 26.50.0-alpha-1. The `Speeds` field/`withSpeeds` became `Velocity`/`withVelocity(ChassisVelocities)`, and `DesaturateWheelSpeeds` became `DesaturateWheelVelocities`.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swerverequest-applyfieldspeeds
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveRequest.ApplyFieldSpeeds
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveRequest.ApplyFieldVelocity
+    notes: Renamed in 26.50.0-alpha-1. The `Speeds` field/`withSpeeds` became `Velocity`/`withVelocity(ChassisVelocities)`.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swerverequest-applyrobotspeeds-withspeeds
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveRequest.ApplyRobotSpeeds#withSpeeds
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveRequest.ApplyRobotVelocity#withVelocity
+    notes: 'The Speeds parameter was renamed Velocity. 2027 signature: `public final SwerveRequest.ApplyRobotVelocity withVelocity(org.wpilib.math.kinematics.ChassisVelocities newVelocity)`.'
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swervedrivestate-speeds
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState#Speeds
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState#Velocity
+    notes: SwerveDriveState.Speeds was renamed to Velocity and is now an org.wpilib.math.kinematics.ChassisVelocities.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swervedrivestate-modulestates
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState#ModuleStates
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState#ModuleVelocities
+    notes: ModuleStates was renamed to ModuleVelocities (SwerveModuleVelocity[]). ModuleTargets keeps its name but is now SwerveModuleVelocity[].
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swervemodule-getcurrentstate
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveModule#getCurrentState
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveModule#getCurrentVelocity
+    notes: Renamed in 26.50.0-alpha-1; returns org.wpilib.math.kinematics.SwerveModuleVelocity.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swervemodule-gettargetstate
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveModule#getTargetState
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveModule#getTargetVelocity
+    notes: Renamed in 26.50.0-alpha-1; returns org.wpilib.math.kinematics.SwerveModuleVelocity.
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: swervedrivetrainconstants-canbusname
+    kind: rename
+    from:
+      java: com.ctre.phoenix6.swerve.SwerveDrivetrainConstants#CANBusName
+    to:
+      java: com.ctre.phoenix6.swerve.SwerveDrivetrainConstants#Network
+    notes: SwerveDrivetrainConstants.CANBusName (String) was renamed to Network and now takes a CANBus object (26.70.0-alpha-2).
+    citation: https://api.ctr-electronics.com/changelog
+
+  - id: canbus-roborio-removed
+    kind: removed
+    from:
+      java: com.ctre.phoenix6.CANBus#roboRIO
+    notes: >-
+      Phoenix 6 26.50/26.70 alphas target WPILib 2027 on Systemcore and do not support the roboRIO, so there is no roboRIO bus factory. Construct the bus with new CANBus(CANPort) (26.70.0-alpha-2), or new CANBus() for the default can_s1 bus.
+    citation: https://api.ctr-electronics.com/changelog

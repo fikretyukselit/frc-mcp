@@ -1,0 +1,6 @@
+# Byte-exact goldens and fixtures on every OS: Git on Windows would otherwise
+# check text out with CRLF and every golden comparison would fail.
+* text=auto eol=lf
+*.jar binary
+*.zip binary
+*.png binary

@@ -33,6 +33,8 @@ const classPage = `<html><body>
 const deprecatedPage = `<html><body><dl class="reflist">
 <dt>Member <a class="el" href="classfrc_1_1_xbox_controller.html#a2">frc::XboxController::GetLeftBumper</a> () const</dt>
 <dd>Use GetLeftBumperButton instead.</dd>
+<dt>Member <a class="el" href="classfrc_1_1_other.html#a9">frc::Other::Other</a> (const <a class="el" href="classfrc_1_1_xbox_controller.html">XboxController</a> &amp;hid)</dt>
+<dd>Use the port constructor.</dd>
 </dl></body></html>`
 
 func TestParse(t *testing.T) {
@@ -78,6 +80,9 @@ func TestParse(t *testing.T) {
 	if d.DeprecatedIn != "2026.2.2" || d.Summary != "Deprecated. Use GetLeftBumperButton instead. Read the value of the left bumper." ||
 		d.SourceURL != "https://x/cpp/classfrc_1_1_xbox_controller.html#a2" {
 		t.Errorf("deprecated %+v", d)
+	}
+	if g := syms["frc::XboxController"]; g.DeprecatedIn != "" {
+		t.Errorf("a parameter type of a deprecated member was marked deprecated: %+v", g)
 	}
 	if b := syms["frc::XboxController#GetLeftBumperButton"]; b.Summary != "" {
 		t.Errorf("inherited description leaked: %+v", b)

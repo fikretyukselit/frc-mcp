@@ -133,33 +133,63 @@ Detects or declares the project's pin set.
   If the symbol exists only in another season, the status is `version_mismatch` and the response says where the
   symbol lives.
 
-### `frc_verify_code`
-- **In:** `code`, or `path` (stdio mode only, under the project root); `language?`; the `Pin` fields.
+### `frc_verify_code` (Java M2; C++, Python and call shapes M4)
+- **In:** `code`, or `path` (stdio mode only, under the project root: `.java`, `.cpp`/`.h`/…, `.py`); `language?`
+  (default: from the path extension, the pin, else detected from the code); the `Pin` fields.
 - **Out:**
   - `findings[]`, each with `line, col, symbol, severity, kind, message, fix?, citation`.
-  - `coverage` per `(library, language)`: `full|partial|none`, stating which checks ran. Silence without coverage is not
-    approval.
+  - `coverage` per library: `partial (…)` names what was checked, `none (…)` says why a library was not. Silence
+    without coverage is not approval.
   - Summary counts.
-- **Status:** implemented for Java in M2. False-positive gate: 0 errors in 128k LOC of public 2026 team code
-  (`docs/benchmarks.md`). Member checks walk the pinned season's supertype hierarchy; a hierarchy that cannot be
-  resolved yields no finding.
-- **MVP scope (M2):**
-  - Java: imports (including wildcard and static), qualified type names, and `new X(`.
-  - C++ (M3): `#include` and `ns::Type`.
-  - Python (M3): `from x import y`.
-  - Member calls (M4): Java only, and only when the receiver's declared type is visible in the same file.
+- **What is checked:**
+  - Java: imports (single, wildcard, static), fully qualified names, members on receivers whose type is declared in the
+    same file or imported (static calls), walking the pinned season's supertype hierarchy.
+  - Java call shapes (M4): `new T(…)` and method calls on those receivers, when the literal arguments (`"x"`, `1`,
+    `1.0`, `true`, `null`, `'c'`) fit no overload of the pinned season. Any other expression matches every parameter
+    type, so a finding means the call cannot compile. Methods are checked only when the whole hierarchy resolves.
+  - C++ (M4): qualified names in the indexed namespaces (`frc::`, `frc2::`, `wpi::`, `ctre::`, `rev::`, …) and
+    `ns::Type::Member`, with nested types tried before members.
+  - Python (M4): `from x import y` (with aliases), `import x[.y] [as z]` attribute chains, and members on variables
+    assigned from an imported class, including `self.` attributes.
 - **Severity rule:**
-  - **`error`** only when a symbol is absent from the pinned table **and** present in another season's table
-    (`wrong_season`), or is marked `removed_in` ≤ the pinned version.
-  - `warning` for symbols marked deprecated in the pinned version.
+  - **`error`** only when a symbol is absent from the pinned table **and** present in another season's table with a
+    known pinned-season counterpart (`wrong_season`), or when no pinned overload accepts a call that another
+    season's overload accepts.
+  - `warning` for deprecated symbols, a wrong-season symbol without a known counterpart, a Python class imported from
+    a module path the season does not use (packages re-export, so this is never an error), a call no overload of any
+    season accepts with that argument count, and every vendor finding when the project's vendordep version differs
+    from the indexed table.
   - `info` for symbols not in any table, which may be team code.
 
-  False positives cost more than misses.
+  False positives cost more than misses. Gate: 0 errors over 12 public 2026 team repositories (139k lines, Java and
+  C++) pinned to their own season (`docs/benchmarks.md`).
 
-### `frc_migrate`
-- **In:** `symbol` or `code`; `from` and `to` (a `Pin` or a version string).
-- **Out:** `mappings[]`, each with `from, to, notes, confidence, source (curated|generated), citation`, plus unresolved
-  items with pointers to changelog chunks. It produces mappings only and never rewrites code.
+### `frc_migrate` (implemented M4)
+- **In:** exactly one of `symbol` (simple name, FQN, `Type#member` or `Type.member`), `code` (a whole Java, C++ or
+  Python file) or `path` (stdio only); `from` and `to` as a season (`2026`) or a library version (`2026.2.2`,
+  `2027.0.0-alpha-7`); `language?`; `include_members?` (symbol mode); `pin?` (supplies `from`). `to` defaults to the
+  next indexed API season after `from`.
+- **Out:** `mappings[]`, each with `from, to, from_season, to_season, language, library, kind, notes, confidence,
+  source, rule_id?, citation?, line?`; `unresolved[]` with a reason and up to three pointers to target-season docs or
+  release notes (`frc_fetch` ids); `not_found` (not a from-season symbol: team code or a typo); `already_in_target`.
+  It produces mappings only and never rewrites code.
+- **Sources, most authoritative first:**
+  1. `curated`: `data/migrations/*.yaml`, one rule per upstream change (`kind` rename, move, removed, signature or
+     behavior), each citing the PR, changelog or docs page it comes from. The index build validates every `from`
+     against the from-season table and every `to` against the to-season table and fails on a mismatch, so a rule
+     cannot drift from the tables it describes. Confidence `high` (`medium` for rules marked `verified: false`).
+  2. `upstream`: the library's own deprecation note (`@deprecated Use X`), resolved to a target-season symbol when it
+     names one uniquely. Confidence `medium`, or `low` when the note names no indexed symbol.
+  3. `generated`: `apisym.Diff`'s same-name moves between consecutive seasons (e.g. `edu.wpi.first.math.geometry.Pose2d`
+     → `org.wpilib.math.geometry.Pose2d`). Confidence `high` when the innermost package is unchanged, else `medium`.
+     A member whose own row has no mapping is mapped through its type (`Type#m` → `Type'#m` when `Type'` declares or
+     inherits `m`), reported as `generated` with the type rule's id and citation as the reason.
+- **Code mode:** every API reference found by the same extractor as `frc_verify_code` is mapped once, with the line of
+  its first use; the curated member rules of each used type are listed too, so constructor and signature changes
+  (Phoenix 6 26.50 removed `TalonFX(int)` and `TalonFX(int, String)`) show up even though no reference names them.
+- **Coverage:** a symbol whose library has no target-season table is `unresolved` with `no_table` set, which is a
+  coverage gap, not a missing mapping. Measured over 12 public 2026 team repositories: 97.8% of API references map to
+  2027, and 251 of the 254 unresolved ones belong to libraries without a 2027 table yet (`docs/benchmarks.md`).
 
 ### `frc_vendordep` (absorbs `check_compat`)
 - **In:**

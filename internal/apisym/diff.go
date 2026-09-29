@@ -55,7 +55,7 @@ func Diff(old, new []index.Symbol, newVersion string) (removed, added, mapped in
 			target += "#" + member
 		}
 		if newSet[target] {
-			s.Replacement = target
+			s.Replacement, s.ReplacementSrc = target, "generated"
 			mapped++
 		}
 	}
