@@ -23,6 +23,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/dcmotor"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/discourse"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/doxygen"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/ghreleases"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/gitbook"
@@ -69,6 +70,10 @@ type SourceReport struct {
 	Chunks      int    `json:"chunks"`
 	Symbols     int    `json:"symbols"`
 	Rev         string `json:"rev"`
+	// Forum feeds: posts flagged by the suspect detector, and items outside
+	// the allowed categories.
+	Suspect  int `json:"suspect,omitempty"`
+	Filtered int `json:"filtered,omitempty"`
 }
 
 type ShardReport struct {
@@ -113,7 +118,7 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 
 	for _, src := range reg.Select(opt.SourceIDs...) {
 		t0 := time.Now()
-		res, err := f.Get(ctx, src.URL)
+		res, err := f.GetFresh(ctx, src.URL, src.Interval())
 		if err != nil {
 			return nil, fmt.Errorf("source %s: %w", src.ID, err)
 		}
@@ -154,6 +159,12 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
+		case "discourse-rss":
+			var st discourse.Stats
+			st, err = discourse.Parse(ctx, f.Within(src.Interval()), res.Path, src, res.FetchedAt, addChunk)
+			sr.Suspect, sr.Filtered = st.Suspect, st.Filtered
+			log.Info("forum feed", "id", src.ID, "topics", st.Topics, "replies", st.Replies, "suspect", st.Suspect,
+				"filtered", st.Filtered, "duplicates", st.Duplicates, "invalid", st.Invalid, "empty", st.Empty)
 		default:
 			err = fmt.Errorf("unknown adapter %q", src.Adapter)
 		}

@@ -209,6 +209,25 @@ func pageChunks(doc *html.Node, rel string, src sources.Source, rev string, retr
 
 // ---- HTML → Markdown ----
 
+// Markdown converts one HTML node (and its subtree) to Markdown blocks with
+// the same rules as Sphinx pages: paragraphs, lists, tables, admonitions,
+// code, blockquotes; images and scripts dropped. Adapters whose upstream
+// serves HTML fragments (discourse-rss) reuse it so every source renders
+// the same Markdown dialect.
+func Markdown(n *html.Node) []string {
+	bs := blocks(n)
+	out := make([]string, 0, len(bs))
+	for _, b := range bs {
+		if b.text != "" {
+			out = append(out, b.text)
+		}
+	}
+	return out
+}
+
+// InlineText renders an element's inline content as one Markdown line.
+func InlineText(n *html.Node) string { return inline(n) }
+
 var syncLang = map[string]string{"java": "java", "c++": "cpp", "cpp": "cpp", "python": "python"}
 
 func blocks(n *html.Node) []block {

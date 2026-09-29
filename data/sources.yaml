@@ -904,6 +904,43 @@ sources:
     shard: vendor-api-2027
     verified: true # probed 2026-09-29
 
+  # ---- Community forum (opt-in; M3) ----
+  # Chief Delphi through its site-level RSS feeds only (probed 2026-09-29,
+  # docs/sources.md §5): robots.txt allows /latest.rss and /posts.rss but
+  # disallows the category and topic feeds (/c/*.rss, /t/*/*.rss); the JSON
+  # API is Cloudflare-blocked. Posts are user content (ToS §3: CC BY-NC-SA 3.0)
+  # and never redistributed: the UserContent license keeps the shard out of
+  # `index publish`, and sources.Validate enforces trust/license/feed policy.
+  # No ETag/Last-Modified behind Cloudflare, so min_interval is the politeness
+  # floor. Searched only with kinds=[forum] or troubleshooting intent.
+  - id: chiefdelphi
+    adapter: discourse-rss
+    url: https://www.chiefdelphi.com/latest.rss
+    posts_url: https://www.chiefdelphi.com/posts.rss
+    base_url: https://www.chiefdelphi.com/
+    categories: # software-relevant subcategories of Technical (c/technical/9)
+      - Programming
+      - Java
+      - C/C++
+      - Python
+      - Control System
+      - CAN
+      - Sensors
+      - Motors
+      - Electrical
+      - PhotonVision
+      - Technical
+      - Technical Discussion
+    min_interval: 30m
+    library: chiefdelphi
+    season: rolling # per post: the pubDate's year
+    channel: stable
+    version: rolling
+    license: LicenseRef-ChiefDelphi-UserContent
+    trust: community
+    shard: forum
+    verified: true # probed 2026-09-29 (robots.txt, ToS, both feeds)
+
   # ---- Hardware specs (M3, frc_hardware) ----
   # WPILib's simulation constants for each motor (DCMotor factories), read
   # from DCMotor.java at the release tag. Labeled "wpilib-dcmotor"; other
