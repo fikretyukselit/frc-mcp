@@ -173,6 +173,8 @@ Each item names how it is checked. The hosted server is announced only when ever
 | 11 | Container hardening: non-root, read-only root fs, no capabilities, images pinned by digest | `Dockerfile`, `deploy/docker-compose.yml` | ✅ |
 | 12 | Injection handling is documented and measured; suspect content is fenced | §2.1, §3 (holdout recall is low: fencing and trust tiers are the primary control) | ✅ documented; improving recall is open |
 | 13 | Verifier false positives stay at 0 on public team code | `docs/benchmarks.md` (193k lines, Java/C++/Python) | ✅ |
-| 14 | Binaries are signed (cosign), attested (SLSA), with an SBOM; Windows Authenticode and macOS notarization | release workflow | ⏳ M5 packaging |
+| 14 | Binaries are signed (cosign keyless on the checksums), attested (SLSA provenance), with a Syft SBOM per archive; the container image is signed and attested | `.github/workflows/release.yml`, `.goreleaser.yaml` (snapshot verified) | ✅ config; ⏳ first tag |
+| 14b | Windows Authenticode and macOS notarization | needs a code-signing certificate and an Apple Developer account | ⏳ Foundation decision |
+| 14c | Homebrew tap, Scoop bucket, winget | `PACKAGING_TOKEN` secret + `homebrew-tap`, `scoop-bucket` repos and a `winget-pkgs` fork | ⏳ maintainer setup |
 | 15 | A published notice states what the hosted server logs (nothing but aggregate counters) and the index licenses | `docs/deploy.md`, README | ✅ docs; ⏳ page on the domain |
 
