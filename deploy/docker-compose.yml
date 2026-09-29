@@ -23,6 +23,10 @@ services:
       - --rate=${FRC_MCP_RATE:-1}
       - --burst=${FRC_MCP_BURST:-30}
       - --max-inflight=${FRC_MCP_MAX_INFLIGHT:-64}
+      # Serve content that states no license (docs/sources.md §0.2); remove
+      # to serve only openly licensed content. Prohibited content (forum
+      # posts, CTRE's C++ header EULA) is never served either way.
+      - --include-unlicensed
     volumes:
       - index:/data
     read_only: true

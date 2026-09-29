@@ -13,19 +13,40 @@ type curator interface {
 	Migrations() []index.Migration
 }
 
-// restrictedLibs are the libraries whose API tables carry a LicenseRef-*
-// license (data/sources.yaml): built locally, left out of the published
-// index until the publisher grants redistribution (docs/sources.md §0.2).
-// Keyed by library and language: REVLib's C++ headers and RobotPy wheels are
-// BSD-3-Clause and published, only its Java table is restricted.
-var restrictedLibs = map[[2]string]string{
-	{"phoenix6", "java"}: "CTRE", {"phoenix6", "cpp"}: "CTRE", {"phoenix6", "python"}: "CTRE",
-	{"revlib", "java"}: "REV Robotics",
+// restrictedLibs are the API tables whose sources carry a LicenseRef-*
+// license (data/sources.yaml), keyed by library and language: REVLib's C++
+// headers and RobotPy wheels are BSD-3-Clause, only its Java table is
+// restricted. eula marks a license that forbids distribution (CTRE's C++
+// header EULA): never in a shared index. The others state no license and
+// are served only with --include-unlicensed (docs/sources.md §0.2).
+var restrictedLibs = map[[2]string]restriction{
+	{"phoenix6", "java"}: {"CTRE", false}, {"phoenix6", "cpp"}: {"CTRE", true}, {"phoenix6", "python"}: {"CTRE", false},
+	{"revlib", "java"}: {"REV Robotics", false},
+}
+
+type restriction struct {
+	publisher string
+	eula      bool
 }
 
 // RestrictedPublisher names the publisher of a library whose API table in a
 // language is license-restricted, or "".
-func RestrictedPublisher(lib, lang string) string { return restrictedLibs[[2]string{lib, lang}] }
+func RestrictedPublisher(lib, lang string) string {
+	return restrictedLibs[[2]string{lib, lang}].publisher
+}
+
+// NoTableReason says why a license-restricted table may be missing from an
+// index ("" for a library that is not restricted).
+func NoTableReason(lib, lang string) string {
+	r, ok := restrictedLibs[[2]string{lib, lang}]
+	switch {
+	case !ok:
+		return ""
+	case r.eula:
+		return r.publisher + "'s license forbids redistributing it, so no shared index carries it"
+	}
+	return r.publisher + " states no redistribution license, so shared servers leave it out unless run with --include-unlicensed"
+}
 
 // LibraryName is the display name of a library id ("phoenix6" → "Phoenix 6").
 func LibraryName(lib string) string { return libName(lib) }
@@ -36,9 +57,9 @@ func noTable(lib, lang, season string) string {
 	if lang != "java" {
 		what = season + " " + lang + " API"
 	}
-	if pub := RestrictedPublisher(lib, lang); pub != "" {
-		return fmt.Sprintf("none (no %s table: %s grants no redistribution license, so the published index leaves it out; "+
-			"`frc-mcp index run` builds it locally. Curated renames and removals are still checked)", what, pub)
+	if why := NoTableReason(lib, lang); why != "" {
+		return fmt.Sprintf("none (no %s table in this index: %s; `frc-mcp index run` builds it locally. "+
+			"Curated renames and removals are still checked)", what, why)
 	}
 	return "none (no " + what + " indexed)"
 }

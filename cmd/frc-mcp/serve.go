@@ -39,7 +39,7 @@ func serve(ctx context.Context, log *slog.Logger, args []string) error {
 	maxInFlight := fs.Int("max-inflight", 64, "public mode: concurrent requests across all clients")
 	trustProxy := fs.String("trust-proxy", "", "comma-separated CIDRs of the reverse proxy whose X-Forwarded-For is trusted (e.g. 172.16.0.0/12)")
 	metricsAddr := fs.String("metrics-addr", "", "serve Prometheus metrics (aggregate counters only) on this address, e.g. 127.0.0.1:9464; off by default")
-	unlicensed := fs.Bool("include-unlicensed", false, "with --transport http, also serve shards whose content has no redistribution license (LicenseRef-*); only with the vendors' permission")
+	unlicensed := fs.Bool("include-unlicensed", false, "with --transport http, also serve shards whose content states no redistribution license (LicenseRef-*); user content and content under a license that forbids distribution are never served")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func serve(ctx context.Context, log *slog.Logger, args []string) error {
 		// Over HTTP others connect, so serving is redistribution: leave out
 		// unlicensed shards unless explicitly allowed. stdio serves the
 		// user's own local index.
-		engine, sh := openEngineWith(ctx, log, *dir, *season, !*noDense, *transport != "http" || *unlicensed)
+		engine, sh := openEngineWith(ctx, log, *dir, *season, !*noDense, *transport == "http", *unlicensed)
 		if engine == nil {
 			log.Warn("no index shards found; tools report status=syncing", "dir", *dir, "hint", "run `frc-mcp sync`")
 			return

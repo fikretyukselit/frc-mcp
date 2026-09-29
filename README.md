@@ -78,9 +78,10 @@ frc-mcp migrate --to 2027 path/to/robot # what a 2026 project must change for 20
 ## Content and licenses
 
 The code is MIT. Indexed content keeps its upstream license, and every result carries it in `citation.license`.
-Content whose publisher grants no redistribution license (for example CTRE's and parts of REV's docs) is never
-published in the index or served by a hosted server; you can build it into a local index yourself with
-`frc-mcp index run` (see `docs/sources.md`). Forum posts are opt-in and local only.
+Vendor content that states no license (REV docs, the Phoenix 6 and REVLib Java APIs, YAGSL docs, CTRE/REV release
+notes) is published with its citation and a link back; a publisher that objects has it removed. Content under a
+license that forbids distribution (CTRE's C++ header EULA) is never published or served; build it into a local index
+with `frc-mcp index run` (see `docs/sources.md` §0.2). Forum posts are opt-in and local only.
 
 ## Running a shared server
 

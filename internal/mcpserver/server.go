@@ -425,9 +425,9 @@ func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, nam
 		}
 	}
 	if restricted != "" && noExact {
-		out.Next = append([]string{fmt.Sprintf("%s is a %s name, but this index has no %s %s API table: %s grants no redistribution license, "+
-			"so the published index leaves it out. Use frc_search for its docs, frc_migrate for curated changes, or build the index locally (frc-mcp index run)",
-			name, verify.LibraryName(restricted), season, verify.LibraryName(restricted), verify.RestrictedPublisher(restricted, restrictedLang))}, out.Next...)
+		out.Next = append([]string{fmt.Sprintf("%s is a %s name, but this index has no %s %s %s API table (%s). "+
+			"Use frc_search for its docs, frc_migrate for curated changes, or build the index locally (frc-mcp index run)",
+			name, verify.LibraryName(restricted), season, verify.LibraryName(restricted), restrictedLang, verify.NoTableReason(restricted, restrictedLang))}, out.Next...)
 	}
 }
 

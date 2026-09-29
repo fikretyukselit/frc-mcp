@@ -150,38 +150,39 @@ code license):
 | AdvantageKit docs | BSD-3-Clause (repository `LICENSE`) | yes |
 | Choreo docs | BSD-3-Clause | yes |
 | PathPlanner docs | MIT | yes |
-| REVLib docs | none published | **no** (`LicenseRef-REV-Docs-NoLicense`) |
-| REV and WCP motor spec pages (`frc_hardware` rows `rev-docs`, `wcp-docs`) | none published | **no** (`LicenseRef-REV-Docs-NoLicense`, `LicenseRef-WCP-Docs-NoLicense`; shard `hardware-restricted`) |
+| REVLib docs | none published | yes, by decision (`LicenseRef-REV-Docs-NoLicense`) |
+| REV and WCP motor spec pages (`frc_hardware` rows `rev-docs`, `wcp-docs`) | none published | yes, by decision (`LicenseRef-REV-Docs-NoLicense`, `LicenseRef-WCP-Docs-NoLicense`; shard `hardware-restricted`) |
 | ReCalc motor table (`recalc`) | MIT (`tervay/recalc` `LICENSE.txt`) | yes |
-| YAGSL docs | none published (`YAGSL-Gitbook` has no license; the library itself is LGPL-2.1) | **no** (`LicenseRef-YAGSL-Docs-NoLicense`) |
-| Phoenix 6 Java API (Javadoc from source comments) | none found in `wpiapi-java` jars (the javadoc jar's `legal/` is the JDK doclet's own license) | **no** (`LicenseRef-CTRE-Phoenix-API`) |
-| REVLib Java API | none found in `REVLib-java` jars | **no** (`LicenseRef-REVLib-API`) |
+| YAGSL docs | none published (`YAGSL-Gitbook` has no license; the library itself is LGPL-2.1) | yes, by decision (`LicenseRef-YAGSL-Docs-NoLicense`) |
+| Phoenix 6 Java API (Javadoc from source comments) | none found in `wpiapi-java` jars (the javadoc jar's `legal/` is the JDK doclet's own license) | yes, by decision (`LicenseRef-CTRE-Phoenix-API`) |
+| REVLib Java API | none found in `REVLib-java` jars | yes, by decision (`LicenseRef-REVLib-API`) |
 | PhotonLib / PhotonTargeting Java API | GPL-3.0 (repository) | yes |
-| Phoenix 6 C++ API (headers) | CTRE EULA (`CTRE_LICENSE.txt` in the zip): the Software, "including … documentation", may not be distributed or made available to any third party | **no** (`LicenseRef-CTRE-Phoenix-API`, shard `vendor-restricted-api-*`) |
+| Phoenix 6 C++ API (headers) | CTRE EULA (`CTRE_LICENSE.txt` in the zip): the Software, "including … documentation", may not be distributed or made available to any third party | **never** (`LicenseRef-CTRE-Phoenix-EULA`, shard `vendor-eula-api-*`; not even with `--include-unlicensed`) |
 | REVLib C++ API (headers) | BSD-3-Clause (`LICENSE.txt` and each header) | **yes** (`vendor-api-*`, with the BSD notice in the citation), like the robotpy-rev Python tables; REVLib Java (no license) stays in `vendor-restricted-api-*` |
 | PhotonLib C++ API (headers) | photonlib-cpp: MIT; photontargeting-cpp: GPL-3.0 (the `LICENSE` in each zip) | yes |
 | PathPlannerLib Java API | MIT | yes |
 | ChoreoLib Java API | BSD-3-Clause | yes |
 | AdvantageKit Java API | BSD-3-Clause | yes |
 | YAGSL Java API | LGPL-2.1 | yes |
-| Python APIs (PyPI wheels) | RobotPy, robotpy-rev, choreolib: BSD-3-Clause; photonlibpy, pathplannerlib: MIT; CTRE `phoenix6`: none declared | yes, except `phoenix6` (`LicenseRef-CTRE-Phoenix-API`, shard `vendor-restricted-api-*`) |
-| Release notes (GitHub releases) | the repository's license (BSD-3/MIT/GPL-3.0/LGPL-2.1); CTRE `Phoenix-Releases` and REV `REV-Software-Binaries` have none | yes, except CTRE/REV (`LicenseRef-*-Release-Notes`, shard `releases-restricted`) |
+| Python APIs (PyPI wheels) | RobotPy, robotpy-rev, choreolib: BSD-3-Clause; photonlibpy, pathplannerlib: MIT; CTRE `phoenix6`: none declared | yes (`phoenix6` by decision: `LicenseRef-CTRE-Phoenix-API`, shard `vendor-restricted-api-*`) |
+| Release notes (GitHub releases) | the repository's license (BSD-3/MIT/GPL-3.0/LGPL-2.1); CTRE `Phoenix-Releases` and REV `REV-Software-Binaries` have none | yes (CTRE/REV by decision: `LicenseRef-*-Release-Notes`, shard `releases-restricted`) |
 | Chief Delphi posts | CC BY-NC-SA 3.0 per ToS §3 (user content) | **never** (`LicenseRef-ChiefDelphi-UserContent`, shard `forum`; not even with `--include-unlicensed`; §0.1.1) |
 
-`LicenseRef-*` marks documentation without a redistribution grant. Those shards are built and can be used from a
-local index, but `frc-mcp index publish` leaves them out of the signed manifest unless `--include-unlicensed` is
-passed. Pass that flag only after the vendor's permission is recorded here (link to the written grant).
+`LicenseRef-*` marks content without a redistribution grant, in three classes:
 
-**Open:** ask CTRE (Phoenix 6 API), REV Robotics (REVLib docs and API) and the YAGSL maintainers (docs) for permission
-to redistribute excerpts with attribution. Until then the public index has no Phoenix 6 or REVLib symbol tables (Java,
-C++ or Python), so `frc_verify_code` on a machine with only the public index reports those libraries as
-`coverage: none`. A locally built index (`make index`) has them. CTRE's header EULA also forbids "derivative works";
-whether a locally built symbol table is acceptable to CTRE belongs in the same request.
+- **States no license** (REV and YAGSL docs, REV/WCP spec pages, Phoenix 6 Java and Python, REVLib Java, CTRE/REV
+  release notes): published and served **by the Foundation's decision** (2026-09-30), because the publishers make it
+  freely available for FRC teams to use. The index workflow passes `--include-unlicensed`, and so does the hosted
+  server. Every excerpt keeps its citation, and links back to the publisher. A publisher that objects gets its content
+  removed: give its sources a prohibited id (`LicenseRef-<Publisher>-EULA`) or remove them; the next daily index
+  no longer carries it.
+- **Forbids distribution** (`LicenseRef-*-EULA`: CTRE's C++ header EULA): **never** published or served by a shared
+  server, whatever the flags (`sources.Prohibited`), in shards of their own (`vendor-eula-api-*`). Build it locally.
+- **User content** (`LicenseRef-*-UserContent`: Chief Delphi posts): **never** published or served (§0.1.1).
 
-Vendor Java APIs come from each vendor's Maven repository: the `-javadoc.jar` of the newest catalog version per
-season, all JDK 17 doclet output with `type-search-index.js`. `maven.revrobotics.com` redirects artifacts to GitHub
-release assets (`github.com` → `release-assets.githubusercontent.com`), and both hosts are on the allowlist.
-Vendor C++ APIs come from the same repositories: the `-headers.zip` of the same versions (§0.1.2).
+**Open:** the permission requests to CTRE, REV Robotics and the YAGSL maintainers still go out; a written grant is
+linked here when it arrives. CTRE's header EULA also forbids "derivative works"; whether a locally built C++ symbol
+table is acceptable to CTRE belongs in the same request.
 
 ## 1. WPILib core
 

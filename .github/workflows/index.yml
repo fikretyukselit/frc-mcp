@@ -62,7 +62,10 @@ jobs:
       - name: Sign and package
         env:
           FRC_MCP_INDEX_KEY: ${{ secrets.FRC_MCP_INDEX_KEY }}
-        run: go run ./cmd/frc-mcp index publish --in shards --out dist/index --channel stable --prev prev/manifest.json
+        # --include-unlicensed: content that states no license is published by
+        # the Foundation's decision (docs/sources.md §0.2); user content and
+        # content under a license that forbids distribution never are.
+        run: go run ./cmd/frc-mcp index publish --in shards --out dist/index --channel stable --prev prev/manifest.json --include-unlicensed
       - name: Upload to the index-stable release
         env:
           GH_TOKEN: ${{ github.token }}

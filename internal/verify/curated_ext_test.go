@@ -53,7 +53,7 @@ func TestCuratedChecksWithoutTables(t *testing.T) {
 		!strings.Contains(res.Findings[0].Fix, "com.revrobotics.spark.SparkMax") || res.Findings[0].Line != 1 {
 		t.Fatalf("java: %+v", res.Findings)
 	}
-	if c := res.Coverage["revlib"]; !strings.Contains(c, "REV Robotics grants no redistribution license") {
+	if c := res.Coverage["revlib"]; !strings.Contains(c, "REV Robotics states no redistribution license") {
 		t.Errorf("coverage: %q", c)
 	}
 	res = verify.Check(ctx, r, "import rev\nm = rev.CANSparkMax(1, rev.CANSparkMax.MotorType.kBrushless)\n", "python", "2026", verify.Options{})
@@ -73,5 +73,39 @@ func TestCuratedChecksWithoutTables(t *testing.T) {
 	// A current name is fine.
 	if res := verify.Check(ctx, r, "import com.revrobotics.spark.SparkMax;\n", "java", "2026", verify.Options{}); len(res.Findings) != 0 {
 		t.Fatalf("current name flagged: %+v", res.Findings)
+	}
+}
+
+// With the library's table indexed, a name the table lacks and a curated rule
+// renames is an error, not "unknown" (the table proves it absent).
+func TestCuratedCheckWithTable(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "t.sqlite")
+	w, err := index.Create(ctx, path, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.AddSymbol(ctx, index.Symbol{FQN: "com.revrobotics.spark.SparkMax", Library: "revlib", Version: "2026.0.5", Season: "2026",
+		Language: "java", Kind: "class", Signature: "public class SparkMax", SourceURL: "https://example.org/s", UpstreamRev: "r",
+		RetrievedAt: time.Unix(1, 0), License: "LicenseRef-REVLib-API", Trust: "vendor"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.AddMigration(ctx, index.Migration{RuleID: "cansparkmax", Library: "revlib", Language: "java", FromSeason: "2024", ToSeason: "2025",
+		Kind: "rename", From: "com.revrobotics.CANSparkMax", To: "com.revrobotics.spark.SparkMax", Citation: "https://example.org/rev", Verified: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rd, err := index.Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rd.Close()
+	r := retrieve.New([]*index.Reader{rd}, retrieve.Options{DefaultSeason: "2026"})
+	res := verify.Check(ctx, r, "import com.revrobotics.CANSparkMax;\nimport com.revrobotics.spark.SparkMax;\n", "java", "2026", verify.Options{})
+	if len(res.Findings) != 1 || res.Findings[0].Severity != "error" || res.Findings[0].Fix != "use com.revrobotics.spark.SparkMax" ||
+		!strings.HasPrefix(res.Coverage["revlib"], "partial") {
+		t.Fatalf("%+v %v", res.Findings, res.Coverage)
 	}
 }

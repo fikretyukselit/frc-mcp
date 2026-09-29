@@ -4,37 +4,52 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"slices"
 
 	"github.com/fikretyukselit/frc-mcp/internal/dist"
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
+	"github.com/fikretyukselit/frc-mcp/internal/sources"
 )
 
 // openEngine loads every shard in dir and, when present, the lite embedding
 // model from dir/models/. Missing pieces degrade (logged), never fail.
 func openEngine(ctx context.Context, log *slog.Logger, dir string, dense bool) (*retrieve.Engine, []*index.Reader) {
-	return openEngineWith(ctx, log, dir, "", dense, true)
+	return openEngineWith(ctx, log, dir, "", dense, false, true)
 }
 
-// openEngineWith is openEngine that can leave out shards holding content
-// without a redistribution license (LicenseRef-*): a server others connect
-// to redistributes what it serves (docs/sources.md §0.2).
-func openEngineWith(ctx context.Context, log *slog.Logger, dir, season string, dense, unlicensed bool) (*retrieve.Engine, []*index.Reader) {
+// openEngineWith is openEngine for a server others connect to (shared):
+// it redistributes what it serves (docs/sources.md §0.2), so it never loads
+// prohibited content (user content, a license that forbids distribution)
+// and loads content without a redistribution license only with unlicensed.
+func openEngineWith(ctx context.Context, log *slog.Logger, dir, season string, dense, shared, unlicensed bool) (*retrieve.Engine, []*index.Reader) {
 	shards, errs := index.OpenDir(ctx, dir)
 	for _, err := range errs {
 		log.Warn("shard skipped", "err", err)
 	}
-	if !unlicensed {
+	if shared {
 		var kept []*index.Reader
 		for _, s := range shards {
-			if lic := unlicensedLicenses(ctx, s); len(lic) > 0 {
-				log.Info("shard not served: content without a redistribution license (pass --include-unlicensed once permission exists)",
-					"shard", s.Meta().Name, "licenses", lic)
+			lics, err := s.Licenses(ctx)
+			if err != nil {
+				log.Warn("shard not served: licenses unreadable", "shard", s.Meta().Name, "err", err)
 				s.Close()
 				continue
 			}
-			kept = append(kept, s)
+			no := slices.DeleteFunc(slices.Clone(lics), func(l string) bool { return !sources.Prohibited(l) })
+			unl := slices.DeleteFunc(slices.Clone(lics), func(l string) bool { return !dist.Unlicensed(l) })
+			switch {
+			case len(no) > 0:
+				log.Info("shard not served: content that is never redistributed", "shard", s.Meta().Name, "licenses", no)
+			case len(unl) > 0 && !unlicensed:
+				log.Info("shard not served: content without a redistribution license (pass --include-unlicensed to serve it)",
+					"shard", s.Meta().Name, "licenses", unl)
+			default:
+				kept = append(kept, s)
+				continue
+			}
+			s.Close()
 		}
 		shards = kept
 	}
@@ -61,20 +76,4 @@ func openEngineWith(ctx context.Context, log *slog.Logger, dir, season string, d
 		log.Warn("degraded", "what", w)
 	}
 	return e, shards
-}
-
-// unlicensedLicenses lists a shard's LicenseRef-* licenses. A shard whose
-// licenses cannot be read is treated as unlicensed (fail closed).
-func unlicensedLicenses(ctx context.Context, s *index.Reader) []string {
-	lics, err := s.Licenses(ctx)
-	if err != nil {
-		return []string{"unreadable: " + err.Error()}
-	}
-	var out []string
-	for _, l := range lics {
-		if dist.Unlicensed(l) {
-			out = append(out, l)
-		}
-	}
-	return out
 }

@@ -190,19 +190,22 @@ func oneChunkShard(t *testing.T, dir, name, license string) {
 	}
 }
 
-// Forum posts never ship, not even with --include-unlicensed.
-func TestPublishNeverShipsUserContent(t *testing.T) {
-	e := setup(t)
-	oneChunkShard(t, e.in, "forum", "LicenseRef-ChiefDelphi-UserContent")
-	for _, include := range []bool{false, true} {
-		var skipped []string
-		m, err := Publish(context.Background(), PublishOptions{InDir: e.in, OutDir: e.out, Channel: "stable", Key: e.priv,
-			IncludeUnlicensed: include, OnSkip: func(s, _ string) { skipped = append(skipped, s) }})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(m.Shards) != 1 || m.Shards[0].Name != "fixture" || len(skipped) != 1 || skipped[0] != "forum" {
-			t.Fatalf("include=%v: shards %+v skipped %v", include, m.Shards, skipped)
+// Forum posts, and content under a license that forbids distribution, never
+// ship, not even with --include-unlicensed.
+func TestPublishNeverShipsProhibited(t *testing.T) {
+	for shard, lic := range map[string]string{"forum": "LicenseRef-ChiefDelphi-UserContent", "vendor-eula-api-2026": "LicenseRef-CTRE-Phoenix-EULA"} {
+		e := setup(t)
+		oneChunkShard(t, e.in, shard, lic)
+		for _, include := range []bool{false, true} {
+			var skipped []string
+			m, err := Publish(context.Background(), PublishOptions{InDir: e.in, OutDir: e.out, Channel: "stable", Key: e.priv,
+				IncludeUnlicensed: include, OnSkip: func(s, _ string) { skipped = append(skipped, s) }})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(m.Shards) != 1 || m.Shards[0].Name != "fixture" || len(skipped) != 1 || skipped[0] != shard {
+				t.Fatalf("%s include=%v: shards %+v skipped %v", shard, include, m.Shards, skipped)
+			}
 		}
 	}
 }
