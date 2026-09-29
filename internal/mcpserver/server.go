@@ -365,14 +365,21 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 // this index leaves out (license-restricted vendor APIs).
 func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, name, lang, season string) {
 	restricted, restrictedLang := "", ""
+	type hit struct {
+		m       index.Migration
+		oldSide bool // the name is the rule's old side (else its new side)
+	}
+	var hits []hit
 	for _, mr := range e.Migrations() {
 		if lang != "" && mr.Language != lang {
 			continue
 		}
 		owner, _, _ := strings.Cut(mr.From, "#")
+		oldSide := migrate.NameIs(mr.From, name) && mr.ToSeason <= season && mr.From != mr.To
+		newSide := mr.To != "" && migrate.NameIs(mr.To, name) && mr.FromSeason >= season && mr.From != mr.To
 		switch {
-		case migrate.NameIs(mr.From, name) && mr.ToSeason <= season && mr.From != mr.To,
-			mr.To != "" && migrate.NameIs(mr.To, name) && mr.FromSeason >= season && mr.From != mr.To:
+		case oldSide || newSide:
+			hits = append(hits, hit{mr, oldSide})
 			out.Curated = append(out.Curated, render.MigrateMapping{From: mr.From, To: mr.To, FromSeason: mr.FromSeason,
 				ToSeason: mr.ToSeason, Language: mr.Language, Library: mr.Library, Kind: mr.Kind, Notes: mr.Notes,
 				Confidence: map[bool]string{true: "high", false: "medium"}[mr.Verified], Source: migrate.SrcCurated,
@@ -384,27 +391,32 @@ func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, nam
 	}
 	// Only names differing in case (YAGSL's TALONFX for TalonFX) are no answer.
 	noExact := len(out.Matches) == 0 || out.Matches[0].Match != ""
-	if len(out.Curated) > 0 && noExact {
-		c := out.Curated[0]
-		lib := verify.LibraryName(c.Library)
+	if len(hits) > 0 && noExact {
+		h := hits[0]
+		c, lib := h.m, verify.LibraryName(h.m.Library)
 		// A rule alone proves absence only for a change from an earlier
 		// season (as frc_verify_code's error rule) or when the season's
 		// table is indexed and lacks the name; in the season of a rename
-		// the old name may linger deprecated.
+		// the old name may linger deprecated. A name that both sides share
+		// ("ControlType" moving between classes) says nothing about which
+		// one the code means.
 		tabled := e.LibraryVersion(ctx, c.Library, season, c.Language) != ""
-		oldName := migrate.NameIs(c.From, name)
-		certain := tabled || oldName && c.ToSeason < season
+		shared := c.To != "" && migrate.NameIs(c.From, name) && migrate.NameIs(c.To, name)
+		certain := !shared && (tabled || h.oldSide && c.ToSeason < season)
 		if certain {
 			out.Status, out.Confidence = retrieve.StatusVersionMismatch, 0
 		}
 		switch {
-		case oldName && c.To == "" && certain:
+		case shared:
+			out.Next = []string{fmt.Sprintf("%s names both sides of curated rule %s (%s → %s in %s %s); check which one the code imports for season %s",
+				name, c.RuleID, c.From, c.To, lib, c.ToSeason, season)}
+		case h.oldSide && c.To == "" && certain:
 			out.Next = []string{fmt.Sprintf("%s was removed in %s %s; read curated[0].notes for what replaces it", name, lib, c.ToSeason)}
-		case oldName && c.To == "":
+		case h.oldSide && c.To == "":
 			out.Next = []string{fmt.Sprintf("a curated rule removes %s in %s %s (it may still exist, deprecated); read curated[0].notes for what replaces it", name, lib, c.ToSeason)}
-		case oldName && certain:
+		case h.oldSide && certain:
 			out.Next = []string{fmt.Sprintf("%s is not a %s name: it became %s in %s %s (see curated); use that", name, season, c.To, lib, c.ToSeason)}
-		case oldName:
+		case h.oldSide:
 			out.Next = []string{fmt.Sprintf("a curated rule renames %s to %s in %s %s (the old name may still exist, deprecated); prefer %s", name, c.To, lib, c.ToSeason, c.To)}
 		case certain:
 			out.Next = []string{fmt.Sprintf("%s is the %s name; season %s uses %s", name, c.ToSeason, season, c.From)}

@@ -186,23 +186,29 @@ func javaCheck(ctx context.Context, r Resolver, code, season string) Result {
 		res.Findings = append(res.Findings, f)
 	}
 
+	// vendorTable maps a vendor name to its library and whether the season's
+	// table for it is indexed ("" for a root that is not a vendor library).
+	vendorTable := func(name string) (string, bool) {
+		root, lib := vendorRoot(name)
+		if lib == "" {
+			return "", false
+		}
+		ok, known := vendorIndexed[root]
+		if !known {
+			ok = checkable[lib] && r.PackageExists(ctx, strings.TrimSuffix(root, "."), season, "java")
+			vendorIndexed[root] = ok
+		}
+		return lib, ok
+	}
+
 	for _, m := range importRe.FindAllStringSubmatchIndex(src, -1) {
 		static := m[2] >= 0
 		name := src[m[4]:m[5]]
 		wildcard := m[6] >= 0
 		if !isCovered(name) {
-			root, lib := vendorRoot(name)
+			lib, ok := vendorTable(name)
 			if lib == "" {
 				continue
-			}
-			ok, known := vendorIndexed[root]
-			if !known && !checkable[lib] {
-				ok, known = false, true
-				vendorIndexed[root] = false
-			}
-			if !known {
-				ok = r.PackageExists(ctx, strings.TrimSuffix(root, "."), season, "java")
-				vendorIndexed[root] = ok
 			}
 			if !ok {
 				if res.Coverage[lib] == "" {
@@ -216,6 +222,7 @@ func javaCheck(ctx context.Context, r Resolver, code, season string) Result {
 				}
 				if !wildcard || static {
 					res.Checked++
+					seen[owner] = true
 					curatedCheck(r, owner, lang, season, func(f Finding) { add(m[4], f) })
 				}
 				continue
@@ -257,6 +264,25 @@ func javaCheck(ctx context.Context, r Resolver, code, season string) Result {
 		seen[name] = true
 		res.Checked++
 		checkType(ctx, r, name, season, lang, func(f Finding) { add(m[2], f) })
+	}
+
+	// Qualified references into a vendor library without a table (not
+	// imported): only the curated rules can check them.
+	for _, m := range javaQualRe.FindAllStringSubmatchIndex(src, -1) {
+		name := trimToType(src[m[2]:m[3]])
+		if isCovered(name) || seen[name] || lineHasImport(src, m[2]) || lineHasPackage(src, m[2]) {
+			continue
+		}
+		lib, ok := vendorTable(name)
+		if lib == "" || ok {
+			continue
+		}
+		seen[name] = true
+		if res.Coverage[lib] == "" {
+			res.Coverage[lib] = noTable(lib, lang, season)
+		}
+		res.Checked++
+		curatedCheck(r, name, lang, season, func(f Finding) { add(m[2], f) })
 	}
 
 	// Receivers: variables declared with an imported type; static calls on

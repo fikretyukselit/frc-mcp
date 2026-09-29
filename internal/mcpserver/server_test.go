@@ -505,6 +505,8 @@ func TestAPICuratedWithoutTables(t *testing.T) {
 		{RuleID: "zero", Library: "revlib", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "rename",
 			From: "com.revrobotics.spark.config.AbsoluteEncoderConfig#zeroCentered", To: "com.revrobotics.spark.config.AbsoluteEncoderConfig#centered",
 			Citation: "https://example.org/b", Verified: true},
+		{RuleID: "controltype", Library: "revlib", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "move",
+			From: "com.revrobotics.spark.SparkBase.ControlType", To: "com.revrobotics.spark.SparkLowLevel.ControlType", Citation: "https://example.org/d", Verified: true},
 		{RuleID: "ctor", Library: "revlib", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "signature",
 			From: "com.revrobotics.spark.SparkMax#SparkMax", To: "com.revrobotics.spark.SparkMax#SparkMax", Notes: "n", Citation: "https://example.org/c", Verified: true},
 	} {
@@ -529,6 +531,11 @@ func TestAPICuratedWithoutTables(t *testing.T) {
 	_, sc, _ = call(t, cs, "frc_api", map[string]any{"symbol": "AbsoluteEncoderConfig#zeroCentered", "language": "java", "frc_season": "2027"})
 	if sc["status"] == "version_mismatch" || len(sc["curated"].([]any)) != 1 || !strings.Contains(sc["next"].([]any)[0].(string), "may still exist") {
 		t.Errorf("same-season rename must stay advice: %v", sc)
+	}
+	// A name both sides share never recommends the other season's class.
+	_, sc, _ = call(t, cs, "frc_api", map[string]any{"symbol": "ControlType", "language": "java"})
+	if sc["status"] == "version_mismatch" || !strings.Contains(sc["next"].([]any)[0].(string), "names both sides") {
+		t.Errorf("shared simple name: %v", sc)
 	}
 	_, sc, _ = call(t, cs, "frc_api", map[string]any{"symbol": "SparkMax", "language": "java"})
 	if sc["status"] != "low_confidence" || !strings.Contains(sc["next"].([]any)[0].(string), "REV Robotics grants no redistribution license") {

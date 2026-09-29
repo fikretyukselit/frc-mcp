@@ -65,6 +65,11 @@ func TestCuratedChecksWithoutTables(t *testing.T) {
 	if len(res.Findings) != 1 || res.Findings[0].Severity != "warning" {
 		t.Fatalf("season of the change: %+v", res.Findings)
 	}
+	// A qualified reference, not imported, is checked too.
+	res = verify.Check(ctx, r, "class A {\n  com.revrobotics.CANSparkMax m;\n}\n", "java", "2026", verify.Options{})
+	if len(res.Findings) != 1 || res.Findings[0].Line != 2 || res.Coverage["revlib"] == "" {
+		t.Fatalf("qualified: %+v %v", res.Findings, res.Coverage)
+	}
 	// A current name is fine.
 	if res := verify.Check(ctx, r, "import com.revrobotics.spark.SparkMax;\n", "java", "2026", verify.Options{}); len(res.Findings) != 0 {
 		t.Fatalf("current name flagged: %+v", res.Findings)
