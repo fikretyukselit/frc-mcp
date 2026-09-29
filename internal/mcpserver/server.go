@@ -625,8 +625,25 @@ func (s *Server) hardware(ctx context.Context, _ *mcp.CallToolRequest, in Hardwa
 	out := render.HardwareOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
 		Season: in.Season, PinSource: pinSource}, Parts: []render.HWPartOut{}}
 	parts, unknown := e.Hardware(in.Parts, in.Category, in.Season)
+	// A category listing names the parts and their sources only: every row
+	// of every motor is several thousand tokens. Values come per part.
+	listing := len(in.Parts) == 0
 	for _, p := range parts {
 		po := render.HWPartOut{Part: p.Part, Name: p.Name, Category: p.Category}
+		if listing {
+			po.Sources = []render.HWSourceRow{}
+			for _, r := range p.Rows {
+				label := r.Source
+				if r.Season != "" && r.Season != "all" {
+					label += " " + r.Season
+				}
+				if !slices.Contains(po.Available, label) {
+					po.Available = append(po.Available, label)
+				}
+			}
+			out.Parts = append(out.Parts, po)
+			continue
+		}
 		for _, r := range p.Rows {
 			po.Sources = append(po.Sources, render.HWSourceRow{Source: r.Source, Season: r.Season, Fields: r.Fields,
 				Factory: r.Factory, Note: r.Note, Citation: render.Citation{SourceURL: r.SourceURL, Library: hwLibrary(r.Source),
@@ -650,6 +667,9 @@ func (s *Server) hardware(ctx context.Context, _ *mcp.CallToolRequest, in Hardwa
 		out.Next = []string{"use one of the known part ids listed above"}
 	} else if len(unknown) > 0 {
 		out.Known = e.HardwareParts()
+	}
+	if listing && len(out.Parts) > 0 {
+		out.Next = []string{`pass part ids for the values, e.g. {"parts": ["` + out.Parts[0].Part + `"]}`}
 	}
 	return text(render.HardwareMarkdown(out)), out, nil
 }

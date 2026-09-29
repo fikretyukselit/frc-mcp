@@ -232,11 +232,14 @@ type HWSourceRow struct {
 
 // HWPartOut is one part in frc_hardware.
 type HWPartOut struct {
-	Part     string            `json:"part"`
-	Name     string            `json:"name"`
-	Category string            `json:"category" jsonschema:"motor | encoder | imu | swerve_module"`
-	Sources  []HWSourceRow     `json:"sources"`
-	Sim      map[string]string `json:"sim,omitempty" jsonschema:"WPILib simulation factory per language (from the indexed API tables)"`
+	Part     string        `json:"part"`
+	Name     string        `json:"name"`
+	Category string        `json:"category" jsonschema:"motor | encoder | imu | swerve_module"`
+	Sources  []HWSourceRow `json:"sources" jsonschema:"one entry per (source, season); empty in a category listing"`
+	// Available lists the source labels of a part in a category listing,
+	// which leaves the rows out to stay within the token budget.
+	Available []string          `json:"available_sources,omitempty" jsonschema:"category listing only: sources with data for the part; ask for the part by id to get the values"`
+	Sim       map[string]string `json:"sim,omitempty" jsonschema:"WPILib simulation factory per language (from the indexed API tables)"`
 }
 
 // HardwareOut is frc_hardware's result.

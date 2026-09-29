@@ -886,6 +886,16 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "available_sources": {
+                "description": "category listing only: sources with data for the part; ask for the part by id to get the values",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
               "category": {
                 "description": "motor | encoder | imu | swerve_module",
                 "type": "string"
@@ -904,6 +914,7 @@
                 "type": "object"
               },
               "sources": {
+                "description": "one entry per (source, season); empty in a category listing",
                 "items": {
                   "additionalProperties": false,
                   "properties": {

@@ -401,6 +401,10 @@ func HardwareMarkdown(o HardwareOut) string {
 	var b strings.Builder
 	envelope(&b, "frc_hardware", o.Envelope)
 	for _, p := range o.Parts {
+		if len(p.Sources) == 0 && len(p.Available) > 0 {
+			fmt.Fprintf(&b, "- %s (`%s`, %s): %s\n", p.Name, p.Part, p.Category, strings.Join(p.Available, ", "))
+			continue
+		}
 		fmt.Fprintf(&b, "\n**%s** (`%s`, %s)\n\n| Field |", p.Name, p.Part, p.Category)
 		for _, r := range p.Sources {
 			fmt.Fprintf(&b, " %s %s |", r.Source, r.Season)
