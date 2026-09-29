@@ -23,7 +23,8 @@ func (rt *roundTrip) RoundTrip(r *http.Request) (*http.Response, error) {
 
 func TestGetFreshHonorsMinInterval(t *testing.T) {
 	rt := &roundTrip{status: http.StatusOK}
-	f := &Fetcher{Client: &http.Client{Transport: rt}, Dir: t.TempDir()}
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	f := &Fetcher{Client: &http.Client{Transport: rt}, Dir: t.TempDir(), Now: func() time.Time { return now }}
 	ctx := context.Background()
 	const u = "https://forum.example/latest.rss"
 
@@ -41,7 +42,8 @@ func TestGetFreshHonorsMinInterval(t *testing.T) {
 		t.Fatalf("plain get: n=%d err=%v", rt.n, err)
 	}
 	// A floor shorter than the cache age: asked again.
-	if _, err := f.GetFresh(ctx, u, time.Nanosecond); err != nil || rt.n != 3 {
+	now = now.Add(time.Minute)
+	if _, err := f.GetFresh(ctx, u, 30*time.Second); err != nil || rt.n != 3 {
 		t.Fatalf("expired floor: n=%d err=%v", rt.n, err)
 	}
 }
