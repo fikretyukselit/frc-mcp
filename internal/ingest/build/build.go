@@ -199,7 +199,7 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 		if err != nil {
 			return nil, err
 		}
-		if rep.Migrations, rep.MigrationsSkipped, err = applyMigrations(shards, rules); err != nil {
+		if rep.Migrations, rep.MigrationsSkipped, err = applyMigrations(shards, rules, reg); err != nil {
 			return nil, err
 		}
 	}
@@ -299,15 +299,44 @@ func diffSeasons(shards map[string]*shardData, _ map[string]sources.Source) []Di
 	return out
 }
 
+// MigrationsShard holds every curated rule. Rules are the project's own data
+// (MIT): publishable whatever the licenses of the tables they describe, and
+// in a shard of their own so no table shard's rebuild can drop or duplicate
+// them.
+const MigrationsShard = "migrations"
+
 // applyMigrations validates curated rules against the symbol tables of this
-// run and writes each into the shard holding its from-season table. Curated
-// replacements override upstream and generated ones. A rule naming a symbol
-// that the table lacks fails the build: rules must track upstream exactly.
-func applyMigrations(shards map[string]*shardData, rules []index.Migration) (written, skipped int, err error) {
+// run and writes them to the migrations shard. Curated replacements override
+// upstream and generated ones on the table rows. A rule naming a symbol that
+// its table lacks fails the build: rules must track upstream exactly.
+//
+// A historical rule, whose from season predates every table the registry
+// declares for its library and language (REVLib's 2025 CANSparkMax →
+// SparkMax), is checked against the oldest declared table at or after its
+// to season: the new name must be there and, for a change in an earlier
+// season, the old one gone.
+//
+// The migrations shard is written only when every rule could be checked,
+// i.e. the run built every table the rules name; a partial run leaves it as
+// it is on disk and reports the rules as skipped.
+func applyMigrations(shards map[string]*shardData, rules []index.Migration, reg *sources.Registry) (written, skipped int, err error) {
 	type tkey struct{ lib, lang, season string }
 	type ref struct {
 		sd *shardData
 		i  int
+	}
+	declared := map[[2]string][]string{} // (lib, lang) → declared table seasons, oldest first
+	for _, src := range reg.Sources {
+		if src.Language == "" {
+			continue // only API sources carry a language
+		}
+		ll := [2]string{src.Library, src.Language}
+		if !slices.Contains(declared[ll], src.Season) {
+			declared[ll] = append(declared[ll], src.Season)
+		}
+	}
+	for _, ss := range declared {
+		sort.Strings(ss)
 	}
 	tables := map[tkey]map[string][]ref{}
 	names := make([]string, 0, len(shards))
@@ -327,10 +356,37 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration) (wri
 		}
 	}
 	var bad []string
+	var ok []index.Migration
 	for _, m := range rules {
+		ss := declared[[2]string{m.Library, m.Language}]
+		if len(ss) > 0 && m.FromSeason < ss[0] {
+			i := slices.IndexFunc(ss, func(se string) bool { return se >= m.ToSeason })
+			if i < 0 {
+				bad = append(bad, fmt.Sprintf("%s (%s): no %s table at or after %s is declared", m.RuleID, m.Language, m.Library, m.ToSeason))
+				continue
+			}
+			at := ss[i]
+			t := tables[tkey{m.Library, m.Language, at}]
+			switch {
+			case t == nil:
+				skipped++ // that table is not built in this run
+			case m.To != "" && len(t[m.To]) == 0:
+				bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.To, at))
+			case m.From != m.To && at > m.ToSeason && len(t[m.From]) > 0:
+				bad = append(bad, fmt.Sprintf("%s (%s): %s still exists in the %s table", m.RuleID, m.Language, m.From, at))
+			default:
+				ok = append(ok, m)
+			}
+			continue
+		}
+		if !slices.Contains(ss, m.FromSeason) {
+			// Never checkable: it would keep every run partial.
+			bad = append(bad, fmt.Sprintf("%s (%s): data/sources.yaml declares no %s %s table for season %s", m.RuleID, m.Language, m.Library, m.Language, m.FromSeason))
+			continue
+		}
 		from := tables[tkey{m.Library, m.Language, m.FromSeason}]
 		if from == nil {
-			skipped++
+			skipped++ // the from-season table is not built in this run
 			continue
 		}
 		refs := from[m.From]
@@ -338,7 +394,12 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration) (wri
 			bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.From, m.FromSeason))
 			continue
 		}
-		if to := tables[tkey{m.Library, m.Language, m.ToSeason}]; to != nil && m.To != "" && len(to[m.To]) == 0 {
+		to := tables[tkey{m.Library, m.Language, m.ToSeason}]
+		if to == nil && m.To != "" && slices.Contains(ss, m.ToSeason) {
+			skipped++ // the to-season table is declared but not built in this run
+			continue
+		}
+		if to != nil && m.To != "" && len(to[m.To]) == 0 {
 			bad = append(bad, fmt.Sprintf("%s (%s): %s not in the %s table", m.RuleID, m.Language, m.To, m.ToSeason))
 			continue
 		}
@@ -348,13 +409,16 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration) (wri
 				s.Replacement, s.ReplacementSrc = m.To, "curated"
 			}
 		}
-		refs[0].sd.migrations = append(refs[0].sd.migrations, m)
-		written++
+		ok = append(ok, m)
 	}
 	if len(bad) > 0 {
 		return 0, 0, fmt.Errorf("migrate: %d curated rule(s) do not match the symbol tables:\n  %s", len(bad), strings.Join(bad, "\n  "))
 	}
-	return written, skipped, nil
+	if skipped > 0 {
+		return 0, len(rules), nil // partial run: keep the shard on disk
+	}
+	shards[MigrationsShard] = &shardData{name: MigrationsShard, migrations: ok}
+	return len(ok), 0, nil
 }
 
 // applyHardware adds the curated hardware rows to their shard when that shard

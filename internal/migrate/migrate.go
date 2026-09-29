@@ -16,6 +16,7 @@ type Resolver interface {
 	SymbolsReplacedBy(ctx context.Context, fqn, season string) []index.Symbol
 	MigrationsFrom(ctx context.Context, fqn, language string, members bool) []index.Migration
 	MigrationsTo(ctx context.Context, fqn, language string) []index.Migration
+	Migrations() []index.Migration
 	SymbolSeasons() []string
 	LibraryVersion(ctx context.Context, library, season, language string) string
 	PackageExists(ctx context.Context, pkg, season, language string) bool
@@ -139,6 +140,9 @@ func (m *mapper) symbol(ctx context.Context, name string, res *Result, quiet boo
 		syms = m.inherited(ctx, name, m.from)
 	}
 	if len(syms) == 0 {
+		if m.curatedOnly(ctx, name, res) {
+			return
+		}
 		if there := m.resolve(ctx, name, m.to); len(there) > 0 {
 			res.AlreadyIn = appendUnique(res.AlreadyIn, there[0].FQN)
 		} else if !quiet {
@@ -158,6 +162,67 @@ func (m *mapper) symbol(ctx context.Context, name string, res *Result, quiet boo
 			m.backward(ctx, s, res)
 		}
 	}
+}
+
+// curatedOnly maps a name from the curated rules alone when its library has
+// no API table for the season the rule starts from: a license-restricted
+// vendor table is left out of the published index, but the rules are the
+// project's own cited data and ship everywhere. Without a table there is
+// nothing else to say about a type, so its members' rules always answer for
+// it (new TalonFX(id, "canivore") under a TalonFX import).
+func (m *mapper) curatedOnly(ctx context.Context, name string, res *Result) bool {
+	name = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(name), "()"))
+	if name == "" {
+		return false
+	}
+	forward := m.from < m.to
+	found := false
+	for _, mr := range m.r.Migrations() {
+		if m.lang != "" && mr.Language != m.lang {
+			continue
+		}
+		side, season := mr.From, mr.FromSeason
+		inRange := mr.FromSeason >= m.from && mr.ToSeason <= m.to
+		if !forward {
+			side, season = mr.To, mr.ToSeason
+			inRange = mr.ToSeason <= m.from && mr.FromSeason >= m.to
+		}
+		owner, _, isMember := strings.Cut(side, "#")
+		named := NameIs(side, name) || isMember && NameIs(owner, name)
+		if side == "" || !inRange || !named {
+			continue
+		}
+		if m.r.LibraryVersion(ctx, mr.Library, season, mr.Language) != "" {
+			continue // the table decides: resolve found nothing, so the name is not there
+		}
+		if m.used[side] && !NameIs(side, name) {
+			continue // code mode: the file uses this member itself, mapped at its own line
+		}
+		key := "rule " + mr.Language + " " + mr.RuleID + " " + mr.From
+		if m.seen[key] {
+			found = true
+			continue
+		}
+		m.seen[key] = true
+		c := curated(mr, m.line)
+		if !forward {
+			c.From, c.To, c.FromSeason, c.ToSeason = mr.To, mr.From, mr.ToSeason, mr.FromSeason
+		}
+		c.Notes = strings.TrimSpace(c.Notes + fmt.Sprintf(" (No %s %s API table is in this index; mapped from the curated rule alone.)",
+			season, libName(mr.Library)))
+		res.Mappings = append(res.Mappings, c)
+		found = true
+	}
+	return found
+}
+
+// NameIs reports whether a name as written ("TalonFX", "TalonFX#setControl",
+// "hardware.TalonFX.setControl", an FQN) denotes fqn. Case-sensitive.
+func NameIs(fqn, name string) bool {
+	if fqn == name || fqn == memberForm(name) {
+		return true
+	}
+	return strings.HasSuffix("."+normalizeFQN(fqn), "."+normalizeFQN(name))
 }
 
 // resolve finds the symbols a name denotes in a season: an exact FQN (or

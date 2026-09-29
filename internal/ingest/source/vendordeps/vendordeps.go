@@ -36,6 +36,7 @@ type vendordepJSON struct {
 	Name          string            `json:"name"`
 	Version       string            `json:"version"`
 	FRCYear       any               `json:"frcYear"`
+	WPILibYear    any               `json:"wpilibYear"` // replaces frcYear from 2027
 	UUID          string            `json:"uuid"`
 	MavenURLs     []string          `json:"mavenUrls"`
 	JSONURL       string            `json:"jsonUrl"`
@@ -86,10 +87,7 @@ func Parse(ctx context.Context, g Getter, src sources.Source, retrieved time.Tim
 		if rev == "" {
 			rev = "sha256:" + r.SHA256[:16]
 		}
-		fy := ""
-		if v.FRCYear != nil {
-			fy = fmt.Sprint(v.FRCYear)
-		}
+		fy := facts.VendordepYear(v.FRCYear, v.WPILibYear)
 		vd := index.Vendordep{UUID: v.UUID, Name: v.Name, Version: v.Version, Season: src.Season, Channel: src.Channel,
 			FRCYear: fy, FileName: v.FileName, JSONURL: v.JSONURL, MavenURLs: v.MavenURLs, Conflicts: v.ConflictsWith,
 			JavaDeps: len(v.JavaDeps), CppDeps: len(v.CppDeps), Raw: raw, SourceURL: f.DownloadURL, UpstreamRev: rev,

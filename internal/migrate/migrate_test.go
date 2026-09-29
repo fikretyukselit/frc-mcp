@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -268,5 +269,66 @@ func TestInheritedMemberAndBackwardHops(t *testing.T) {
 		Language: "java", From: "2026", To: "2027", MaxRefs: 1})
 	if res.Omitted != 1 {
 		t.Fatalf("omitted = %d", res.Omitted)
+	}
+}
+
+// A library whose API tables are not in the index (license-restricted
+// vendor tables are left out of the published index) is still mapped by its
+// curated rules, which ship everywhere.
+func TestMapCuratedOnlyWithoutTables(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "c.sqlite")
+	w, err := index.Create(ctx, path, "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []index.Symbol{sym(cs, "wpilib", "2026", "java"), sym(cv, "wpilib", "2027", "java")} {
+		if err := w.AddSymbol(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, m := range []index.Migration{
+		{RuleID: "canbus", Library: "phoenix6", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "signature",
+			From: talon + "#TalonFX", To: talon + "#TalonFX", Notes: "Pass a CANBus.", Citation: "https://example.org/ctre", Verified: true},
+		{RuleID: "old-name", Library: "revlib", Language: "java", FromSeason: "2024", ToSeason: "2025", Kind: "rename",
+			From: "com.revrobotics.CANSparkMax", To: "com.revrobotics.spark.SparkMax", Citation: "https://example.org/rev", Verified: true},
+	} {
+		if err := w.AddMigration(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := index.Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	e := retrieve.New([]*index.Reader{r}, retrieve.Options{})
+
+	for _, name := range []string{"TalonFX", talon, "TalonFX#TalonFX", talon + "#TalonFX"} {
+		res := Map(ctx, e, Query{Symbol: name, Language: "java", From: "2026", To: "2027"})
+		if len(res.Mappings) != 1 || res.Mappings[0].RuleID != "canbus" || res.Mappings[0].Source != SrcCurated ||
+			!strings.Contains(res.Mappings[0].Notes, "curated rule alone") {
+			t.Errorf("%s: %+v", name, res)
+		}
+	}
+	res := Map(ctx, e, Query{Code: "import com.ctre.phoenix6.hardware.TalonFX;\nclass A {\n  TalonFX m = new TalonFX(1, \"canivore\");\n}\n",
+		Language: "java", From: "2026", To: "2027"})
+	if len(res.Mappings) != 1 || res.Mappings[0].RuleID != "canbus" || res.Mappings[0].Line == 0 {
+		t.Errorf("code mode: %+v", res)
+	}
+	res = Map(ctx, e, Query{Symbol: talon + "#TalonFX", Language: "java", From: "2027", To: "2026"})
+	if len(res.Mappings) != 1 || res.Mappings[0].FromSeason != "2027" || res.Mappings[0].ToSeason != "2026" {
+		t.Errorf("backward: %+v", res)
+	}
+	// Rules of a transition outside from→to do not answer.
+	if res := Map(ctx, e, Query{Symbol: "CANSparkMax", Language: "java", From: "2026", To: "2027"}); len(res.Mappings) != 0 {
+		t.Errorf("historical rule applied to 2026→2027: %+v", res)
+	}
+	// A library that has a from-season table is decided by the table.
+	if res := Map(ctx, e, Query{Symbol: "edu.wpi.first.math.kinematics.Nope", Language: "java", From: "2026", To: "2027"}); len(res.NotFound) != 1 {
+		t.Errorf("table library: %+v", res)
 	}
 }

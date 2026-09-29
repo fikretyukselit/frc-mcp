@@ -16,6 +16,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/fikretyukselit/frc-mcp/internal/facts"
 )
 
 const (
@@ -156,20 +158,19 @@ func Detect(root string) (*Project, error) {
 			Name    string `json:"name"`
 			Version string `json:"version"`
 			FRCYear any    `json:"frcYear"`
-			UUID    string `json:"uuid"`
-			JSONURL string `json:"jsonUrl"`
+			// 2027 vendordeps name it wpilibYear ("2027_alpha7").
+			WPILibYear any    `json:"wpilibYear"`
+			UUID       string `json:"uuid"`
+			JSONURL    string `json:"jsonUrl"`
 		}
 		if err := json.Unmarshal(b, &v); err != nil {
 			p.Warnings = append(p.Warnings, "vendordeps/"+n+": invalid JSON")
 			continue
 		}
-		vd := Vendordep{File: "vendordeps/" + n, Name: v.Name, Version: v.Version, FRCYear: fmt.Sprint(v.FRCYear),
+		vd := Vendordep{File: "vendordeps/" + n, Name: v.Name, Version: v.Version, FRCYear: facts.VendordepYear(v.FRCYear, v.WPILibYear),
 			UUID: v.UUID, JSONURL: v.JSONURL}
-		if v.FRCYear == nil {
-			vd.FRCYear = ""
-		}
 		p.Vendordeps = append(p.Vendordeps, vd)
-		if yr := seasonOf.FindString(vd.FRCYear); p.Season != "" && yr != "" && yr != p.Season {
+		if yr := facts.DeclaredSeason(vd.FRCYear); p.Season != "" && yr != "" && yr != p.Season {
 			p.Warnings = append(p.Warnings, fmt.Sprintf("%s (%s) declares frcYear=%s but the project is WPILib %s (season %s); update or re-import it",
 				vd.Name, vd.File, vd.FRCYear, p.WPILib, p.Season))
 		}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -167,9 +168,11 @@ func (r *Reader) prepare(ctx context.Context) error {
 		{&r.symFQN, `SELECT ` + symbolCols + ` FROM symbol WHERE fqn = ?1 AND (?2 = '' OR season = ?2)
 			AND (?3 = '' OR ?3 = 'any' OR language = ?3) ORDER BY season DESC, fqn, signature LIMIT ?4`},
 		{&r.symSimple, `SELECT ` + symbolCols + ` FROM symbol WHERE simple = ?1 AND (?2 = '' OR season = ?2)
-			AND (?3 = '' OR ?3 = 'any' OR language = ?3) ORDER BY season DESC, kind <> 'class', fqn, signature LIMIT ?4`},
+			AND (?3 = '' OR ?3 = 'any' OR language = ?3)
+			ORDER BY simple = ?1 COLLATE BINARY DESC, season DESC, kind <> 'class', fqn, signature LIMIT ?4`},
 		{&r.symMember, `SELECT ` + symbolCols + ` FROM symbol WHERE owner = ?1 AND simple = ?2 AND (?3 = '' OR season = ?3)
-			AND (?4 = '' OR ?4 = 'any' OR language = ?4) ORDER BY season DESC, fqn, signature LIMIT ?5`},
+			AND (?4 = '' OR ?4 = 'any' OR language = ?4)
+			ORDER BY simple = ?2 COLLATE BINARY DESC, season DESC, fqn, signature LIMIT ?5`},
 	} {
 		st, err := r.db.PrepareContext(ctx, p.q)
 		if err != nil {
@@ -410,6 +413,9 @@ func (r *Reader) Symbols(ctx context.Context, q SymbolQuery) ([]Symbol, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if !isQualified {
+		out = preferCase(out, name)
+	}
 	// A qualified name that is not an FQN may still be Type#member written as
 	// "Type.member" or a C++ "ns::Type::member"; fall back to simple lookup.
 	if len(out) == 0 && isQualified && !strings.Contains(name, "#") && !q.Exact {
@@ -429,6 +435,27 @@ func (r *Reader) Symbols(ctx context.Context, q SymbolQuery) ([]Symbol, error) {
 		return r.Symbols(ctx, SymbolQuery{Name: SimpleName(name), Season: q.Season, Language: q.Language, Limit: q.Limit})
 	}
 	return out, nil
+}
+
+// preferCase applies letter case to a simple or "Type#member" lookup, which
+// the NOCASE column matches case-insensitively: when any row matches
+// exactly, the rows that differ only in case are dropped ("TalonFX" is not
+// YAGSL's TALONFX enum constant); otherwise they are kept and marked.
+func preferCase(syms []Symbol, name string) []Symbol {
+	owner, member, isMember := strings.Cut(name, "#")
+	exact := func(s Symbol) bool {
+		if !isMember {
+			return SimpleName(s.FQN) == name
+		}
+		return SimpleName(s.FQN) == member && OwnerName(s.FQN) == SimpleName(owner)
+	}
+	if slices.ContainsFunc(syms, exact) {
+		return slices.DeleteFunc(syms, func(s Symbol) bool { return !exact(s) })
+	}
+	for i := range syms {
+		syms[i].CaseMismatch = true
+	}
+	return syms
 }
 
 type scanner interface{ Scan(...any) error }

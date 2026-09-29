@@ -41,7 +41,7 @@ type PublishOptions struct {
 }
 
 // Unlicensed reports whether a chunk license means "no redistribution grant".
-func Unlicensed(license string) bool { return strings.HasPrefix(license, "LicenseRef-") }
+func Unlicensed(license string) bool { return index.RestrictedLicense(license) }
 
 // Publish packages every shard in InDir (with vector layers and models) into
 // OutDir and writes a signed manifest. Object names are content-addressed, so

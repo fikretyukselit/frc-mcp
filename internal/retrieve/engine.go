@@ -184,6 +184,7 @@ func New(shards []*index.Reader, opt Options) *Engine {
 	})
 	e.migFrom, e.migTo = map[string][]int{}, map[string][]int{}
 	symSeasons := map[string]bool{}
+	seenRule := map[string]bool{}
 	for i, s := range shards {
 		if e.hasSymbols[i] {
 			for se := range e.seasons[i] {
@@ -196,6 +197,13 @@ func New(shards []*index.Reader, opt Options) *Engine {
 			continue
 		}
 		for _, m := range ms {
+			// Rules live in the migrations shard; indexes built before it
+			// kept them in table shards, so the same rule can come twice.
+			k := m.Language + " " + m.RuleID + " " + m.FromSeason + " " + m.From
+			if seenRule[k] {
+				continue
+			}
+			seenRule[k] = true
 			e.migFrom[m.From] = append(e.migFrom[m.From], len(e.migrations))
 			if m.To != "" {
 				e.migTo[m.To] = append(e.migTo[m.To], len(e.migrations))
@@ -733,6 +741,11 @@ func (e *Engine) rank(ctx context.Context, q Query, d router.Decision, f index.F
 				if err != nil {
 					return err
 				}
+				// A case-only match is kept for a sloppy spelling of the
+				// same type ("talonFX"), not when it is a different kind of
+				// symbol: a constant or member (YAGSL's MotorType#TALONFX
+				// for "TalonFX").
+				syms = slices.DeleteFunc(syms, func(s index.Symbol) bool { return s.CaseMismatch && otherSymbol(s, id) })
 				o.syms = append(o.syms, syms...)
 				for _, s := range syms {
 					if s.ChunkID != "" {
@@ -1064,6 +1077,11 @@ func (e *Engine) Symbols(ctx context.Context, q index.SymbolQuery) ([]index.Symb
 		}
 		out = append(out, r...)
 	}
+	// Each shard prefers its own exact-case rows; across shards too, an
+	// exact match anywhere drops the rows that differ only in case.
+	if slices.ContainsFunc(out, func(s index.Symbol) bool { return !s.CaseMismatch }) {
+		out = slices.DeleteFunc(out, func(s index.Symbol) bool { return s.CaseMismatch })
+	}
 	return dedupeSymbols(out), nil
 }
 
@@ -1184,4 +1202,12 @@ func (e *Engine) Metas() []index.Meta {
 		out[i] = s.Meta()
 	}
 	return out
+}
+
+// otherSymbol reports whether a case-only match for the identifier id names
+// a different symbol rather than id spelled loosely: an all-caps constant,
+// or a member when id names no member.
+func otherSymbol(s index.Symbol, id string) bool {
+	simple := index.SimpleName(s.FQN)
+	return simple == strings.ToUpper(simple) || strings.Contains(s.FQN, "#") && !strings.Contains(id, "#")
 }

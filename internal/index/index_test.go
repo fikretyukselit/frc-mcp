@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -258,5 +259,57 @@ func TestLicensesCoverSymbolsAndFacts(t *testing.T) {
 	got, err := r.Licenses(ctx)
 	if err != nil || len(got) != 2 || got[0] != "LicenseRef-X" || got[1] != "MIT" {
 		t.Fatalf("licenses = %v, %v", got, err)
+	}
+}
+
+// The simple-name column is NOCASE: an exact-case match drops the rows that
+// differ only in case; without one they are kept and marked.
+func TestSymbolLookupPrefersCase(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "c.sqlite")
+	w, err := Create(ctx, path, "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fqn := range []string{"com.ctre.phoenix6.hardware.TalonFX", "swervelib.motors.MotorType#TALONFX"} {
+		if err := w.AddSymbol(ctx, Symbol{FQN: fqn, Library: "x", Version: "1", Season: "2026", Language: "java", Kind: "class",
+			Signature: "s", SourceURL: "https://x", UpstreamRev: "r", RetrievedAt: time.Unix(1, 0), License: "MIT", Trust: "vendor"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	for _, tc := range []struct {
+		name     string
+		want     []string
+		mismatch bool
+	}{
+		{"TalonFX", []string{"com.ctre.phoenix6.hardware.TalonFX"}, false},
+		{"TALONFX", []string{"swervelib.motors.MotorType#TALONFX"}, false},
+		{"talonfx", []string{"com.ctre.phoenix6.hardware.TalonFX", "swervelib.motors.MotorType#TALONFX"}, true},
+		{"MotorType#TALONFX", []string{"swervelib.motors.MotorType#TALONFX"}, false},
+		{"MotorType#TalonFX", []string{"swervelib.motors.MotorType#TALONFX"}, true},
+	} {
+		got, err := r.Symbols(ctx, SymbolQuery{Name: tc.name, Season: "2026"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fqns []string
+		for _, s := range got {
+			fqns = append(fqns, s.FQN)
+			if s.CaseMismatch != tc.mismatch {
+				t.Errorf("%s: %s CaseMismatch=%v", tc.name, s.FQN, s.CaseMismatch)
+			}
+		}
+		slices.Sort(fqns)
+		if !slices.Equal(fqns, tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.name, fqns, tc.want)
+		}
 	}
 }

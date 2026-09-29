@@ -7,7 +7,7 @@
       "readOnlyHint": true,
       "title": "Look up FRC API symbol"
     },
-    "description": "Look up an exact API symbol (class, method, constructor, field) for one FRC season and language: signatures, deprecation/removal, replacement, and where the same symbol lives in other seasons.\n\nUse when: you know or suspect a class/method name (TalonFX, SparkMax#configure, frc::SwerveDriveKinematics, edu.wpi.first.math.kinematics.SwerveDriveKinematics) and need its current, correct form — especially before writing code against it.\nDon't use when: you have a conceptual question — call frc_search.\n\nstatus \"version_mismatch\" means the symbol does not exist in the pinned season (e.g. CANSparkMax in 2025+, edu.wpi.first packages in 2027). Examples:\n{\"symbol\": \"TalonFX#TalonFX\", \"language\": \"java\"}\n{\"symbol\": \"SwerveDriveKinematics\", \"frc_season\": \"2027\"}",
+    "description": "Look up an exact API symbol (class, method, constructor, field) for one FRC season and language: signatures, deprecation/removal, replacement, and where the same symbol lives in other seasons.\n\nUse when: you know or suspect a class/method name (TalonFX, SparkMax#configure, frc::SwerveDriveKinematics, edu.wpi.first.math.kinematics.SwerveDriveKinematics) and need its current, correct form — especially before writing code against it.\nDon't use when: you have a conceptual question — call frc_search.\n\nstatus \"version_mismatch\" means the symbol does not exist in the pinned season (e.g. CANSparkMax in 2025+, edu.wpi.first packages in 2027); curated[] then gives the cited rename. Names match exactly: match \"case_differs\" (status low_confidence) is a different symbol, not the one you asked for. Examples:\n{\"symbol\": \"TalonFX#TalonFX\", \"language\": \"java\"}\n{\"symbol\": \"SwerveDriveKinematics\", \"frc_season\": \"2027\"}",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -54,6 +54,74 @@
         "confidence": {
           "description": "0..1 confidence in the top result",
           "type": "number"
+        },
+        "curated": {
+          "description": "curated rules that rename or remove this name in another season (answers where no API table is indexed)",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "citation": {
+                "description": "upstream change the curated rule cites",
+                "type": "string"
+              },
+              "confidence": {
+                "description": "high | medium | low",
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "from_season": {
+                "type": "string"
+              },
+              "kind": {
+                "description": "rename | move | removed | signature | behavior | unchanged",
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "library": {
+                "type": "string"
+              },
+              "line": {
+                "description": "code mode: line of first use",
+                "type": "integer"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "rule_id": {
+                "type": "string"
+              },
+              "source": {
+                "description": "curated (cited rule) | upstream (library deprecation note) | generated (same-name move between seasons) | unchanged",
+                "type": "string"
+              },
+              "to": {
+                "description": "counterpart in the target season; empty for removed APIs (read notes)",
+                "type": "string"
+              },
+              "to_season": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from",
+              "from_season",
+              "to_season",
+              "language",
+              "library",
+              "kind",
+              "confidence",
+              "source"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
         },
         "degraded": {
           "description": "retrievers that were unavailable for this call",
@@ -156,6 +224,10 @@
                 "type": "string"
               },
               "library": {
+                "type": "string"
+              },
+              "match": {
+                "description": "case_differs: the name matches the query only when letter case is ignored (a different symbol)",
                 "type": "string"
               },
               "removed_in": {
@@ -284,6 +356,10 @@
                 "type": "string"
               },
               "library": {
+                "type": "string"
+              },
+              "match": {
+                "description": "case_differs: the name matches the query only when letter case is ignored (a different symbol)",
                 "type": "string"
               },
               "removed_in": {

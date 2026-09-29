@@ -103,13 +103,15 @@ type SymbolOut struct {
 	Replacement  string   `json:"replacement,omitempty"`
 	DocID        string   `json:"doc_id,omitempty" jsonschema:"chunk id of the related documentation; pass to frc_fetch"`
 	Citation     Citation `json:"citation"`
+	Match        string   `json:"match,omitempty" jsonschema:"case_differs: the name matches the query only when letter case is ignored (a different symbol)"`
 }
 
 // APIOut is frc_api's structured result.
 type APIOut struct {
 	Envelope
-	Matches      []SymbolOut `json:"matches"`
-	OtherSeasons []SymbolOut `json:"other_seasons,omitempty" jsonschema:"the same symbol in other seasons (e.g. before/after a package move)"`
+	Matches      []SymbolOut      `json:"matches"`
+	OtherSeasons []SymbolOut      `json:"other_seasons,omitempty" jsonschema:"the same symbol in other seasons (e.g. before/after a package move)"`
+	Curated      []MigrateMapping `json:"curated,omitempty" jsonschema:"curated rules that rename or remove this name in another season (answers where no API table is indexed)"`
 }
 
 // DetectedVendordep is a vendordep found in the project.

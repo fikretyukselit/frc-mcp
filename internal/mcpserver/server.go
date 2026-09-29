@@ -344,6 +344,9 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 	}
 	others := slices.DeleteFunc(all, func(x index.Symbol) bool { return x.Season == season })
 	out := render.API(matches, others[:min(len(others), 5)], render.Context{Now: s.now(), BuiltAt: e.BuiltAt()}, season)
+	if out.Status != retrieve.StatusOK {
+		apiCurated(ctx, e, &out, in.Symbol, in.Language, season)
+	}
 	out.PinSource = "default"
 	switch {
 	case fromPin:
@@ -354,6 +357,78 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 	out.Language = in.Language
 	out.IndexStale = e.Stale(s.now())
 	return text(render.APIMarkdown(out)), out, nil
+}
+
+// apiCurated answers a name the season's tables do not have from the
+// curated rules: a name renamed or removed in an earlier season (REVLib's
+// CANSparkMax), a later season's name, or a type of a library whose table
+// this index leaves out (license-restricted vendor APIs).
+func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, name, lang, season string) {
+	restricted, restrictedLang := "", ""
+	type hit struct {
+		m       index.Migration
+		oldSide bool // the name is the rule's old side (else its new side)
+	}
+	var hits []hit
+	for _, mr := range e.Migrations() {
+		if lang != "" && mr.Language != lang {
+			continue
+		}
+		owner, _, _ := strings.Cut(mr.From, "#")
+		oldSide := migrate.NameIs(mr.From, name) && mr.ToSeason <= season && mr.From != mr.To
+		newSide := mr.To != "" && migrate.NameIs(mr.To, name) && mr.FromSeason >= season && mr.From != mr.To
+		switch {
+		case oldSide || newSide:
+			hits = append(hits, hit{mr, oldSide})
+			out.Curated = append(out.Curated, render.MigrateMapping{From: mr.From, To: mr.To, FromSeason: mr.FromSeason,
+				ToSeason: mr.ToSeason, Language: mr.Language, Library: mr.Library, Kind: mr.Kind, Notes: mr.Notes,
+				Confidence: map[bool]string{true: "high", false: "medium"}[mr.Verified], Source: migrate.SrcCurated,
+				RuleID: mr.RuleID, Citation: mr.Citation})
+		case restricted == "" && verify.RestrictedPublisher(mr.Library, mr.Language) != "" && (migrate.NameIs(owner, name) || migrate.NameIs(mr.From, name)) &&
+			e.LibraryVersion(ctx, mr.Library, season, mr.Language) == "":
+			restricted, restrictedLang = mr.Library, mr.Language
+		}
+	}
+	// Only names differing in case (YAGSL's TALONFX for TalonFX) are no answer.
+	noExact := len(out.Matches) == 0 || out.Matches[0].Match != ""
+	if len(hits) > 0 && noExact {
+		h := hits[0]
+		c, lib := h.m, verify.LibraryName(h.m.Library)
+		// A rule alone proves absence only for a change from an earlier
+		// season (as frc_verify_code's error rule) or when the season's
+		// table is indexed and lacks the name; in the season of a rename
+		// the old name may linger deprecated. A name that both sides share
+		// ("ControlType" moving between classes) says nothing about which
+		// one the code means.
+		tabled := e.LibraryVersion(ctx, c.Library, season, c.Language) != ""
+		shared := c.To != "" && migrate.NameIs(c.From, name) && migrate.NameIs(c.To, name)
+		certain := !shared && (tabled || h.oldSide && c.ToSeason < season)
+		if certain {
+			out.Status, out.Confidence = retrieve.StatusVersionMismatch, 0
+		}
+		switch {
+		case shared:
+			out.Next = []string{fmt.Sprintf("%s names both sides of curated rule %s (%s → %s in %s %s); check which one the code imports for season %s",
+				name, c.RuleID, c.From, c.To, lib, c.ToSeason, season)}
+		case h.oldSide && c.To == "" && certain:
+			out.Next = []string{fmt.Sprintf("%s was removed in %s %s; read curated[0].notes for what replaces it", name, lib, c.ToSeason)}
+		case h.oldSide && c.To == "":
+			out.Next = []string{fmt.Sprintf("a curated rule removes %s in %s %s (it may still exist, deprecated); read curated[0].notes for what replaces it", name, lib, c.ToSeason)}
+		case h.oldSide && certain:
+			out.Next = []string{fmt.Sprintf("%s is not a %s name: it became %s in %s %s (see curated); use that", name, season, c.To, lib, c.ToSeason)}
+		case h.oldSide:
+			out.Next = []string{fmt.Sprintf("a curated rule renames %s to %s in %s %s (the old name may still exist, deprecated); prefer %s", name, c.To, lib, c.ToSeason, c.To)}
+		case certain:
+			out.Next = []string{fmt.Sprintf("%s is the %s name; season %s uses %s", name, c.ToSeason, season, c.From)}
+		default:
+			out.Next = []string{fmt.Sprintf("%s is the %s %s name (curated rule); season %s used %s, and may not have %s yet", name, lib, c.ToSeason, season, c.From, name)}
+		}
+	}
+	if restricted != "" && noExact {
+		out.Next = append([]string{fmt.Sprintf("%s is a %s name, but this index has no %s %s API table: %s grants no redistribution license, "+
+			"so the published index leaves it out. Use frc_search for its docs, frc_migrate for curated changes, or build the index locally (frc-mcp index run)",
+			name, verify.LibraryName(restricted), season, verify.LibraryName(restricted), verify.RestrictedPublisher(restricted, restrictedLang))}, out.Next...)
+	}
 }
 
 // ---- frc_context ----
@@ -958,9 +1033,10 @@ func (s *Server) vendordep(_ context.Context, _ *mcp.CallToolRequest, in Vendord
 	for _, c := range l.Conflicts {
 		info.ConflictsWith = append(info.ConflictsWith, c.ErrorMessage)
 	}
-	if yr := l.FRCYear; yr != "" && yr != in.Season {
+	// 2027 entries declare wpilibYear "2027_alpha7": compare its season.
+	if yr := l.FRCYear; yr != "" && facts.DeclaredSeason(yr) != in.Season {
 		out.Status = retrieve.StatusVersionMismatch
-		out.Next = append(out.Next, fmt.Sprintf("the newest catalog entry declares frcYear %s, not %s: the vendor may not have published a %s release yet", yr, in.Season, in.Season))
+		out.Next = append(out.Next, fmt.Sprintf("the newest catalog entry declares year %s, not %s: the vendor may not have published a %s release yet", yr, in.Season, in.Season))
 	}
 	out.Library = info
 	return text(render.VendordepMarkdown(out)), out, nil

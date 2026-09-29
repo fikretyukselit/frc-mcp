@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -169,6 +170,15 @@ func Fetch(c *index.Chunk, rc Context) FetchOut {
 // API builds frc_api's result.
 func API(matches, others []index.Symbol, rc Context, season string) APIOut {
 	out := APIOut{Envelope: Envelope{Freshness: "shard", IndexAge: rc.indexAge(), Season: season}, Matches: []SymbolOut{}}
+	exact := func(ss []index.Symbol) bool {
+		return slices.ContainsFunc(ss, func(s index.Symbol) bool { return !s.CaseMismatch })
+	}
+	// Names that match only when case is ignored are other symbols: shown
+	// (marked) only when nothing else answers, and never as other seasons.
+	others = slices.DeleteFunc(others, func(s index.Symbol) bool { return s.CaseMismatch })
+	if !exact(matches) && len(others) > 0 {
+		matches = nil
+	}
 	for _, s := range matches {
 		out.Matches = append(out.Matches, symbolOut(s))
 	}
@@ -176,6 +186,9 @@ func API(matches, others []index.Symbol, rc Context, season string) APIOut {
 		out.OtherSeasons = append(out.OtherSeasons, symbolOut(s))
 	}
 	switch {
+	case len(out.Matches) > 0 && out.Matches[0].Match != "":
+		out.Status, out.Confidence = retrieve.StatusLowConfidence, 0.3
+		out.Next = []string{"no symbol has exactly this name; these differ in letter case and are likely other symbols (e.g. an enum constant). Check the spelling, or use frc_search"}
 	case len(out.Matches) > 0:
 		out.Status, out.Confidence = retrieve.StatusOK, 1
 		for _, m := range out.Matches {
@@ -206,7 +219,8 @@ func symbolOut(s index.Symbol) SymbolOut {
 		Version: s.Version, Season: s.Season, Language: s.Language, Since: s.Since, DeprecatedIn: s.DeprecatedIn,
 		RemovedIn: s.RemovedIn, Replacement: s.Replacement, DocID: s.ChunkID,
 		Citation: Citation{SourceURL: s.SourceURL, Library: s.Library, Version: s.Version, UpstreamRev: s.UpstreamRev,
-			RetrievedAt: s.RetrievedAt.UTC().Format(time.RFC3339), License: s.License, Trust: s.Trust}}
+			RetrievedAt: s.RetrievedAt.UTC().Format(time.RFC3339), License: s.License, Trust: s.Trust},
+		Match: map[bool]string{true: "case_differs"}[s.CaseMismatch]}
 }
 
 func citation(c *index.Chunk) Citation {
