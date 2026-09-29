@@ -65,6 +65,41 @@ expected changes/day in the off-season (scaled by the season multiplier). **Pri*
 - `docs.photonvision.org` has no htmlzip download enabled; `pathplanner.dev` and `docs.advantagekit.org` publish no
   `llms.txt`.
 
+### 0.1.1 Verified during forum ingestion (2026-09-29)
+
+Chief Delphi (`www.chiefdelphi.com`, Discourse behind Cloudflare), probed by hand with an identifying User-Agent:
+
+- **`/robots.txt`** (`cache-control: max-age=14400`): `User-agent: *` disallows `/admin/`, `/auth/`, `/email/`,
+  `/session`, `/user-api-key`, `/*?api_key*`, `/badges`, `/my`, `/search`, `/tag/*/l`, `/g`, **`/t/*/*.rss`** and
+  **`/c/*.rss`**. `/latest.rss` and `/posts.rss` are allowed. The **category feeds planned in §5 are disallowed**,
+  so they are not used; the category filter runs on the `<category>` element of `latest.rss` instead.
+- **Category ids** (from the `/categories` and `/c/technical/9` HTML pages, not from the disallowed feeds): the plan's
+  `programming/11` and `control-systems/9` were wrong. Actual: `technical/9`, `technical/programming/30`,
+  `technical/control-system/72`, `technical/java/75`, `technical/c-c/74`, `technical/python/77`, `technical/can/76`,
+  `technical/sensors/70`, `technical/motors/31`, `technical/electrical/32`, `technical/photonvision/87`,
+  `technical/technical-discussion/25`.
+- **Feeds:** `latest.rss` has the 30 most recently active topics (title, `dc:creator`, `<category>`, the first post's
+  cooked HTML plus a "N posts - M participants" / "Read full topic" footer, `pubDate`, GUID
+  `www.chiefdelphi.com-topic-<id>`). `posts.rss` has the 50 newest posts (no category; `dc:creator` is
+  `@username Display Name`; link `/t/<slug>/<topic>#post_<n>`; GUID `www.chiefdelphi.com-post-<id>`). Both answer
+  `cache-control: no-cache, no-store` with **no ETag or Last-Modified**, so change detection is the byte hash (rung 4)
+  and `min_interval: 30m` is the politeness floor.
+- **[Terms of Service](https://www.chiefdelphi.com/tos)** — nothing forbids automated access or feed readers. §3
+  "User Content License": *"User contributions are licensed under a Creative Commons Attribution-NonCommercial-ShareAlike
+  3.0 Unported License."* The [FAQ / guidelines](https://www.chiefdelphi.com/guidelines) add "Post Only Your Own
+  Stuff" and nothing about reuse or crawling. The site is open to users from 13 years old.
+- **Decision:** ingest, but **never redistribute**. Posts carry `LicenseRef-ChiefDelphi-UserContent`, not the
+  CC BY-NC-SA 3.0 id: redistributing would require per-post author attribution, a ShareAlike shard license and
+  honoring moderator removals in copies we cannot recall, and many authors are minors. `index publish` never ships a
+  `LicenseRef-*-UserContent` shard, even with `--include-unlicensed`; the `forum` shard exists only in locally built
+  indexes. The shard mirrors the feeds' rolling window (no archive), so posts removed upstream disappear on the next
+  build.
+- **First real build (2026-09-29 17:27 UTC):** 30 topics → 6 kept in allowed categories (Programming ×3, Control
+  System, Motors, Technical), 24 filtered; 50 replies → 0 kept (none were in those 6 topics; the window was dominated
+  by forum-game threads), 0 invalid after the `?page=N` fix, **0 suspect**. `forum` shard: 6 chunks. The real-index
+  detector check (`TestRealIndexNotSuspect`) stays at 0 flags over 17,298 chunks. Forum recall is therefore limited
+  to what is active at build time; an archive would need its own policy for moderator removals.
+
 ## 0.2 Licensing and redistribution
 
 Shards redistribute text, so every source records the license of its **documentation** (which can differ from the
@@ -89,6 +124,7 @@ code license):
 | YAGSL Java API | LGPL-2.1 | yes |
 | Python APIs (PyPI wheels) | RobotPy, robotpy-rev, choreolib: BSD-3-Clause; photonlibpy, pathplannerlib: MIT; CTRE `phoenix6`: none declared | yes, except `phoenix6` (`LicenseRef-CTRE-Phoenix-API`, shard `vendor-restricted-api-*`) |
 | Release notes (GitHub releases) | the repository's license (BSD-3/MIT/GPL-3.0/LGPL-2.1); CTRE `Phoenix-Releases` and REV `REV-Software-Binaries` have none | yes, except CTRE/REV (`LicenseRef-*-Release-Notes`, shard `releases-restricted`) |
+| Chief Delphi posts | CC BY-NC-SA 3.0 per ToS §3 (user content) | **never** (`LicenseRef-ChiefDelphi-UserContent`, shard `forum`; not even with `--include-unlicensed`; §0.1.1) |
 
 `LicenseRef-*` marks documentation without a redistribution grant. Those shards are built and can be used from a
 local index, but `frc-mcp index publish` leaves them out of the signed manifest unless `--include-unlicensed` is
@@ -162,8 +198,9 @@ release assets (`github.com` → `release-assets.githubusercontent.com`), and bo
 
 | Source | Endpoint | Detect | Floor | Notes |
 |---|---|---|---|---|
-| Chief Delphi latest | `https://www.chiefdelphi.com/latest.rss` | GUID + item hash (no validators) | 15 m | JSON API is Cloudflare-blocked; RSS is explicitly allowed |
-| Chief Delphi Programming / Control Systems | `/c/technical/programming/11.rss`, `/c/technical/control-systems/9.rss` ⚠️ IDs | same | 30 m | |
+| Chief Delphi topics | `https://www.chiefdelphi.com/latest.rss` (adapter `discourse-rss`, id `chiefdelphi`) | GUID + item hash (no validators) | 30 m (`min_interval`) | JSON API is Cloudflare-blocked; site-level RSS is allowed by robots.txt. Category allowlist on `<category>` (Programming, Java, C/C++, Python, Control System, CAN, Sensors, Motors, Electrical, PhotonVision, Technical, Technical Discussion). Opt-in only, never published (§0.1.1) |
+| Chief Delphi replies | `https://www.chiefdelphi.com/posts.rss` (`posts_url` of the same source) | same | 30 m | no category in the feed: a reply is kept only when its topic is in `latest.rss` in an allowed category |
+| ~~Chief Delphi category feeds~~ | `/c/technical/programming/30.rss`, `/c/technical/control-system/72.rss` | — | — | **not used: robots.txt disallows `/c/*.rss`** (and `/t/*/*.rss`); the plan's ids 11 and 9 were also wrong |
 | YouTube (WPILib, FIRST, vendors) | `https://www.youtube.com/feeds/videos.xml?channel_id={id}` | ETag; WebSub optional when hosted | 1 h | titles/descriptions only |
 | r/FRC | `https://www.reddit.com/r/FRC/.rss` ⚠️ | GUID | 1 h | custom UA required |
 | Discord | — | — | — | out of scope (auth + ToS) |
