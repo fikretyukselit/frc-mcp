@@ -285,6 +285,30 @@ func (r *Reader) SymbolsReplacedBy(ctx context.Context, fqn, season string) ([]S
 	return out, rows.Err()
 }
 
+// Members lists the members of a type ("owner#…" FQNs) in a season and
+// language, sorted by FQN. It is not on the search hot path.
+func (r *Reader) Members(ctx context.Context, owner, season, language string) ([]Symbol, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+symbolCols+` FROM symbol WHERE fqn >= ?1 AND fqn < ?2
+		AND (?3 = '' OR season = ?3) AND language = ?4 ORDER BY fqn LIMIT 500`, owner+"#", owner+"$", season, language)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Symbol
+	for rows.Next() {
+		var s Symbol
+		var at int64
+		if err := rows.Scan(&s.FQN, &s.Library, &s.Version, &s.Season, &s.Language, &s.Kind, &s.Signature,
+			&s.Summary, &s.Since, &s.DeprecatedIn, &s.RemovedIn, &s.Replacement, &s.ChunkID, &s.SourceURL,
+			&s.UpstreamRev, &at, &s.License, &s.Trust); err != nil {
+			return nil, err
+		}
+		s.RetrievedAt = time.Unix(at, 0).UTC()
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 // LibraryVersion returns the version of a library's symbol table for a season
 // and language, or "" when the shard has none.
 func (r *Reader) LibraryVersion(ctx context.Context, library, season, language string) string {

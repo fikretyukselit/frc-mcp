@@ -116,6 +116,8 @@ func (s *Server) register() {
 		Annotations: readOnly("Verify robot code against the season API"), InputSchema: verifySchema()}, s.verifyCode)
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_whats_new", Title: "FRC library release notes", Description: surface.WhatsNew(),
 		Annotations: readOnly("FRC library release notes"), InputSchema: whatsNewSchema()}, s.whatsNew)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_hardware", Title: "FRC motor specs", Description: surface.Hardware(),
+		Annotations: readOnly("FRC motor specs"), InputSchema: hardwareSchema()}, s.hardware)
 	s.mcp.AddResource(&mcp.Resource{URI: "frc://index/manifest", Name: "index-manifest", Title: "Loaded index shards",
 		Description: "Shards currently loaded: names, build ids, build times, seasons, chunk and symbol counts.",
 		MIMEType:    "application/json"}, s.manifest)
@@ -588,6 +590,83 @@ func (s *Server) whatsNew(_ context.Context, _ *mcp.CallToolRequest, in WhatsNew
 	return text(render.WhatsNewMarkdown(out)), out, nil
 }
 
+// ---- frc_hardware ----
+
+// HardwareIn is frc_hardware's input.
+type HardwareIn struct {
+	Parts    []string `json:"parts,omitempty" jsonschema:"part names or aliases, e.g. kraken x60, kraken x60 foc, neo vortex, falcon, neo550"`
+	Category string   `json:"category,omitempty" jsonschema:"list every part of a category instead (motor)"`
+	Season   string   `json:"frc_season,omitempty" jsonschema:"FRC season (default: pin, then the current stable season)"`
+	Pin      string   `json:"pin,omitempty" jsonschema:"pin handle from frc_context"`
+}
+
+func (s *Server) hardware(ctx context.Context, _ *mcp.CallToolRequest, in HardwareIn) (*mcp.CallToolResult, render.HardwareOut, error) {
+	var lang, channel string
+	fromPin, err := applyPin(in.Pin, &in.Season, &lang, &channel)
+	if err != nil {
+		return nil, render.HardwareOut{}, err
+	}
+	if err := validateCommon(in.Season, "", ""); err != nil {
+		return nil, render.HardwareOut{}, err
+	}
+	if len(in.Parts) == 0 && in.Category == "" {
+		return nil, render.HardwareOut{}, errors.New(`pass parts (e.g. {"parts": ["kraken x60", "neo vortex"]}) or a category (e.g. {"category": "motor"})`)
+	}
+	e := s.engine.Load()
+	if !e.Ready() {
+		out := render.HardwareOut{Envelope: syncing(), Parts: []render.HWPartOut{}}
+		return text(render.HardwareMarkdown(out)), out, nil
+	}
+	pinSource := "arg"
+	switch {
+	case fromPin:
+		pinSource = "handle"
+	case in.Season == "":
+		in.Season, pinSource = e.DefaultSeason(), "default"
+	}
+	out := render.HardwareOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
+		Season: in.Season, PinSource: pinSource}, Parts: []render.HWPartOut{}}
+	parts, unknown := e.Hardware(in.Parts, in.Category, in.Season)
+	for _, p := range parts {
+		po := render.HWPartOut{Part: p.Part, Name: p.Name, Category: p.Category}
+		for _, r := range p.Rows {
+			po.Sources = append(po.Sources, render.HWSourceRow{Source: r.Source, Season: r.Season, Fields: r.Fields,
+				Factory: r.Factory, Note: r.Note, Citation: render.Citation{SourceURL: r.SourceURL, Library: "wpilib",
+					Version: r.UpstreamRev, UpstreamRev: r.UpstreamRev, RetrievedAt: r.RetrievedAt.Format(time.RFC3339),
+					License: r.License, Trust: r.Trust}})
+			if r.Source == "wpilib-dcmotor" && po.Sim == nil {
+				po.Sim = map[string]string{}
+				for _, l := range []string{"java", "cpp", "python"} {
+					if f := e.SimFactory(ctx, r.Factory, r.Season, l); f != "" {
+						po.Sim[l] = callForm(f, l)
+					}
+				}
+			}
+		}
+		out.Parts = append(out.Parts, po)
+	}
+	out.Unknown = unknown
+	if len(out.Parts) == 0 {
+		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
+		out.Known = e.HardwareParts()
+		out.Next = []string{"use one of the known part ids listed above"}
+	} else if len(unknown) > 0 {
+		out.Known = e.HardwareParts()
+	}
+	return text(render.HardwareMarkdown(out)), out, nil
+}
+
+// callForm renders a factory FQN as a call: "frc::DCMotor#NEO" →
+// "frc::DCMotor::NEO(numMotors)", "pkg.DCMotor#getNEO" → "pkg.DCMotor.getNEO(numMotors)".
+func callForm(fqn, lang string) string {
+	owner, member, _ := strings.Cut(fqn, "#")
+	sep := "."
+	if lang == "cpp" {
+		sep = "::"
+	}
+	return owner + sep + member + "(numMotors)"
+}
+
 // ---- frc_vendordep ----
 
 // VendordepIn is frc_vendordep's input.
@@ -784,6 +863,14 @@ func vendordepSchema() *jsonschema.Schema {
 	s := infer[VendordepIn]()
 	s.Properties["frc_season"].Pattern = seasonRe.String()
 	s.Properties["vendordeps"].MaxItems = ptr(64)
+	return s
+}
+
+func hardwareSchema() *jsonschema.Schema {
+	s := infer[HardwareIn]()
+	s.Properties["frc_season"].Pattern = seasonRe.String()
+	s.Properties["parts"].MaxItems = ptr(20)
+	enum(s, "category", []string{"motor"})
 	return s
 }
 

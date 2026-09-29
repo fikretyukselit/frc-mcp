@@ -219,3 +219,30 @@ type WhatsNewOut struct {
 	Entries   []ReleaseEntry `json:"entries"`
 	Libraries []string       `json:"libraries,omitempty" jsonschema:"libraries with release data (when the requested one has none)"`
 }
+
+// HWSourceRow is one source's values for a part (never merged across sources).
+type HWSourceRow struct {
+	Source  string             `json:"source" jsonschema:"where the numbers come from, e.g. wpilib-dcmotor (WPILib simulation constants)"`
+	Season  string             `json:"frc_season"`
+	Fields  map[string]float64 `json:"fields" jsonschema:"values with unit-suffixed keys: stall_torque_nm, stall_current_a, free_current_a, free_speed_rpm, nominal_voltage_v"`
+	Factory string             `json:"factory,omitempty"`
+	Note    string             `json:"note,omitempty" jsonschema:"the source's own provenance note (e.g. the dyno it copied)"`
+	Citation
+}
+
+// HWPartOut is one part in frc_hardware.
+type HWPartOut struct {
+	Part     string            `json:"part"`
+	Name     string            `json:"name"`
+	Category string            `json:"category"`
+	Sources  []HWSourceRow     `json:"sources"`
+	Sim      map[string]string `json:"sim,omitempty" jsonschema:"WPILib simulation factory per language (from the indexed API tables)"`
+}
+
+// HardwareOut is frc_hardware's result.
+type HardwareOut struct {
+	Envelope
+	Parts   []HWPartOut `json:"parts"`
+	Unknown []string    `json:"unknown,omitempty"`
+	Known   []string    `json:"known,omitempty" jsonschema:"part ids with data (when a requested part is unknown)"`
+}

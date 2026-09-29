@@ -67,7 +67,7 @@ func TestStdioEndToEnd(t *testing.T) {
 	var err error
 	defer cs.Close()
 	t.Logf("first exec → tools/list: %s; subsequent launches (max of 3): %s", firstLat, cold)
-	if len(tools.Tools) != 7 {
+	if len(tools.Tools) != 8 {
 		t.Fatalf("tools = %d", len(tools.Tools))
 	}
 	if cold > time.Second { // generous for CI runners; laptop budget is 150 ms

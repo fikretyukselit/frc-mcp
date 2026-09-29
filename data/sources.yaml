@@ -904,6 +904,35 @@ sources:
     shard: vendor-api-2027
     verified: true # probed 2026-09-29
 
+  # ---- Hardware specs (M3, frc_hardware) ----
+  # WPILib's simulation constants for each motor (DCMotor factories), read
+  # from DCMotor.java at the release tag. Labeled "wpilib-dcmotor"; other
+  # sources (vendor dyno data, ReCalc) will be separate rows, never merged.
+  - id: wpilib-dcmotor-2026
+    adapter: wpilib-dcmotor
+    url: https://raw.githubusercontent.com/wpilibsuite/allwpilib/v2026.2.2/wpimath/src/main/java/edu/wpi/first/math/system/plant/DCMotor.java
+    base_url: https://github.com/wpilibsuite/allwpilib/blob/v2026.2.2/wpimath/src/main/java/edu/wpi/first/math/system/plant/DCMotor.java
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    license: BSD-3-Clause
+    trust: official
+    shard: hardware
+    verified: true # probed 2026-09-29 (20 factories)
+  - id: wpilib-dcmotor-2027
+    adapter: wpilib-dcmotor
+    url: https://raw.githubusercontent.com/wpilibsuite/allwpilib/v2027.0.0-alpha-7/wpimath/src/main/java/org/wpilib/math/system/DCMotor.java
+    base_url: https://github.com/wpilibsuite/allwpilib/blob/v2027.0.0-alpha-7/wpimath/src/main/java/org/wpilib/math/system/DCMotor.java
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-7
+    license: BSD-3-Clause
+    trust: official
+    shard: hardware
+    verified: true
+
 models:
   - id: potion-code-16M-v2 # MIT; query + document encoder for the lite profile
     license: MIT

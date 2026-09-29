@@ -80,6 +80,7 @@ type Engine struct {
 	hasSymbols []bool
 
 	releases []index.Release // every shard's release facts, newest first
+	hwspecs  []index.HWSpec  // hardware rows, by category/part/source/season
 }
 
 // Options configures an Engine.
@@ -160,6 +161,14 @@ func New(shards []*index.Reader, opt Options) *Engine {
 		}
 		e.releases = append(e.releases, rs...)
 	}
+	for _, s := range shards {
+		hs, err := s.HWSpecs(context.Background())
+		if err != nil {
+			e.warnings = append(e.warnings, "hw_spec:"+s.Meta().Name+": "+err.Error())
+			continue
+		}
+		e.hwspecs = append(e.hwspecs, hs...)
+	}
 	slices.SortStableFunc(e.releases, func(a, b index.Release) int {
 		if c := b.PublishedAt.Compare(a.PublishedAt); c != 0 {
 			return c
@@ -213,6 +222,159 @@ func (e *Engine) WhatsNew(q WhatsNewQuery) []index.Release {
 		}
 	}
 	return out
+}
+
+// ---- hardware (frc_hardware) ----
+
+// partAliases map common names to hw_spec part ids.
+var partAliases = map[string]string{
+	"kraken": "krakenx60", "x60": "krakenx60", "krakenx60": "krakenx60", "x44": "krakenx44", "krakenx44": "krakenx44",
+	"falcon": "falcon500", "falcon500": "falcon500", "vortex": "neovortex", "neovortex": "neovortex", "sparkflexvortex": "neovortex",
+	"neo": "neo", "neov11": "neo", "neo550": "neo550", "550": "neo550", "775": "vex775pro", "775pro": "vex775pro",
+	"vex775pro": "vex775pro", "cim": "cim", "minicim": "minicim", "bag": "bag", "minion": "minion", "romi": "romibuiltin",
+}
+
+// PartID normalizes a part name: "Kraken X60 FOC" → "krakenx60-foc".
+func PartID(name string) string {
+	n := strings.ToLower(name)
+	n = strings.NewReplacer(" ", "", "-", "", "_", "", "(", "", ")", "").Replace(n)
+	foc := false
+	if base, ok := strings.CutSuffix(n, "foc"); ok && base != "" {
+		n, foc = base, true
+	}
+	if id, ok := partAliases[n]; ok {
+		n = id
+	}
+	if foc {
+		return n + "-foc"
+	}
+	return n
+}
+
+// HWPart groups every source's rows for one part.
+type HWPart struct {
+	Part, Name, Category string
+	Rows                 []index.HWSpec
+}
+
+// Hardware returns the rows for the given parts (or a category), one group
+// per part, with every source and season kept separate.
+func (e *Engine) Hardware(parts []string, category, season string) (found []HWPart, unknown []string) {
+	known := e.HardwareParts()
+	want := map[string]bool{}
+	resolved := map[string]string{} // input → part id
+	for _, p := range parts {
+		id := PartID(p)
+		if !slices.Contains(known, id) {
+			// A unique prefix is accepted: "andymark rs775" → andymarkrs775_125.
+			var cands []string
+			for _, k := range known {
+				if strings.HasPrefix(k, id) && !strings.HasSuffix(k, "-foc") {
+					cands = append(cands, k)
+				}
+			}
+			if len(cands) == 1 {
+				id = cands[0]
+			}
+		}
+		want[id], resolved[p] = true, id
+	}
+	idx := map[string]int{}
+	for _, h := range e.hwspecs {
+		switch {
+		case len(want) > 0 && !want[h.Part]:
+			continue
+		case len(want) == 0 && category != "" && h.Category != category:
+			continue
+		case season != "" && h.Season != season:
+			continue
+		}
+		i, ok := idx[h.Part]
+		if !ok {
+			i = len(found)
+			idx[h.Part] = i
+			found = append(found, HWPart{Part: h.Part, Name: h.Name, Category: h.Category})
+		}
+		found[i].Rows = append(found[i].Rows, h)
+	}
+	order := map[string]int{}
+	for i, p := range parts {
+		if _, ok := idx[resolved[p]]; !ok {
+			unknown = append(unknown, p)
+		}
+		if _, ok := order[resolved[p]]; !ok {
+			order[resolved[p]] = i
+		}
+	}
+	if len(parts) > 0 { // answer in the order asked
+		slices.SortStableFunc(found, func(a, b HWPart) int { return order[a.Part] - order[b.Part] })
+	}
+	return found, unknown
+}
+
+// HardwareParts lists the known part ids.
+func (e *Engine) HardwareParts() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, h := range e.hwspecs {
+		if !seen[h.Part] {
+			seen[h.Part] = true
+			out = append(out, h.Part)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// SimFactory finds the DCMotor factory for a WPILib factory name (Java
+// "getKrakenX60Foc") in another language's symbol table (C++
+// "KrakenX60FOC", Python "krakenX60FOC"), by case-insensitive name match,
+// then a unique suffix match ("getAndymarkRs775_125" ↔ "RS775_125").
+func (e *Engine) SimFactory(ctx context.Context, javaFactory, season, language string) string {
+	var owner string
+	for _, sh := range e.shards {
+		syms, err := sh.Symbols(ctx, index.SymbolQuery{Name: "DCMotor", Season: season, Language: language, Limit: 5})
+		if err != nil {
+			continue
+		}
+		for _, s := range syms {
+			if s.Kind == "class" {
+				owner = s.FQN
+				break
+			}
+		}
+		if owner != "" {
+			break
+		}
+	}
+	if owner == "" {
+		return ""
+	}
+	want := strings.ToLower(javaFactory)
+	if language != "java" {
+		want = strings.TrimPrefix(want, "get")
+	}
+	var suffix []string
+	for _, sh := range e.shards {
+		ms, err := sh.Members(ctx, owner, season, language)
+		if err != nil {
+			continue
+		}
+		for _, m := range ms {
+			name := index.SimpleName(m.FQN)
+			l := strings.ToLower(name)
+			switch {
+			case l == want:
+				return owner + "#" + name
+			case len(l) >= 4 && strings.HasSuffix(want, l) && m.Kind != "field":
+				suffix = append(suffix, owner+"#"+name)
+			}
+		}
+	}
+	if len(suffix) == 1 {
+		return suffix[0]
+	}
+	return ""
 }
 
 // libraryAliases maps common names to library ids (frc_whats_new input).

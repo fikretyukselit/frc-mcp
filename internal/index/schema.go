@@ -122,6 +122,25 @@ CREATE TABLE release (
   trust        TEXT NOT NULL,
   PRIMARY KEY (library, version)
 ) WITHOUT ROWID;
+
+-- Hardware specs (frc_hardware). One row per (part, source, season): values
+-- from different sources are never merged. Added in M3.
+CREATE TABLE hw_spec (
+  part         TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  category     TEXT NOT NULL,
+  source       TEXT NOT NULL,
+  season       TEXT NOT NULL,
+  fields       TEXT NOT NULL, -- JSON object of numeric values with unit-suffixed keys
+  factory      TEXT NOT NULL DEFAULT '',
+  note         TEXT NOT NULL DEFAULT '',
+  source_url   TEXT NOT NULL,
+  upstream_rev TEXT NOT NULL,
+  retrieved_at INTEGER NOT NULL,
+  license      TEXT NOT NULL,
+  trust        TEXT NOT NULL,
+  PRIMARY KEY (part, source, season)
+) WITHOUT ROWID;
 `
 
 // Enum codes returned by the light FTS query (no per-row string allocation).

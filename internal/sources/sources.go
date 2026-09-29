@@ -53,7 +53,7 @@ type Model struct {
 }
 
 // Adapters known to this binary.
-var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip"}
+var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip", "wpilib-dcmotor"}
 
 // Load parses and validates a registry file.
 func Load(path string) (*Registry, error) {

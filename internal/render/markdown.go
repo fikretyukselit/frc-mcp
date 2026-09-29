@@ -353,3 +353,64 @@ func WhatsNewMarkdown(o WhatsNewOut) string {
 	footer(&b, o.Envelope)
 	return b.String()
 }
+
+var hwFieldOrder = []struct{ key, label string }{
+	{"stall_torque_nm", "Stall torque (N·m)"}, {"stall_current_a", "Stall current (A)"},
+	{"free_speed_rpm", "Free speed (RPM)"}, {"free_current_a", "Free current (A)"}, {"nominal_voltage_v", "Nominal voltage (V)"},
+}
+
+// HardwareMarkdown renders frc_hardware: one table per part, one column per
+// (source, season). Sources are never averaged or merged.
+func HardwareMarkdown(o HardwareOut) string {
+	var b strings.Builder
+	envelope(&b, "frc_hardware", o.Envelope)
+	for _, p := range o.Parts {
+		fmt.Fprintf(&b, "\n**%s** (`%s`, %s)\n\n| Field |", p.Name, p.Part, p.Category)
+		for _, r := range p.Sources {
+			fmt.Fprintf(&b, " %s %s |", r.Source, r.Season)
+		}
+		b.WriteString("\n|---|")
+		for range p.Sources {
+			b.WriteString("---|")
+		}
+		b.WriteString("\n")
+		for _, f := range hwFieldOrder {
+			fmt.Fprintf(&b, "| %s |", f.label)
+			for _, r := range p.Sources {
+				if v, ok := r.Fields[f.key]; ok {
+					fmt.Fprintf(&b, " %s |", strconv.FormatFloat(v, 'f', -1, 64))
+				} else {
+					b.WriteString(" — |")
+				}
+			}
+			b.WriteString("\n")
+		}
+		if len(p.Sim) > 0 {
+			langs := make([]string, 0, len(p.Sim))
+			for l := range p.Sim {
+				langs = append(langs, l)
+			}
+			sort.Strings(langs)
+			b.WriteString("\nSimulation (WPILib DCMotor):")
+			for _, l := range langs {
+				fmt.Fprintf(&b, " %s `%s`;", l, p.Sim[l])
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString("\n")
+		for _, r := range p.Sources {
+			if r.Note != "" {
+				fmt.Fprintf(&b, "%s %s note: %s\n", r.Source, r.Season, r.Note)
+			}
+			source(&b, r.Citation, "")
+		}
+	}
+	if len(o.Unknown) > 0 {
+		fmt.Fprintf(&b, "\nNo data for: %s\n", strings.Join(o.Unknown, ", "))
+	}
+	if len(o.Known) > 0 {
+		fmt.Fprintf(&b, "Known parts: %s\n", strings.Join(o.Known, ", "))
+	}
+	footer(&b, o.Envelope)
+	return b.String()
+}

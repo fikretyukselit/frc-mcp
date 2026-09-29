@@ -100,7 +100,7 @@ func TestToolAnnotationsReadOnly(t *testing.T) {
 		}
 	}
 	// The SDK lists tools sorted by name: deterministic, as SEP-2549 asks.
-	if strings.Join(names, ",") != "frc_api,frc_context,frc_fetch,frc_search,frc_vendordep,frc_verify_code,frc_whats_new" {
+	if strings.Join(names, ",") != "frc_api,frc_context,frc_fetch,frc_hardware,frc_search,frc_vendordep,frc_verify_code,frc_whats_new" {
 		t.Fatalf("tool order = %v", names)
 	}
 }

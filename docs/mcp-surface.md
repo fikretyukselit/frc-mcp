@@ -200,11 +200,22 @@ Detects or declares the project's pin set.
   generated from pull-request titles, so they are sanitized at ingest and rendered as a quote block. Notes from
   non-vendor repositories, if ever added, are `trust: community` and fenced.
 
-### `frc_hardware` (spec'd v0.2, implemented M3)
-- **In:** `parts[]`, or `category` (`motor|controller|encoder|imu|swerve_module|sensor`); `fields?`; `source?`.
-- **Out:** rows from the `hw_spec` table. **Every source is returned labeled and never merged.** For example, WPILib
-  `DCMotor` and CTRE-dyno/ReCalc values for NEO differ by about 60% in stall torque. Each row also gives which WPILib
-  `DCMotor` factory to use in simulation.
+### `frc_hardware` (implemented M3)
+- **In:**
+  - `parts[]`: names or aliases such as "kraken x60 foc", "vortex" or "neo550". A unique prefix is accepted;
+  - or `category`: `motor` today; controller, encoder, imu and swerve_module arrive with their sources;
+  - `frc_season` or `pin`.
+- **Out:** rows from the `hw_spec` table, grouped per part in the order asked:
+  - one column per (source, season) with unit-suffixed fields;
+  - the source's own provenance note (e.g. "From <vendor page>");
+  - a citation;
+  - the WPILib `DCMotor` factory in Java, C++ and Python, resolved from the indexed API tables of that season (for
+    example 2026 `frc::DCMotor::KrakenX60FOC(numMotors)`, 2027 `wpi::math::DCMotor::…`).
+
+  **Every source is returned labeled and never merged.** WPILib `DCMotor` and CTRE-dyno/ReCalc values for NEO differ by
+  about 60% in stall torque.
+- **Sources today:** `wpilib-dcmotor`, WPILib's simulation constants parsed from `DCMotor.java` at the release tag, for
+  20 motors. Vendor dyno data and ReCalc are planned as additional labeled sources.
 
 ### Optional toolset (HTTP only): `--toolset openai`
 Registers literal `search` and `fetch` tools with the output shapes expected by OpenAI connectors and deep research.

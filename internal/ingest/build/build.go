@@ -22,6 +22,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/dcmotor"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/doxygen"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/ghreleases"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/gitbook"
@@ -71,6 +72,7 @@ type ShardReport struct {
 	Vectors    int    `json:"vectors"`
 	Vendordeps int    `json:"vendordeps,omitempty"`
 	Releases   int    `json:"releases,omitempty"`
+	HWSpecs    int    `json:"hw_specs,omitempty"`
 	BuildID    string `json:"build_id"`
 }
 
@@ -85,6 +87,7 @@ type shardData struct {
 	symbols    []index.Symbol
 	vendordeps []index.Vendordep
 	releases   []index.Release
+	hwspecs    []index.HWSpec
 }
 
 // Run executes a build.
@@ -137,6 +140,9 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 		case "doxygen-zip":
 			_, err = doxygen.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
+		case "wpilib-dcmotor":
+			_, err = dcmotor.Parse(res.Path, src, rev, res.FetchedAt,
+				func(h index.HWSpec) error { sd.hwspecs = append(sd.hwspecs, h); sr.Symbols++; return nil })
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
@@ -303,6 +309,16 @@ func writeShard(ctx context.Context, dir string, sd *shardData, model *m2v.Model
 			return nil, err
 		}
 		rep.Releases++
+	}
+	for _, h := range sd.hwspecs {
+		if err := w.AddHWSpec(ctx, h); err != nil {
+			if errors.Is(err, index.ErrInvalidChunk) {
+				rep.Rejected++
+				continue
+			}
+			return nil, err
+		}
+		rep.HWSpecs++
 	}
 	if err := w.Close(ctx); err != nil {
 		return nil, err
