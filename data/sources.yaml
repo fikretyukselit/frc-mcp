@@ -10,6 +10,7 @@ extra_hosts:
   - github.com # maven.revrobotics.com redirects artifacts to REVrobotics/REV-Software-Binaries releases
   - release-assets.githubusercontent.com # github.com release downloads redirect here
   - objects.githubusercontent.com # older github.com release download redirect target
+  - files.pythonhosted.org # wheel downloads listed by the PyPI JSON API (pypi-wheel adapter)
 
 sources:
   # ---- WPILib documentation (frc-docs, now wpilibsuite/wpilib-docs; CC BY 4.0) ----
@@ -111,7 +112,8 @@ sources:
   # `index publish` leaves those shards out until permission is recorded (see
   # docs/sources.md §0.2).
   # Shards: vendor sources are packed per season into vendor-docs-<season>,
-  # vendor-java-<season> and vendor-restricted-<season> (the LicenseRef ones),
+  # vendor-api-<season> (Java + Python) and vendor-restricted-{docs,api}-<season> (the LicenseRef ones);
+  # docs and API pages never share a shard because BM25 statistics are per shard,
   # because every shard costs a query per search (docs/benchmarks.md).
 
   # CTRE Phoenix 6: Sphinx (Furo) on Read the Docs; CC BY-NC-ND 4.0 permits
@@ -255,7 +257,7 @@ sources:
     version: "2026"
     license: LicenseRef-REV-Docs-NoLicense
     trust: vendor
-    shard: vendor-restricted-2026
+    shard: vendor-restricted-docs-2026
     verified: true
   - id: yagsl-docs-2026
     adapter: gitbook-llms
@@ -268,7 +270,7 @@ sources:
     version: "2026"
     license: LicenseRef-YAGSL-Docs-NoLicense
     trust: vendor
-    shard: vendor-restricted-2026
+    shard: vendor-restricted-docs-2026
     verified: true
 
   # ---- Vendor Java APIs (M3): Javadoc jars from each vendor's Maven repo ----
@@ -289,7 +291,7 @@ sources:
     language: java
     license: LicenseRef-CTRE-Phoenix-API
     trust: vendor
-    shard: vendor-restricted-2026
+    shard: vendor-restricted-api-2026
     verified: true # probed 2026-09-29
   - id: phoenix6-java-2027
     adapter: javadoc-zip
@@ -302,7 +304,7 @@ sources:
     language: java
     license: LicenseRef-CTRE-Phoenix-API
     trust: vendor
-    shard: vendor-restricted-2027
+    shard: vendor-restricted-api-2027
     verified: true # probed 2026-09-29
   - id: revlib-java-2026
     adapter: javadoc-zip
@@ -315,7 +317,7 @@ sources:
     language: java
     license: LicenseRef-REVLib-API
     trust: vendor
-    shard: vendor-restricted-2026
+    shard: vendor-restricted-api-2026
     verified: true # probed 2026-09-29
   - id: revlib-java-2027
     adapter: javadoc-zip
@@ -328,7 +330,7 @@ sources:
     language: java
     license: LicenseRef-REVLib-API
     trust: vendor
-    shard: vendor-restricted-2027
+    shard: vendor-restricted-api-2027
     verified: true # probed 2026-09-29
   - id: photonlib-java-2026
     adapter: javadoc-zip
@@ -341,7 +343,7 @@ sources:
     language: java
     license: GPL-3.0
     trust: vendor
-    shard: vendor-java-2026
+    shard: vendor-api-2026
     verified: true # probed 2026-09-29
   - id: photontargeting-java-2026
     adapter: javadoc-zip
@@ -354,7 +356,7 @@ sources:
     language: java
     license: GPL-3.0
     trust: vendor
-    shard: vendor-java-2026
+    shard: vendor-api-2026
     verified: true # probed 2026-09-29
   - id: photonlib-java-2027
     adapter: javadoc-zip
@@ -367,7 +369,7 @@ sources:
     language: java
     license: GPL-3.0
     trust: vendor
-    shard: vendor-java-2027
+    shard: vendor-api-2027
     verified: true # probed 2026-09-29
   - id: photontargeting-java-2027
     adapter: javadoc-zip
@@ -380,7 +382,7 @@ sources:
     language: java
     license: GPL-3.0
     trust: vendor
-    shard: vendor-java-2027
+    shard: vendor-api-2027
     verified: true # probed 2026-09-29
   - id: pathplannerlib-java-2026
     adapter: javadoc-zip
@@ -393,7 +395,7 @@ sources:
     language: java
     license: MIT
     trust: vendor
-    shard: vendor-java-2026
+    shard: vendor-api-2026
     verified: true # probed 2026-09-29
   - id: choreolib-java-2026
     adapter: javadoc-zip
@@ -406,7 +408,7 @@ sources:
     language: java
     license: BSD-3-Clause
     trust: vendor
-    shard: vendor-java-2026
+    shard: vendor-api-2026
     verified: true # probed 2026-09-29
   - id: choreolib-java-2027
     adapter: javadoc-zip
@@ -419,7 +421,7 @@ sources:
     language: java
     license: BSD-3-Clause
     trust: vendor
-    shard: vendor-java-2027
+    shard: vendor-api-2027
     verified: true # probed 2026-09-29
   - id: advantagekit-java-2026
     adapter: javadoc-zip
@@ -432,7 +434,7 @@ sources:
     language: java
     license: BSD-3-Clause
     trust: vendor
-    shard: vendor-java-2026
+    shard: vendor-api-2026
     verified: true # probed 2026-09-29
   - id: advantagekit-java-2027
     adapter: javadoc-zip
@@ -445,7 +447,7 @@ sources:
     language: java
     license: BSD-3-Clause
     trust: vendor
-    shard: vendor-java-2027
+    shard: vendor-api-2027
     verified: true # probed 2026-09-29
   - id: yagsl-java-2026
     adapter: javadoc-zip
@@ -458,7 +460,7 @@ sources:
     language: java
     license: LGPL-2.1
     trust: vendor
-    shard: vendor-java-2026
+    shard: vendor-api-2026
     verified: true # probed 2026-09-29
 
   # ---- Release notes (M3, frc_whats_new): GitHub releases of each project ----
@@ -563,6 +565,310 @@ sources:
     license: LGPL-2.1
     trust: vendor
     shard: releases
+    verified: true # probed 2026-09-29
+
+  # ---- Python APIs (M3): type stubs / typed sources from PyPI wheels ----
+  # RobotPy (WPILib for Python) and vendor Python packages, version-pinned to
+  # the newest release of each season. The pypi-wheel adapter reads the .pyi
+  # stubs (or .py sources for pure-Python packages) of one wheel.
+  - id: wpilib-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/wpilib/2026.2.2/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2026
+    verified: true # probed 2026-09-29
+  - id: robotpy-wpimath-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-wpimath/2026.2.2/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2026
+    verified: true # probed 2026-09-29
+  - id: robotpy-wpiutil-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-wpiutil/2026.2.2/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2026
+    verified: true # probed 2026-09-29
+  - id: pyntcore-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/pyntcore/2026.2.2/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2026
+    verified: true # probed 2026-09-29
+  - id: robotpy-hal-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-hal/2026.2.2/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2026
+    verified: true # probed 2026-09-29
+  - id: robotpy-commands-v2-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-commands-v2/2026.2.2/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2026
+    verified: true # probed 2026-09-29
+  - id: robotpy-apriltag-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-apriltag/2026.2.2/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2026
+    verified: true # probed 2026-09-29
+  - id: wpilib-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/wpilib/2027.0.0a7/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2027
+    verified: true # probed 2026-09-29
+  - id: robotpy-wpimath-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-wpimath/2027.0.0a7/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2027
+    verified: true # probed 2026-09-29
+  - id: robotpy-wpiutil-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-wpiutil/2027.0.0a7/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2027
+    verified: true # probed 2026-09-29
+  - id: pyntcore-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/pyntcore/2027.0.0a7/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2027
+    verified: true # probed 2026-09-29
+  - id: robotpy-hal-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-hal/2027.0.0a7/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2027
+    verified: true # probed 2026-09-29
+  - id: robotpy-commands-v2-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-commands-v2/2027.0.0a7/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2027
+    verified: true # probed 2026-09-29
+  - id: robotpy-apriltag-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-apriltag/2027.0.0a7/json
+    base_url: https://robotpy.readthedocs.io/projects/robotpy/en/stable/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7
+    language: python
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-python-2027
+    verified: true # probed 2026-09-29
+  - id: phoenix6-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/phoenix6/26.3.0/json
+    base_url: https://api.ctr-electronics.com/phoenix6/stable/python/
+    library: phoenix6
+    season: "2026"
+    channel: stable
+    version: 26.3.0
+    language: python
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-api-2026
+    verified: true # probed 2026-09-29
+  - id: phoenix6-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/phoenix6/26.70.0a2/json
+    base_url: https://api.ctr-electronics.com/phoenix6/latest/python/
+    library: phoenix6
+    season: "2027"
+    channel: alpha
+    version: 26.70.0a2
+    language: python
+    license: LicenseRef-CTRE-Phoenix-API
+    trust: vendor
+    shard: vendor-restricted-api-2027
+    verified: true # probed 2026-09-29
+  - id: robotpy-rev-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-rev/2026.0.4/json
+    base_url: https://robotpy.readthedocs.io/projects/rev/en/stable/
+    library: revlib
+    season: "2026"
+    channel: stable
+    version: 2026.0.4
+    language: python
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-api-2026
+    verified: true # probed 2026-09-29
+  - id: robotpy-rev-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-rev/2027.0.0a7.post1/json
+    base_url: https://robotpy.readthedocs.io/projects/rev/en/latest/
+    library: revlib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a7.post1
+    language: python
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-api-2027
+    verified: true # probed 2026-09-29
+  - id: photonlibpy-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/photonlibpy/2026.3.4/json
+    base_url: https://javadocs.photonvision.org/python/
+    library: photonvision
+    season: "2026"
+    channel: stable
+    version: 2026.3.4
+    language: python
+    license: MIT
+    trust: vendor
+    shard: vendor-api-2026
+    verified: true # probed 2026-09-29
+  - id: photonlibpy-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/photonlibpy/2027.0.0a2/json
+    base_url: https://javadocs.photonvision.org/python/
+    library: photonvision
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a2
+    language: python
+    license: MIT
+    trust: vendor
+    shard: vendor-api-2027
+    verified: true # probed 2026-09-29
+  - id: robotpy-pathplannerlib-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/robotpy-pathplannerlib/2026.1.2/json
+    base_url: https://pathplanner.dev/api/python/
+    library: pathplannerlib
+    season: "2026"
+    channel: stable
+    version: 2026.1.2
+    language: python
+    license: MIT
+    trust: vendor
+    shard: vendor-api-2026
+    verified: true # probed 2026-09-29
+  - id: sleipnirgroup-choreolib-py-2026
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/sleipnirgroup-choreolib/2026.0.3/json
+    base_url: https://choreo.autos/api/choreolib/py/
+    library: choreolib
+    season: "2026"
+    channel: stable
+    version: 2026.0.3
+    language: python
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-api-2026
+    verified: true # probed 2026-09-29
+  - id: sleipnirgroup-choreolib-py-2027
+    adapter: pypi-wheel
+    url: https://pypi.org/pypi/sleipnirgroup-choreolib/2027.0.0a3/json
+    base_url: https://choreo.autos/api/choreolib/py/
+    library: choreolib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0a3
+    language: python
+    license: BSD-3-Clause
+    trust: vendor
+    shard: vendor-api-2027
     verified: true # probed 2026-09-29
 
 models:

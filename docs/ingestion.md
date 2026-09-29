@@ -45,6 +45,8 @@ Hints we record but never trust alone: sitemap `lastmod` (RTD sitemaps list vers
 | `vendordep-catalog` | `internal/ingest/source/vendordeps` | GitHub contents API listing of `vendor-json-repo/<year>` | fact rows + one install chunk per library |
 | `github-markdown` | `internal/ingest/source/repomd` | git tree API URL of a pinned ref | fetches `include/**/*.md(x)` from raw.githubusercontent.com; `url_style` (`html`, `dir`, `plain`) and `lowercase` map files to page URLs; a Docusaurus `slug` wins |
 | `gitbook-llms` | `internal/ingest/source/gitbook` | a GitBook site's `llms.txt` | same-host `.md` pages under `include`, ≤ 3.3 req/s, conditional GET |
+| `github-releases` | `internal/ingest/source/ghreleases` | GitHub REST releases listing | release fact rows + release chunks; `include` = tag prefix; seasons ≥ 2025 via `facts.SeasonFor` |
+| `pypi-wheel` | `internal/ingest/source/pypi` + `pystub` | version-pinned PyPI JSON | picks one wheel (pure-Python, else manylinux x86_64; sha256-checked); `.pyi` stubs or typed `.py`; private `_segments` dropped and package `__init__` re-exports resolved, so FQNs are the import paths users write (`phoenix6.hardware.TalonFX`, `commands2.Command`) |
 
 Both Markdown adapters share `internal/ingest/source/markdown`. It normalizes five dialects into CommonMark before
 sectioning:

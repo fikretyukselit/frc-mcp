@@ -492,7 +492,7 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 		Season: in.Season, PinSource: pinSource, Language: in.Language}, File: file, Findings: []render.VerifyFinding{}}
 	if in.Language != "java" {
 		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
-		out.Coverage = map[string]string{"wpilib": "none (" + in.Language + " verification arrives in M3)"}
+		out.Coverage = map[string]string{"wpilib": "none (" + in.Language + " verification arrives in M4; its symbols are searchable with frc_api)"}
 		out.Next = []string{"only Java is verified today; use frc_api to check individual " + in.Language + " symbols"}
 		return text(render.VerifyMarkdown(out)), out, nil
 	}

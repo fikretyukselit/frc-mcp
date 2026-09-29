@@ -25,6 +25,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/ghreleases"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/gitbook"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/javadoc"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/pypi"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/repomd"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/sphinx"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/vendordeps"
@@ -129,6 +130,9 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 		case "github-releases":
 			_, err = ghreleases.Parse(ctx, f, res.Path, src, res.FetchedAt,
 				func(r index.Release) error { sd.releases = append(sd.releases, r); sr.Symbols++; return nil }, addChunk)
+		case "pypi-wheel":
+			_, err = pypi.Parse(ctx, f, res.Path, src, res.FetchedAt,
+				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)

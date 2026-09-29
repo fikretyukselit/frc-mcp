@@ -228,3 +228,12 @@
 {"id": "q226", "bucket": "troubleshoot", "query": "YAGSL swerve drifting while driving", "relevant": ["yagsl-docs/2026/reference/swerve-drift-causes"], "split": "holdout", "author": "llm"}
 {"id": "q227", "bucket": "howto", "query": "set up PathPlanner with YAGSL", "relevant": ["yagsl-docs/2026/how-to-guides/setup-pathplanner"], "language": "java", "split": "train", "author": "llm"}
 {"id": "q228", "bucket": "howto", "query": "determine motor inversion YAGSL", "relevant": ["yagsl-docs/2026/how-to-guides/determine-inversion"], "split": "train", "author": "llm"}
+{"id": "q229", "bucket": "symbol", "query": "XboxController getLeftBumperButton in python robotpy", "relevant": ["wpilib-python/2026/wpilib.XboxController"], "language": "python", "split": "train", "author": "llm"}
+{"id": "q230", "bucket": "symbol", "query": "commands2 InstantCommand python", "relevant": ["wpilib-python/2026/commands2.InstantCommand"], "language": "python", "split": "train", "author": "llm"}
+{"id": "q231", "bucket": "howto", "query": "robotpy SwerveDrive4Kinematics toSwerveModuleStates python", "relevant": ["wpilib-python/2026/wpimath.kinematics.SwerveDrive4Kinematics"], "language": "python", "split": "train", "author": "llm"}
+{"id": "q232", "bucket": "howto", "query": "ntcore NetworkTableInstance getDefault in python", "relevant": ["wpilib-python/2026/ntcore.NetworkTableInstance"], "language": "python", "split": "holdout", "author": "llm"}
+{"id": "q233", "bucket": "howto", "query": "photonlibpy PhotonCamera get latest result python", "relevant": ["photonvision-python/2026/photonlibpy.PhotonCamera"], "language": "python", "split": "train", "author": "llm"}
+{"id": "q234", "bucket": "symbol", "query": "rev SparkMax python robotpy-rev", "relevant": ["revlib-python/2026/rev.SparkMax"], "language": "python", "split": "train", "author": "llm"}
+{"id": "q235", "bucket": "howto", "query": "pathplannerlib AutoBuilder configure in python", "relevant": ["pathplannerlib-python/2026/pathplannerlib.auto.AutoBuilder"], "language": "python", "split": "holdout", "author": "llm"}
+{"id": "q236", "bucket": "symbol", "query": "phoenix6 TalonFX python class", "relevant": ["phoenix6-python/2026/phoenix6.hardware.TalonFX"], "language": "python", "split": "train", "author": "llm"}
+{"id": "q237", "bucket": "howto", "query": "choreo SwerveTrajectory sample_at python", "relevant": ["choreolib-python/2026/choreo.SwerveTrajectory"], "language": "python", "split": "train", "author": "llm"}
