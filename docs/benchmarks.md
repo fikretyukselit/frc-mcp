@@ -1,5 +1,40 @@
 # Benchmarks
 
+## Agent-level eval (M4 exit criterion, 2026-09-29)
+
+**Question:** does the same coding agent write robot code that compiles more often with frc-mcp than without it?
+
+**Setup** (`cmd/agenteval`, `eval/tasks/`):
+- 26 tasks: 20 for 2027 (WPILib 2027.0.0-alpha-7 and the vendors' 2027 alphas) and 6 control tasks for 2026. Prompts
+  are what a student would ask and name the season and library versions, never the API under test (a test enforces
+  this). Every task has a reference solution that compiles and that `frc_verify_code` finds clean.
+- The agent is the claude CLI, headless, in an empty GradleRIO project (build file and vendordeps only), with file
+  tools only: no shell and no web in either condition. The two conditions differ only in the frc-mcp server being
+  attached. Every run records the MCP servers of the session, and a baseline run that sees one aborts.
+- The result is compiled with `javac --release 25` (2027) or `17` (2026) against the exact Maven artifacts GradleRIO's
+  `WPIJavaDepsExtension` puts on the classpath, plus the task's vendordeps and WPILib's annotation processors and javac
+  plugin (so an ignored `@NoDiscard` result fails the build as in Gradle). It does not run Gradle, tests or simulation.
+- Results: `eval/results/2026-09-29-*.jsonl`, one line per run with the agent's tool calls, turns, compile output and
+  the verifier's error count. Reproduce with `agenteval run --model sonnet --trials 3 --out FILE` and `agenteval report
+  FILE`.
+
+| Model | Trials | Compile pass with frc-mcp | Without | Paired difference over 26 tasks (95% bootstrap) | 2027 only | 2026 control |
+|---|---|---|---|---|---|---|
+| Sonnet (claude-sonnet-5-5) | 3 | **98.7%** (77/78) | 38.5% (30/78) | **+60.3 pp** (+43.6 to +76.9) | 98.3% vs 20.0% | 100% vs 100% |
+| Haiku (claude-haiku-4-5) | 1 | 34.6% (9/26) | 19.2% (5/26) | **+15.4 pp** (+3.8 to +30.8) | 15.0% vs 0.0% | 100% vs 83.3% |
+
+**Reading the numbers:**
+- **The gain is all in the season the model does not know.** On 2026 both conditions pass (the model's training data
+  covers it); on 2027 Sonnet without frc-mcp passes 20%, and with it 98%. Without the server it writes
+  `edu.wpi.first.*` imports, `ChassisSpeeds`, `SmartDashboard` and `new TalonFX(id, "canivore")` in a 2027 project.
+- **Exit criterion (≥ +20 pp): met for Sonnet, not for Haiku.** Haiku calls frc_api and frc_search (6 calls per run)
+  but never frc_verify_code, and 17 of its 20 2027 attempts fail to compile. Sonnet verified its code in 39 of 60
+  2027 runs; its one failure (`PWMSparkMax.set`, `setThrottle` in 2027) was in a run that did not.
+- **The verifier on agent code:** it flagged 32 of the 49 failed Sonnet compiles and 30 of the 38 failed Haiku
+  compiles, with **0 errors on code that compiled** (208 runs).
+- **Cost:** with frc-mcp Sonnet takes 12 turns instead of 7 and about 2.2× the cost of the baseline (USD 0.13 vs 0.06 per task
+  at API prices).
+
 ## Migration and verification on real team code (M4, 2026-09-29)
 
 12 public 2026 team repositories (Java, plus 6328's C++ tools), shallow-cloned from GitHub: 6328 Mechanical Advantage,
