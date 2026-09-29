@@ -18,6 +18,17 @@ with cited sources, and checks code against the real API before the agent says i
 classpath. With frc-mcp, **98.7%** of Sonnet's solutions compile, against **38.5%** without it; for 2027 tasks alone,
 98% against 20%. Haiku improves by 42 points.
 
+## Use the hosted server
+
+No install needed: add `https://mrkaynak.com/frc/mcp` as a Streamable HTTP MCP server. For Claude Code:
+
+```sh
+claude mcp add --transport http frc https://mrkaynak.com/frc/mcp
+```
+
+The hosted server keeps no request content (aggregate counters only) and is rate-limited per client. It cannot read
+your files, so tools that take a `path` want the code inline; for whole-project checks install locally.
+
 ## Install
 
 Download the archive for your OS from the [latest release](https://github.com/fikretyukselit/frc-mcp/releases/latest)
