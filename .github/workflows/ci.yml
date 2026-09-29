@@ -78,3 +78,16 @@ jobs:
         run: go test ./internal/embed/m2v/
       - name: Eval gate
         run: go run ./cmd/frc-mcp eval --index .shards --ab --baseline eval/baseline.json
+  conformance:
+    # Official MCP conformance suite: the server scenarios that apply to a
+    # read-only knowledge server, over the HTTP transport on the fixture index.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: ./scripts/conformance.sh
+        env:
+          CGO_ENABLED: "0"
+
