@@ -15,9 +15,12 @@ var RedirectHosts = []string{"github.com", "objects.githubusercontent.com", "rel
 // keys). Rotation: add the new key here one release before switching the
 // publisher, remove the old one a release after.
 //
-// Empty until the Foundation generates the production key (docs/adr/0006):
-// until then sync fails closed unless keys are supplied explicitly.
-var trustedKeys = []string{}
+// 4d6c685f407388a5: production key, generated 2026-09-29 (ADR-0006 rollout);
+// its seed exists only as FRC_MCP_INDEX_KEY in the protected index-publish
+// environment.
+var trustedKeys = []string{
+	"4Puxgh/jMb9e9yNTdYVHe20jwUFuHdgEJoZEGL4SF74=",
+}
 
 // TrustedKeyring returns the compiled-in keys plus FRC_MCP_TRUSTED_KEYS
 // (for self-hosted mirrors that sign with their own key).
