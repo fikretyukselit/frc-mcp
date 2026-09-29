@@ -83,3 +83,39 @@ By contributing, you agree that your contributions are licensed under the projec
   These should be real questions students asked, mapped to the WPILib page that answers them. The current 184
   queries were written by the plan author and are biased toward the docs' own vocabulary.
 - Verify a `⚠`-marked endpoint in `docs/sources.md` and record the evidence.
+
+## 7. Adding a source or adapter
+
+Most M3 work is "teach the indexer a new upstream". The steps:
+
+1. **Probe first.** Verify the endpoint by hand (license, robots.txt, whether it serves a bulk artifact such as a zip or
+   a Maven documentation jar) and record the evidence in `docs/sources.md`. Prefer one bulk download over crawling pages.
+2. **Declare it** in `data/sources.yaml`: `id`, `adapter`, `url`, `library`, `season`, `channel`, `version`,
+   `license`, `trust` (`official` / `vendor` / `community`), `shard`, `verified`. That file is the only place endpoints
+   live; the egress allowlist is derived from it. A redirect to another host needs an `extra_hosts` entry with a comment.
+3. **Reuse an adapter if you can.** `sphinx-htmlzip` handles any Sphinx site (RTD and Furo themes); `javadoc-zip` handles
+   any Javadoc zip (vendor Java APIs are published this way on their Maven repos).
+4. **New adapter:** add a package under `internal/ingest/source/<name>/` with a
+   `Parse(path, src, rev, retrieved, emit...)` function (see `sphinx.Parse`), register the name in
+   `internal/sources/sources.go` (`Adapters`) and the switch in `internal/ingest/build/build.go`. Emitted chunks must set
+   library, season, version, trust and a stable `doc_id`. Run all text through `internal/ingest/sanitize`.
+5. **Test offline:** a small recorded input under the adapter's `testdata/` plus a table test. CI never hits the network
+   in unit tests.
+6. **Prove it helps:** `make index && make eval`. Add a few judged queries for the new library to
+   `eval/queries.jsonl`; the gate in `eval/baseline.json` must not regress (update the baseline in the same PR only when
+   metrics improve).
+
+## 8. Open work (pick one, open an issue first so two people don't take the same item)
+
+| Item | Size | Where |
+|---|---|---|
+| Human-written eval holdout (≈ 50 real student questions) | S, no Go needed | `eval/queries.jsonl` |
+| Run `frc-mcp verify` on your team's code, report false errors | S | issues |
+| Vendor docs: REV, PhotonVision, PathPlanner, Choreo, YAGSL, AdvantageKit, CTRE | M each | §7, `data/sources.yaml` |
+| Vendor Java APIs (Javadoc zips from vendor Maven repos) | M each | `javadoc-zip` adapter |
+| C++ symbols (Doxygen XML) and Python symbols (`.pyi` from robotpy) | L | new adapters |
+| Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |
+| `frc_whats_new` (release notes, fenced as untrusted) and `frc_hardware` | L | `internal/mcpserver`, `docs/mcp-surface.md` |
+| MCP conformance suite and goreleaser snapshot in CI; sync check on all 3 OSes | M | `.github/workflows/` |
+| Packaging: Homebrew, Scoop, Winget | M | `.goreleaser.yaml` |
+| M4: `frc_migrate`, Java member-level verification, agent compile-pass eval | L | `CLAUDE.md` §9 |
