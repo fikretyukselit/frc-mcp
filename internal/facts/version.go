@@ -4,6 +4,7 @@
 package facts
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -131,4 +132,28 @@ func SeasonFor(library, v string) string {
 		return strconv.Itoa(2001 + core[0])
 	}
 	return s
+}
+
+// VendordepYear is a vendordep's declared year: frcYear ("2026"), or the
+// wpilibYear that replaces it from 2027 ("2027_alpha7"); "" when neither.
+func VendordepYear(frcYear, wpilibYear any) string {
+	for _, v := range []any{frcYear, wpilibYear} {
+		if v != nil {
+			if s := fmt.Sprint(v); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// DeclaredSeason is the season of a declared vendordep year ("2026",
+// "2027_alpha7" → "2027"), or "".
+func DeclaredSeason(year string) string {
+	if len(year) >= 4 && (len(year) == 4 || year[4] < '0' || year[4] > '9') {
+		if y, err := strconv.Atoi(year[:4]); err == nil && y >= 2020 && y <= 2039 {
+			return year[:4]
+		}
+	}
+	return ""
 }

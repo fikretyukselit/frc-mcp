@@ -16,6 +16,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/fikretyukselit/frc-mcp/internal/facts"
 )
 
 const (
@@ -165,10 +167,10 @@ func Detect(root string) (*Project, error) {
 			p.Warnings = append(p.Warnings, "vendordeps/"+n+": invalid JSON")
 			continue
 		}
-		vd := Vendordep{File: "vendordeps/" + n, Name: v.Name, Version: v.Version, FRCYear: VendordepYear(v.FRCYear, v.WPILibYear),
+		vd := Vendordep{File: "vendordeps/" + n, Name: v.Name, Version: v.Version, FRCYear: facts.VendordepYear(v.FRCYear, v.WPILibYear),
 			UUID: v.UUID, JSONURL: v.JSONURL}
 		p.Vendordeps = append(p.Vendordeps, vd)
-		if yr := seasonOf.FindString(vd.FRCYear); p.Season != "" && yr != "" && yr != p.Season {
+		if yr := facts.DeclaredSeason(vd.FRCYear); p.Season != "" && yr != "" && yr != p.Season {
 			p.Warnings = append(p.Warnings, fmt.Sprintf("%s (%s) declares frcYear=%s but the project is WPILib %s (season %s); update or re-import it",
 				vd.Name, vd.File, vd.FRCYear, p.WPILib, p.Season))
 		}
@@ -295,17 +297,4 @@ func (p *Project) PinOf() Pin {
 		}
 	}
 	return pin
-}
-
-// VendordepYear is a vendordep's declared year: frcYear ("2026"), or the
-// wpilibYear that replaces it from 2027 ("2027_alpha7"); "" when neither.
-func VendordepYear(frcYear, wpilibYear any) string {
-	for _, v := range []any{frcYear, wpilibYear} {
-		if v != nil {
-			if s := fmt.Sprint(v); s != "" {
-				return s
-			}
-		}
-	}
-	return ""
 }

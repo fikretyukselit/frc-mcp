@@ -192,10 +192,12 @@ Detects or declares the project's pin set.
      behavior), each citing the PR, changelog or docs page it comes from. The index build validates every `from`
      against the from-season table and every `to` against the to-season table and fails on a mismatch, so a rule
      cannot drift from the tables it describes. A historical rule, from before the oldest indexed table of its
-     library (REVLib 2024 → 2025), is checked against the oldest newer table: the old name must be gone and the new one
-     present. Confidence `high` (`medium` for rules marked `verified: false`). Rules are the project's own data (MIT)
-     and always go to a publishable shard, even when the library's table is license-restricted; without the table a
-     rule maps its name alone, with a note saying so.
+     library in `data/sources.yaml` (REVLib 2024 → 2025), is checked against the oldest declared table at or after its
+     to season: the new name must be there and, for a change in an earlier season, the old one gone. A rule that no
+     declared table can check fails the build. Confidence `high` (`medium` for rules marked `verified: false`).
+     Rules are the project's own data (MIT) and live in their own `migrations` shard, published whatever the licenses
+     of the tables they describe; a partial run that does not build every table the rules name leaves that shard as
+     it is. Without a table, a rule maps its name alone, with a note saying so.
   2. `upstream`: the library's own deprecation note (`@deprecated Use X`), resolved to a target-season symbol when it
      names one uniquely. Confidence `medium`, or `low` when the note names no indexed symbol.
   3. `generated`: `apisym.Diff`'s same-name moves between consecutive seasons (e.g. `edu.wpi.first.math.geometry.Pose2d`

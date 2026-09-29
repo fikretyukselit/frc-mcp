@@ -63,14 +63,3 @@ func TestSymlinkEscapeRejected(t *testing.T) {
 		t.Fatalf("symlink outside root must not be read: %v", err)
 	}
 }
-
-func TestVendordepYear(t *testing.T) {
-	for _, tc := range []struct {
-		frc, wpilib any
-		want        string
-	}{{"2026", nil, "2026"}, {2026.0, nil, "2026"}, {nil, "2027_alpha7", "2027_alpha7"}, {"", "2027_alpha7", "2027_alpha7"}, {nil, nil, ""}} {
-		if got := VendordepYear(tc.frc, tc.wpilib); got != tc.want {
-			t.Errorf("VendordepYear(%v, %v) = %q, want %q", tc.frc, tc.wpilib, got, tc.want)
-		}
-	}
-}

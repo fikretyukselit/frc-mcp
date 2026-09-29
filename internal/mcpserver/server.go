@@ -364,7 +364,7 @@ func (s *Server) api(ctx context.Context, _ *mcp.CallToolRequest, in APIIn) (*mc
 // CANSparkMax), a later season's name, or a type of a library whose table
 // this index leaves out (license-restricted vendor APIs).
 func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, name, lang, season string) {
-	restricted := ""
+	restricted, restrictedLang := "", ""
 	for _, mr := range e.Migrations() {
 		if lang != "" && mr.Language != lang {
 			continue
@@ -377,9 +377,9 @@ func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, nam
 				ToSeason: mr.ToSeason, Language: mr.Language, Library: mr.Library, Kind: mr.Kind, Notes: mr.Notes,
 				Confidence: map[bool]string{true: "high", false: "medium"}[mr.Verified], Source: migrate.SrcCurated,
 				RuleID: mr.RuleID, Citation: mr.Citation})
-		case restricted == "" && verify.RestrictedPublisher(mr.Library) != "" && (migrate.NameIs(owner, name) || migrate.NameIs(mr.From, name)) &&
+		case restricted == "" && verify.RestrictedPublisher(mr.Library, mr.Language) != "" && (migrate.NameIs(owner, name) || migrate.NameIs(mr.From, name)) &&
 			e.LibraryVersion(ctx, mr.Library, season, mr.Language) == "":
-			restricted = mr.Library
+			restricted, restrictedLang = mr.Library, mr.Language
 		}
 	}
 	// Only names differing in case (YAGSL's TALONFX for TalonFX) are no answer.
@@ -399,7 +399,7 @@ func apiCurated(ctx context.Context, e *retrieve.Engine, out *render.APIOut, nam
 	if restricted != "" && noExact {
 		out.Next = append([]string{fmt.Sprintf("%s is a %s name, but this index has no %s %s API table: %s grants no redistribution license, "+
 			"so the published index leaves it out. Use frc_search for its docs, frc_migrate for curated changes, or build the index locally (frc-mcp index run)",
-			name, verify.LibraryName(restricted), season, verify.LibraryName(restricted), verify.RestrictedPublisher(restricted))}, out.Next...)
+			name, verify.LibraryName(restricted), season, verify.LibraryName(restricted), verify.RestrictedPublisher(restricted, restrictedLang))}, out.Next...)
 	}
 }
 
@@ -1005,9 +1005,10 @@ func (s *Server) vendordep(_ context.Context, _ *mcp.CallToolRequest, in Vendord
 	for _, c := range l.Conflicts {
 		info.ConflictsWith = append(info.ConflictsWith, c.ErrorMessage)
 	}
-	if yr := l.FRCYear; yr != "" && yr != in.Season {
+	// 2027 entries declare wpilibYear "2027_alpha7": compare its season.
+	if yr := l.FRCYear; yr != "" && facts.DeclaredSeason(yr) != in.Season {
 		out.Status = retrieve.StatusVersionMismatch
-		out.Next = append(out.Next, fmt.Sprintf("the newest catalog entry declares frcYear %s, not %s: the vendor may not have published a %s release yet", yr, in.Season, in.Season))
+		out.Next = append(out.Next, fmt.Sprintf("the newest catalog entry declares year %s, not %s: the vendor may not have published a %s release yet", yr, in.Season, in.Season))
 	}
 	out.Library = info
 	return text(render.VendordepMarkdown(out)), out, nil

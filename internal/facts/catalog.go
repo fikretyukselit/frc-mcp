@@ -179,15 +179,13 @@ func ParseInstalled(s string) (Installed, error) {
 			Version string `json:"version"`
 			UUID    string `json:"uuid"`
 			FRCYear any    `json:"frcYear"`
+			// 2027 vendordeps name it wpilibYear ("2027_alpha7").
+			WPILibYear any `json:"wpilibYear"`
 		}
 		if err := json.Unmarshal([]byte(s), &v); err != nil {
 			return Installed{}, fmt.Errorf("vendordep JSON: %w", err)
 		}
-		in := Installed{Name: v.Name, Version: v.Version, UUID: v.UUID}
-		if v.FRCYear != nil {
-			in.FRCYear = fmt.Sprint(v.FRCYear)
-		}
-		return in, nil
+		return Installed{Name: v.Name, Version: v.Version, UUID: v.UUID, FRCYear: VendordepYear(v.FRCYear, v.WPILibYear)}, nil
 	}
 	name, ver, ok := strings.Cut(s, "@")
 	if !ok || name == "" || ver == "" {
@@ -229,14 +227,14 @@ func (c *Catalog) Check(installed []Installed, season string) []Finding {
 			if m.Latest.JSONURL != "" {
 				f.Fix = "./gradlew vendordep --url=" + m.Latest.JSONURL
 			}
-			yr := Season(in.FRCYear)
+			yr := DeclaredSeason(in.FRCYear)
 			if yr == "" {
 				yr = in.FRCYear
 			}
 			switch cmp := CompareVersions(in.Version, m.Latest.Version); {
 			case in.FRCYear != "" && yr != season:
 				f.Status = "wrong_year"
-				f.Message = fmt.Sprintf("%s %s declares frcYear %s but the project targets %s; install the %s version (%s)",
+				f.Message = fmt.Sprintf("%s %s declares year %s but the project targets %s; install the %s version (%s)",
 					in.Name, in.Version, in.FRCYear, season, season, m.Latest.Version)
 			case cmp < 0:
 				f.Status = "outdated"

@@ -16,11 +16,16 @@ type curator interface {
 // restrictedLibs are the libraries whose API tables carry a LicenseRef-*
 // license (data/sources.yaml): built locally, left out of the published
 // index until the publisher grants redistribution (docs/sources.md §0.2).
-var restrictedLibs = map[string]string{"phoenix6": "CTRE", "revlib": "REV Robotics"}
+// Keyed by library and language: REVLib's C++ headers and RobotPy wheels are
+// BSD-3-Clause and published, only its Java table is restricted.
+var restrictedLibs = map[[2]string]string{
+	{"phoenix6", "java"}: "CTRE", {"phoenix6", "cpp"}: "CTRE", {"phoenix6", "python"}: "CTRE",
+	{"revlib", "java"}: "REV Robotics",
+}
 
-// RestrictedPublisher names the publisher of a library whose API table is
-// license-restricted, or "".
-func RestrictedPublisher(lib string) string { return restrictedLibs[lib] }
+// RestrictedPublisher names the publisher of a library whose API table in a
+// language is license-restricted, or "".
+func RestrictedPublisher(lib, lang string) string { return restrictedLibs[[2]string{lib, lang}] }
 
 // LibraryName is the display name of a library id ("phoenix6" → "Phoenix 6").
 func LibraryName(lib string) string { return libName(lib) }
@@ -31,7 +36,7 @@ func noTable(lib, lang, season string) string {
 	if lang != "java" {
 		what = season + " " + lang + " API"
 	}
-	if pub := restrictedLibs[lib]; pub != "" {
+	if pub := RestrictedPublisher(lib, lang); pub != "" {
 		return fmt.Sprintf("none (no %s table: %s grants no redistribution license, so the published index leaves it out; "+
 			"`frc-mcp index run` builds it locally. Curated renames and removals are still checked)", what, pub)
 	}
