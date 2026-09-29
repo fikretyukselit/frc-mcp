@@ -69,6 +69,8 @@ jobs:
       - name: Build index
         env:
           CGO_ENABLED: "0"
+          # Read-only; api.github.com listings are rate-limited per runner IP without it.
+          GITHUB_TOKEN: ${{ github.token }}
         run: go run ./cmd/frc-mcp index run --out .shards
       - name: model2vec golden test (needs the downloaded model)
         env:
