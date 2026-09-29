@@ -583,7 +583,7 @@ sources:
     language: cpp
     license: BSD-3-Clause
     trust: vendor
-    shard: vendor-restricted-api-2026
+    shard: vendor-api-2026
     verified: true # probed 2026-09-29 (142 KB; redirects to REV-Software-Binaries release assets)
   - id: revlib-cpp-2027
     adapter: cpp-headers-zip
@@ -597,7 +597,7 @@ sources:
     language: cpp
     license: BSD-3-Clause
     trust: vendor
-    shard: vendor-restricted-api-2027
+    shard: vendor-api-2027
     verified: true # probed 2026-09-29 (145 KB)
   # PhotonVision serves one C++ Doxygen build (javadocs.photonvision.org/cpp/,
   # currently the 2027 alpha); /release/cpp/ does not exist, so both seasons

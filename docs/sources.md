@@ -158,7 +158,7 @@ code license):
 | REVLib Java API | none found in `REVLib-java` jars | **no** (`LicenseRef-REVLib-API`) |
 | PhotonLib / PhotonTargeting Java API | GPL-3.0 (repository) | yes |
 | Phoenix 6 C++ API (headers) | CTRE EULA (`CTRE_LICENSE.txt` in the zip): the Software, "including … documentation", may not be distributed or made available to any third party | **no** (`LicenseRef-CTRE-Phoenix-API`, shard `vendor-restricted-api-*`) |
-| REVLib C++ API (headers) | BSD-3-Clause (`LICENSE.txt` and each header) | **not yet**: the table is recorded as BSD-3-Clause but kept in `vendor-restricted-api-*` next to REVLib Java by project policy, so that shard stays unpublished until REV confirms. It could move to `vendor-api-*` on that confirmation. |
+| REVLib C++ API (headers) | BSD-3-Clause (`LICENSE.txt` and each header) | **yes** (`vendor-api-*`, with the BSD notice in the citation), like the robotpy-rev Python tables; REVLib Java (no license) stays in `vendor-restricted-api-*` |
 | PhotonLib C++ API (headers) | photonlib-cpp: MIT; photontargeting-cpp: GPL-3.0 (the `LICENSE` in each zip) | yes |
 | PathPlannerLib Java API | MIT | yes |
 | ChoreoLib Java API | BSD-3-Clause | yes |
