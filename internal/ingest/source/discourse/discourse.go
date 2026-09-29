@@ -84,9 +84,8 @@ type item struct {
 type post struct {
 	docID    string // <library>/topic-<id> | <library>/post-<id>, from the GUID
 	topicID  string
-	number   int // post number within the topic (1 = the topic's first post)
-	url      string
-	anchor   string
+	number   int    // post number within the topic (1 = the topic's first post)
+	url      string // canonical permalink
 	pub      time.Time
 	title    string
 	category string
@@ -96,7 +95,8 @@ type post struct {
 
 var (
 	guidRe     = regexp.MustCompile(`-(topic|post)-([0-9]{1,12})$`)
-	topicPath  = regexp.MustCompile(`^/t/[^/]+/([0-9]{1,12})(?:/([0-9]{1,6}))?/?$`)
+	topicPath  = regexp.MustCompile(`^/t/([^/]+)/([0-9]{1,12})(?:/([0-9]{1,6}))?/?$`)
+	pageQuery  = regexp.MustCompile(`^page=[0-9]{1,6}$`)
 	postAnchor = regexp.MustCompile(`^post_([0-9]{1,6})$`)
 	username   = regexp.MustCompile(`^[\p{L}\p{N}_.-]{1,60}$`)
 	footerRe   = regexp.MustCompile(`(?i)^(\d+ posts? - \d+ participants?|read full topic)$`)
@@ -215,20 +215,21 @@ func parseItem(it item, host, library, want string) (post, bool) {
 		return p, false
 	}
 	u, err := url.Parse(strings.TrimSpace(it.Link))
-	if err != nil || u.Scheme != "https" || u.Host != host || u.RawQuery != "" {
+	// posts.rss links long topics with ?page=N; nothing else is expected.
+	if err != nil || u.Scheme != "https" || u.Host != host || (u.RawQuery != "" && !pageQuery.MatchString(u.RawQuery)) {
 		return p, false
 	}
 	lm := topicPath.FindStringSubmatch(u.Path)
 	if lm == nil {
 		return p, false
 	}
-	p.topicID, p.number = lm[1], 1
-	if lm[2] != "" {
-		p.number, _ = strconv.Atoi(lm[2])
+	slug := lm[1]
+	p.topicID, p.number = lm[2], 1
+	if lm[3] != "" {
+		p.number, _ = strconv.Atoi(lm[3])
 	}
 	if am := postAnchor.FindStringSubmatch(u.Fragment); am != nil {
 		p.number, _ = strconv.Atoi(am[1])
-		p.anchor = u.Fragment
 	}
 	if want == "topic" && m[2] != p.topicID {
 		return p, false // GUID and link disagree about which topic this is
@@ -240,7 +241,13 @@ func parseItem(it item, host, library, want string) (post, bool) {
 		}
 	}
 	p.pub = p.pub.UTC()
-	u.Fragment = ""
+	// Cite the canonical permalink: /t/<slug>/<topic> for a first post,
+	// /t/<slug>/<topic>/<n> for a reply (stable when the page count grows).
+	u.RawQuery, u.RawPath, u.Fragment = "", "", ""
+	u.Path = "/t/" + slug + "/" + p.topicID
+	if p.number > 1 {
+		u.Path += "/" + strconv.Itoa(p.number)
+	}
 	p.url = u.String()
 	p.docID = library + "/" + m[1] + "-" + m[2]
 	p.title = line(it.Title)
@@ -292,7 +299,7 @@ func emitPost(p post, src sources.Source, retrieved time.Time, emit func(index.C
 	for ord, part := range chunking.Split(p.body) {
 		if err := emit(index.Chunk{DocID: p.docID, Ord: ord, Library: src.Library, VersionLo: season, Season: season,
 			Channel: "stable", Language: language(p.category), Kind: "forum", Title: p.title, HeadingPath: heading,
-			Body: part, SourceURL: p.url, Anchor: p.anchor, UpstreamRev: rev, RetrievedAt: retrieved,
+			Body: part, SourceURL: p.url, UpstreamRev: rev, RetrievedAt: retrieved,
 			License: src.License, Trust: src.Trust, Suspect: suspect}); err != nil {
 			return false, err
 		}

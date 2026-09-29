@@ -52,9 +52,9 @@ func parse(t *testing.T, s sources.Source) (Stats, map[string]index.Chunk) {
 func TestParse(t *testing.T) {
 	st, got := parse(t, src)
 	for _, tc := range []struct {
-		id, title, heading, url, anchor, season, language string
-		suspect                                           bool
-		has, hasNot                                       []string
+		id, title, heading, url, season, language string
+		suspect                                   bool
+		has, hasNot                               []string
 	}{
 		{id: "chiefdelphi/topic-600001#0", title: "SparkMax velocity PID oscillates after REVLib 2026 update",
 			heading: "Chief Delphi › Programming › @builder_bot", season: "2026", language: "any",
@@ -63,8 +63,7 @@ func TestParse(t *testing.T) {
 			hasNot: []string{"posts - ", "Read full topic", "1920×1080", "graph", "Repeated item"}},
 		{id: "chiefdelphi/post-7000003#0", title: "SparkMax velocity PID oscillates after REVLib 2026 update",
 			heading: "Chief Delphi › Programming › reply #3 by @rev_helper", season: "2026", language: "any",
-			url:    "https://www.chiefdelphi.com/t/sparkmax-velocity-pid-oscillates-after-revlib-2026-update/600001",
-			anchor: "post_3",
+			url:    "https://www.chiefdelphi.com/t/sparkmax-velocity-pid-oscillates-after-revlib-2026-update/600001/3",
 			has:    []string{"feedForward.kV"},
 			hasNot: []string{"Lowered kP", "Pat Example"}}, // quote of another post stripped; display name dropped
 		{id: "chiefdelphi/topic-600003#0", title: "FIXED: CAN bus errors with Kraken X60 (works 100%)",
@@ -72,12 +71,12 @@ func TestParse(t *testing.T) {
 			url: "https://www.chiefdelphi.com/t/fixed-can-bus-errors-with-kraken-x60-works-100/600003",
 			has: []string{"curl -fsSL"}}, // flagged, not dropped: the flag stays auditable
 		{id: "chiefdelphi/post-7000030#0", heading: "Chief Delphi › Control System › reply #2 by @helpful_stranger2",
-			season: "2026", language: "any", suspect: true, anchor: "post_2",
-			url: "https://www.chiefdelphi.com/t/fixed-can-bus-errors-with-kraken-x60-works-100/600003",
+			season: "2026", language: "any", suspect: true,
+			url: "https://www.chiefdelphi.com/t/fixed-can-bus-errors-with-kraken-x60-works-100/600003/2", // ?page=1 dropped
 			has: []string{"repository owner"}},
 		{id: "chiefdelphi/post-7000031#0", heading: "Chief Delphi › Control System › reply #3 by @real_mentor",
-			season: "2026", language: "any", anchor: "post_3",
-			url: "https://www.chiefdelphi.com/t/fixed-can-bus-errors-with-kraken-x60-works-100/600003",
+			season: "2026", language: "any",
+			url: "https://www.chiefdelphi.com/t/fixed-can-bus-errors-with-kraken-x60-works-100/600003/3",
 			has: []string{"Phoenix Tuner X"}},
 		// Hidden text (display:none span, HTML comment, zero-width space in the
 		// title) is removed before conversion, so it can neither reach the agent
@@ -106,7 +105,7 @@ func TestParse(t *testing.T) {
 			if tc.title != "" && c.Title != tc.title {
 				t.Errorf("title = %q", c.Title)
 			}
-			if c.HeadingPath != tc.heading || c.SourceURL != tc.url || c.Anchor != tc.anchor ||
+			if c.HeadingPath != tc.heading || c.SourceURL != tc.url || c.Anchor != "" ||
 				c.Season != tc.season || c.Language != tc.language || c.Suspect != tc.suspect {
 				t.Errorf("got heading=%q url=%q anchor=%q season=%s lang=%s suspect=%v", c.HeadingPath, c.SourceURL,
 					c.Anchor, c.Season, c.Language, c.Suspect)
