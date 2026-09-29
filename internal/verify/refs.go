@@ -47,7 +47,7 @@ func DetectLanguage(code string) string {
 
 var (
 	javaHint = regexp.MustCompile(`(?m)^[ \t]*(?:import[ \t]+[\w.]+(?:\.\*)?[ \t]*;|package[ \t]+[\w.]+;|public[ \t]+(?:final[ \t]+)?class\b)`)
-	cppHint  = regexp.MustCompile(`(?m)^[ \t]*#include\b|\b(?:frc2?|wpi|ctre|rev|units)::\w`)
+	cppHint  = regexp.MustCompile(`(?m)^[ \t]*#include\b|\b(?:frc2?|wpi|ctre|rev|photon|pathplanner|choreo|units)::\w`)
 	pyHint   = regexp.MustCompile(`(?m)^[ \t]*(?:from[ \t]+[\w.]+[ \t]+import\b|import[ \t]+[\w.]+[ \t]*$|def[ \t]+\w+\(|class[ \t]+\w+(?:\([\w., ]*\))?:)`)
 )
 

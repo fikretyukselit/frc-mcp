@@ -80,6 +80,8 @@ func TestDetectLanguage(t *testing.T) {
 	for code, want := range map[string]string{
 		"package frc.robot;\nimport edu.wpi.first.wpilibj.TimedRobot;": "java",
 		"#include <frc/TimedRobot.h>\nint x;":                          "cpp",
+		"photon::PhotonCamera camera{\"front\"};":                      "cpp",
+		"ctre::phoenix6::hardware::TalonFX motor{1};":                  "cpp",
 		"import wpilib\n\nclass Robot(wpilib.TimedRobot):\n  pass":     "python",
 		"hello": "",
 	} {
