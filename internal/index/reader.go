@@ -285,6 +285,24 @@ func (r *Reader) SymbolsReplacedBy(ctx context.Context, fqn, season string) ([]S
 	return out, rows.Err()
 }
 
+// Licenses lists the distinct chunk licenses in the shard (publish policy).
+func (r *Reader) Licenses(ctx context.Context) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT license FROM chunk ORDER BY license`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var l string
+		if err := rows.Scan(&l); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
 // DocExists reports whether any chunk belongs to docID.
 func (r *Reader) DocExists(ctx context.Context, docID string) bool {
 	var one int

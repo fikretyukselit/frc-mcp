@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -27,7 +28,18 @@ type PublishOptions struct {
 	Key     ed25519.PrivateKey
 	TTL     time.Duration // expiry window (default 30 days)
 	Now     time.Time
+
+	// IncludeUnlicensed publishes shards with content whose license is a
+	// LicenseRef-* (the vendor publishes no license; docs/sources.md §4).
+	// Off by default: such shards are built and usable locally, but only
+	// redistributed once permission is recorded.
+	IncludeUnlicensed bool
+	// OnSkip is told about every shard left out of the manifest.
+	OnSkip func(shard, reason string)
 }
+
+// Unlicensed reports whether a chunk license means "no redistribution grant".
+func Unlicensed(license string) bool { return strings.HasPrefix(license, "LicenseRef-") }
 
 // Publish packages every shard in InDir (with vector layers and models) into
 // OutDir and writes a signed manifest. Object names are content-addressed, so
@@ -58,7 +70,17 @@ func Publish(ctx context.Context, o PublishOptions) (*Manifest, error) {
 			return nil, fmt.Errorf("publish: %w", err)
 		}
 		meta := r.Meta()
+		lics, err := r.Licenses(ctx)
 		r.Close()
+		if err != nil {
+			return nil, fmt.Errorf("publish: %s: %w", p, err)
+		}
+		if bad := slices.DeleteFunc(lics, func(l string) bool { return !Unlicensed(l) }); len(bad) > 0 && !o.IncludeUnlicensed {
+			if o.OnSkip != nil {
+				o.OnSkip(meta.Name, "unlicensed content ("+strings.Join(bad, ", ")+"); pass --include-unlicensed once permission is recorded")
+			}
+			continue
+		}
 		sh := Shard{Name: meta.Name, BuildID: meta.BuildID}
 		for _, sc := range meta.Seasons {
 			sh.Seasons = append(sh.Seasons, sc.Season)

@@ -86,6 +86,7 @@ func indexPublish(ctx context.Context, args []string) error {
 	prev := fs.String("prev", "", "previous manifest.json (for the monotonic serial); empty = serial 1")
 	keyEnv := fs.String("key-env", "FRC_MCP_INDEX_KEY", "environment variable holding the base64 ed25519 private key")
 	ttl := fs.Duration("ttl", 30*24*time.Hour, "manifest validity")
+	unlicensed := fs.Bool("include-unlicensed", false, "also publish shards whose content has no redistribution license (LicenseRef-*)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -106,7 +107,9 @@ func indexPublish(ctx context.Context, args []string) error {
 			}
 		}
 	}
-	m, err := dist.Publish(ctx, dist.PublishOptions{InDir: *in, OutDir: *out, Channel: *channel, Prev: pm, Key: priv, TTL: *ttl})
+	m, err := dist.Publish(ctx, dist.PublishOptions{InDir: *in, OutDir: *out, Channel: *channel, Prev: pm, Key: priv, TTL: *ttl,
+		IncludeUnlicensed: *unlicensed,
+		OnSkip:            func(shard, reason string) { fmt.Fprintf(os.Stderr, "skipped %s: %s\n", shard, reason) }})
 	if err != nil {
 		return err
 	}

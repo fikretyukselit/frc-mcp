@@ -93,12 +93,3 @@ func TestParseBothThemes(t *testing.T) {
 		})
 	}
 }
-
-func TestSplitNeverBreaksFence(t *testing.T) {
-	code := "```java\n" + strings.Repeat("x();\n\n", 800) + "```"
-	for _, part := range split(strings.Repeat("para.\n\n", 50) + code + "\n\ntrailing") {
-		if strings.Count(part, "```")%2 != 0 {
-			t.Fatalf("fence split: ...%s", part[max(0, len(part)-40):])
-		}
-	}
-}

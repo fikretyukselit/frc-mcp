@@ -7,12 +7,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,5 +157,47 @@ func TestParseKeyring(t *testing.T) {
 	}
 	if _, err := ParseKeyring("not-a-key"); err == nil {
 		t.Fatal("want error")
+	}
+}
+
+func TestPublishSkipsUnlicensed(t *testing.T) {
+	e := setup(t)
+	// A second shard whose content has no redistribution license.
+	b, err := os.ReadFile(filepath.Join(testfixture.Root(), "chunks.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var line string
+	for _, l := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(l, "{") {
+			line = l
+			break
+		}
+	}
+	var c map[string]any
+	if err := json.Unmarshal([]byte(line), &c); err != nil {
+		t.Fatal(err)
+	}
+	c["license"] = "LicenseRef-Vendor-NoLicense"
+	lb, _ := json.Marshal(c)
+	jl := filepath.Join(t.TempDir(), "u.jsonl")
+	if err := os.WriteFile(jl, append(lb, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := index.BuildFromJSONL(context.Background(), filepath.Join(e.in, "vendor-x.sqlite"), "vendor-x", jl, ""); err != nil {
+		t.Fatal(err)
+	}
+	var skipped []string
+	m, err := Publish(context.Background(), PublishOptions{InDir: e.in, OutDir: e.out, Channel: "stable", Key: e.priv,
+		OnSkip: func(s, _ string) { skipped = append(skipped, s) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Shards) != 1 || m.Shards[0].Name != "fixture" || len(skipped) != 1 || skipped[0] != "vendor-x" {
+		t.Fatalf("shards %+v skipped %v", m.Shards, skipped)
+	}
+	m, err = Publish(context.Background(), PublishOptions{InDir: e.in, OutDir: e.out, Channel: "stable", Key: e.priv, IncludeUnlicensed: true})
+	if err != nil || len(m.Shards) != 2 {
+		t.Fatalf("include: %v %+v", err, m)
 	}
 }

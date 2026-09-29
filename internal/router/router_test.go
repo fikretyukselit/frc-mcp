@@ -32,6 +32,15 @@ func TestDecide(t *testing.T) {
 			Decision{Intent: IntentSymbol, Identifiers: []string{"TalonFX"}, Libraries: []string{"phoenix6"}, NonEnglish: true}},
 		{"what is a subsystem",
 			Decision{Intent: IntentHowTo}},
+		// Source seasons do not pin the query.
+		{"migrate REVLib 2024 code to the current API",
+			Decision{Intent: IntentGeneral, Identifiers: []string{"REVLib"}, Libraries: []string{"revlib"}}},
+		{"REVLib 2024 or older configuration",
+			Decision{Intent: IntentGeneral, Identifiers: []string{"REVLib"}, Libraries: []string{"revlib"}}},
+		{"migrate from 2026 to 2027",
+			Decision{Intent: IntentGeneral, Season: "2027"}},
+		{"closed loop on a spark max",
+			Decision{Intent: IntentGeneral, Libraries: []string{"revlib"}}},
 	} {
 		got := Decide(tc.q)
 		if d := cmp.Diff(tc.want, got, cmpopts.EquateEmpty()); d != "" {

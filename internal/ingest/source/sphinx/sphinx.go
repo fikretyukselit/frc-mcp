@@ -23,13 +23,9 @@ import (
 	"golang.org/x/net/html/atom"
 
 	"github.com/fikretyukselit/frc-mcp/internal/index"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/chunking"
 	"github.com/fikretyukselit/frc-mcp/internal/sources"
 	"github.com/fikretyukselit/frc-mcp/internal/textutil"
-)
-
-const (
-	maxChunkTokens = 650
-	minChunkTokens = 12
 )
 
 // skipDirs are sections of the site that do not help an agent write robot
@@ -113,6 +109,14 @@ func skip(rel string) bool {
 	return rel == "index.html"
 }
 
+func toChunking(bs []block) []chunking.Block {
+	out := make([]chunking.Block, len(bs))
+	for i, b := range bs {
+		out[i] = chunking.Block{Lang: b.lang, Text: b.text}
+	}
+	return out
+}
+
 // block is one Markdown block; lang is "" for content shared by all languages.
 type block struct {
 	lang string
@@ -178,86 +182,27 @@ func pageChunks(doc *html.Node, rel string, src sources.Source, rev string, retr
 	}
 	docID := src.Library + "-docs/" + src.Season + "/" + strings.TrimSuffix(rel, ".html")
 	kind := "prose"
-	if strings.HasPrefix(rel, "yearly-overview/") {
+	if strings.HasPrefix(rel, "yearly-overview/") || strings.Contains(rel, "yearly-changes/") || strings.Contains(rel, "migration/") {
 		kind = "release"
 	}
 	var out []index.Chunk
 	ord := 0
 	for _, x := range secs {
-		for _, v := range variants(x.s.blocks) {
-			for _, part := range split(v.text) {
-				if textutil.EstimateTokens(part) < minChunkTokens {
+		for _, v := range chunking.Variants(toChunking(x.s.blocks)) {
+			for _, part := range chunking.Split(v.Text) {
+				if textutil.EstimateTokens(part) < chunking.MinTokens {
 					continue
 				}
 				out = append(out, index.Chunk{
 					DocID: docID, Ord: ord, Library: src.Library, VersionLo: src.Version, Season: src.Season,
-					Channel: src.Channel, Language: v.lang, Kind: kind, Title: title,
+					Channel: src.Channel, Language: v.Lang, Kind: kind, Title: title,
 					HeadingPath: strings.Join(x.path, " › "), Body: part, SourceURL: src.BaseURL + rel,
 					Anchor: x.s.anchor, UpstreamRev: rev, RetrievedAt: retrieved, License: src.License,
-					Trust: src.Trust, Authority: 3,
+					Trust: src.Trust, Authority: authority(src.Trust),
 				})
 				ord++
 			}
 		}
-	}
-	return out
-}
-
-type variant struct{ lang, text string }
-
-// variants renders a section once per language present in its code tabs
-// (shared blocks + that language's blocks), or once as "any".
-func variants(bs []block) []variant {
-	langs := []string{}
-	for _, b := range bs {
-		if b.lang != "" && !contains(langs, b.lang) {
-			langs = append(langs, b.lang)
-		}
-	}
-	join := func(lang string) string {
-		var parts []string
-		for _, b := range bs {
-			if b.lang == "" || b.lang == lang {
-				parts = append(parts, b.text)
-			}
-		}
-		return strings.TrimSpace(strings.Join(parts, "\n\n"))
-	}
-	if len(langs) == 0 {
-		return []variant{{"any", join("")}}
-	}
-	sort.Strings(langs)
-	out := make([]variant, 0, len(langs))
-	for _, l := range langs {
-		out = append(out, variant{l, join(l)})
-	}
-	return out
-}
-
-// split cuts oversized text on paragraph boundaries, never inside a fence.
-func split(s string) []string {
-	if textutil.EstimateTokens(s) <= maxChunkTokens {
-		return []string{s}
-	}
-	var out []string
-	var cur strings.Builder
-	inFence := false
-	for _, para := range strings.Split(s, "\n\n") {
-		fences := strings.Count(para, "```")
-		if cur.Len() > 0 && !inFence && textutil.EstimateTokens(cur.String()+para) > maxChunkTokens {
-			out = append(out, strings.TrimSpace(cur.String()))
-			cur.Reset()
-		}
-		if cur.Len() > 0 {
-			cur.WriteString("\n\n")
-		}
-		cur.WriteString(para)
-		if fences%2 == 1 {
-			inFence = !inFence
-		}
-	}
-	if cur.Len() > 0 {
-		out = append(out, strings.TrimSpace(cur.String()))
 	}
 	return out
 }
@@ -592,11 +537,10 @@ func hasClass(cls, c string) bool {
 	return false
 }
 
-func contains(xs []string, v string) bool {
-	for _, x := range xs {
-		if x == v {
-			return true
-		}
+// authority ranks first-party documentation above vendor documentation.
+func authority(trust string) int {
+	if trust == "official" {
+		return 3
 	}
-	return false
+	return 2
 }

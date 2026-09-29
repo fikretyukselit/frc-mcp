@@ -36,6 +36,28 @@ Hints we record but never trust alone: sitemap `lastmod` (RTD sitemaps list vers
 - **RSS/Atom (Chief Delphi `latest.rss`, category/tag feeds; YouTube channel feeds; WPILib blog):** honor `<ttl>`, `skipHours`, `skipDays` as *minimum* intervals, `Cache-Control`, `Retry-After`; dedupe by GUID + normalized item hash; Chief Delphi JSON endpoints are Cloudflare-blocked → RSS only.
 - **PDF (Game Manual, Team Updates):** `HEAD` for ETag/Last-Modified on the season-materials page links; on change, extract with go-pdfium (Wasm), split by rule ID, diff rule-by-rule and emit a change log chunk ("R501 changed in Team Update 07").
 
+### 2.2 Implemented adapters (`data/sources.yaml` `adapter:`)
+
+| Adapter | Package | Input | Notes |
+|---|---|---|---|
+| `sphinx-htmlzip` | `internal/ingest/source/sphinx` | Read the Docs htmlzip | `sphinx_rtd_theme` and Furo; sphinx-design code tabs become per-language chunks |
+| `javadoc-zip` | `internal/ingest/source/javadoc` | Javadoc zip (Maven `documentation` artifact) | symbol table + one API chunk per class |
+| `vendordep-catalog` | `internal/ingest/source/vendordeps` | GitHub contents API listing of `vendor-json-repo/<year>` | fact rows + one install chunk per library |
+| `github-markdown` | `internal/ingest/source/repomd` | git tree API URL of a pinned ref | fetches `include/**/*.md(x)` from raw.githubusercontent.com; `url_style` (`html`, `dir`, `plain`) and `lowercase` map files to page URLs; a Docusaurus `slug` wins |
+| `gitbook-llms` | `internal/ingest/source/gitbook` | a GitBook site's `llms.txt` | same-host `.md` pages under `include`, ≤ 3.3 req/s, conditional GET |
+
+Both Markdown adapters share `internal/ingest/source/markdown`. It normalizes five dialects into CommonMark before
+sectioning:
+- MyST: `:::{note}`, `{directive}` fences, roles, `{eval-rst}` islands with `tab-set-code` and `code-block`;
+- Docusaurus/MDX: front matter, import/export lines, `<Tabs>`, admonitions, `{#id}` anchors;
+- Writerside: `<tabs>`/`<tab>`, `{style=…}`;
+- MkDocs Material: indented `===` tabs and `!!!` admonitions;
+- GitBook: `{% hint %}`, `{% tabs %}`, `{% embed %}`, `{% content-ref %}`, `<figure>`.
+
+It then applies the Sphinx chunking rules (shared in `internal/ingest/chunking`): heading-path sections, one variant
+per code language, and fences are never split. A normalizer fuzz target guards against crashes, and a leak check in
+the tests fails if dialect syntax survives into a chunk body.
+
 ## 3. Scheduler — the decision model
 
 **Phasing:** M2–M4 run a **fixed-interval scheduler** (interval per source from `sources.yaml`, scaled by the season

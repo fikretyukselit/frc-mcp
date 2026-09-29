@@ -26,6 +26,7 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Render contract (`internal/render`) | ✅ implemented, golden-tested |
 | Vector layer (`internal/vec`) + pure-Go model2vec (`internal/embed/m2v`, golden-tested against Python) | ✅ implemented, dense retrieval on by default |
 | Ingestion: `data/sources.yaml`, conditional-GET fetch, Sphinx + Javadoc adapters, cross-season symbol diff (`internal/ingest/*`, `internal/apisym`) | ✅ WPILib docs + Java API for 2026 and 2027-alpha |
+| Vendor docs: `github-markdown`, `gitbook-llms` adapters, 5-dialect Markdown normalizer (`internal/ingest/source/{repomd,gitbook,markdown}`) | ✅ Phoenix 6, REVLib, PhotonVision, PathPlannerLib, Choreo, AdvantageKit, YAGSL (M3) |
 | Project detection + pin handles (`internal/project`) | ✅ implemented |
 | Eval harness + judged queries + CI gate (`internal/eval`, `eval/`) | ✅ 184 queries; a human-written holdout is still needed |
 | Egress guard, sanitizer (`internal/netguard`, `internal/ingest/sanitize`) | ✅ implemented |
@@ -33,7 +34,7 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Vendordep catalog facts (`internal/facts`, `source/vendordeps`) | ✅ WPILib vendor-json-repo, 2026 + 2027-alpha |
 | Verifier (`internal/verify`, `frc-mcp verify`) | ✅ Java: 0 false errors on 128k LOC of public 2026 team code |
 | Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
-| `frc_migrate`, `frc_whats_new`, `frc_hardware`, vendor docs/APIs, C++/Python symbol tables | ⏳ M3–M4 |
+| `frc_migrate`, `frc_whats_new`, `frc_hardware`, vendor Java APIs, C++/Python symbol tables | ⏳ M3–M4 |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -93,8 +94,14 @@ Most M3 work is "teach the indexer a new upstream". The steps:
 2. **Declare it** in `data/sources.yaml`: `id`, `adapter`, `url`, `library`, `season`, `channel`, `version`,
    `license`, `trust` (`official` / `vendor` / `community`), `shard`, `verified`. That file is the only place endpoints
    live; the egress allowlist is derived from it. A redirect to another host needs an `extra_hosts` entry with a comment.
-3. **Reuse an adapter if you can.** `sphinx-htmlzip` handles any Sphinx site (RTD and Furo themes); `javadoc-zip` handles
-   any Javadoc zip (vendor Java APIs are published this way on their Maven repos).
+3. **Reuse an adapter if you can.**
+   - `sphinx-htmlzip` handles any Sphinx site (RTD and Furo themes).
+   - `javadoc-zip` handles any Javadoc zip. Vendor Java APIs are published this way on their Maven repos.
+   - `github-markdown` handles Markdown docs in a GitHub repository (MyST, Docusaurus, MkDocs Material, Writerside).
+     Pin a release tag, never `main`.
+   - `gitbook-llms` handles GitBook sites that publish `llms.txt`.
+   - Record the **docs** license. If the vendor publishes none, use `LicenseRef-<Vendor>-Docs-NoLicense`, and the
+     shard will not be redistributed (`docs/sources.md` §0.2).
 4. **New adapter:** add a package under `internal/ingest/source/<name>/` with a
    `Parse(path, src, rev, retrieved, emit...)` function (see `sphinx.Parse`), register the name in
    `internal/sources/sources.go` (`Adapters`) and the switch in `internal/ingest/build/build.go`. Emitted chunks must set
@@ -111,7 +118,8 @@ Most M3 work is "teach the indexer a new upstream". The steps:
 |---|---|---|
 | Human-written eval holdout (≈ 50 real student questions) | S, no Go needed | `eval/queries.jsonl` |
 | Run `frc-mcp verify` on your team's code, report false errors | S | issues |
-| Vendor docs: REV, PhotonVision, PathPlanner, Choreo, YAGSL, AdvantageKit, CTRE | M each | §7, `data/sources.yaml` |
+| More vendor docs: ReduxLib, Studica, Limelight, maple-sim; CTRE 2027 docs | S–M each | §7, `data/sources.yaml` |
+| Ask REV and YAGSL for permission to redistribute doc excerpts (`docs/sources.md` §0.2) | S, no code | email |
 | Vendor Java APIs (Javadoc zips from vendor Maven repos) | M each | `javadoc-zip` adapter |
 | C++ symbols (Doxygen XML) and Python symbols (`.pyi` from robotpy) | L | new adapters |
 | Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |

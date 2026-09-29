@@ -37,6 +37,56 @@ expected changes/day in the off-season (scaled by the season multiplier). **Pri*
   - Catalog quirks we keep verbatim: `PathplannerLib-2025.1.2.json` in the 2026 folder contains version 2026.1.2.
     Phoenix 6 for 2027 is already `26.70.0-alpha-2`, newer than the research's alpha-1.
 
+### 0.1 Verified during M3 vendor ingestion (2026-09-29)
+
+- **Seasons come from pinned refs, never from `main` / `latest`.** Vendor `main` branches already carry 2027-alpha code
+  (PhotonVision C++ examples use `wpi::math`, Choreo's install page points at `ChoreoLib2027Alpha.json`). 2026 docs are
+  therefore read at the last 2026 release tag, 2027 docs at the newest alpha tag:
+
+  | Library | 2026 ref | 2027 ref | Site generator → adapter |
+  |---|---|---|---|
+  | CTRE Phoenix 6 | RTD `stable` htmlzip (127 MB, 116 pages; Furo) | — (not yet ingested) | Sphinx → `sphinx-htmlzip` |
+  | PhotonVision | `v2026.3.4` | `v2027.0.0-alpha-2` | MyST Markdown in `docs/source/` → `github-markdown` |
+  | AdvantageKit | `v26.0.2` | `v27.0.0-alpha-6` | Docusaurus in `docs/docs/` → `github-markdown` |
+  | Choreo / ChoreoLib | `v2026.0.3` | `v2027.0.0-alpha-3` | MkDocs Material in `docs/` → `github-markdown` |
+  | PathPlannerLib | `v2026.1.2` | — (no 2027 release yet) | Writerside topics → `github-markdown` |
+  | REVLib | GitBook (unversioned) | — | `llms.txt` + per-page `.md` → `gitbook-llms` |
+  | YAGSL | GitBook (unversioned) | — | `llms.txt` + per-page `.md` → `gitbook-llms` |
+
+- **Repository docs are read file by file, not as a tarball.** The git tree API lists the files for a ref (one request),
+  then only the Markdown under `include` is fetched from `raw.githubusercontent.com`. PhotonVision's codeload tarball is
+  about 195 MB and takes over 100 s for roughly 100 Markdown files. A tag's files never change, so re-runs are served
+  from the conditional-GET cache.
+- **PhotonVision** serves versioned docs (`/en/v2026.3.4/…`); `/en/stable/` returns 404 for many pages, so links use the
+  tag path. AdvantageKit, Choreo, PathPlanner, REV and YAGSL publish a single version, so links point at the live site.
+- **GitBook** (REV, YAGSL) publishes `llms.txt` (a Markdown link list of every page's `.md` rendition) and
+  `llms-full.txt`. `llms-full.txt` has no page boundaries or URLs, so the adapter uses `llms.txt`. REV's `llms.txt`
+  covers every REV product; `include: /revlib/` keeps REVLib only.
+- `docs.photonvision.org` has no htmlzip download enabled; `pathplanner.dev` and `docs.advantagekit.org` publish no
+  `llms.txt`.
+
+## 0.2 Licensing and redistribution
+
+Shards redistribute text, so every source records the license of its **documentation** (which can differ from the
+code license):
+
+| Library | Docs license | Redistributed? |
+|---|---|---|
+| WPILib docs | CC BY 4.0 | yes |
+| CTRE Phoenix 6 docs | CC BY-NC-ND 4.0 (`license.txt` in `CrossTheRoadElec/Phoenix6-Documentation`) | yes. frc-mcp is free and non-commercial, and NoDerivatives 4.0 permits sharing the material "in whole or in part"; converting format (HTML → Markdown) is a technical modification, not an adaptation (§2(a)(4)). Every excerpt keeps its citation. |
+| PhotonVision docs | CC BY 4.0 (`docs/LICENSE`) | yes |
+| AdvantageKit docs | BSD-3-Clause (repository `LICENSE`) | yes |
+| Choreo docs | BSD-3-Clause | yes |
+| PathPlanner docs | MIT | yes |
+| REVLib docs | none published | **no** (`LicenseRef-REV-Docs-NoLicense`) |
+| YAGSL docs | none published (`YAGSL-Gitbook` has no license; the library itself is LGPL-2.1) | **no** (`LicenseRef-YAGSL-Docs-NoLicense`) |
+
+`LicenseRef-*` marks documentation without a redistribution grant. Those shards are built and can be used from a
+local index, but `frc-mcp index publish` leaves them out of the signed manifest unless `--include-unlicensed` is
+passed. Pass that flag only after the vendor's permission is recorded here (link to the written grant).
+
+**Open:** ask REV Robotics and the YAGSL maintainers for permission to redistribute excerpts with attribution.
+
 ## 1. WPILib core
 
 | Source | Endpoint(s) | Detect | Floor | Prior | Pri |

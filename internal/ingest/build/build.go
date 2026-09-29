@@ -22,7 +22,9 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/gitbook"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/javadoc"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/repomd"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/sphinx"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/vendordeps"
 	"github.com/fikretyukselit/frc-mcp/internal/sources"
@@ -117,6 +119,10 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 		case "vendordep-catalog":
 			_, err = vendordeps.Parse(ctx, f, src, res.FetchedAt,
 				func(v index.Vendordep) error { sd.vendordeps = append(sd.vendordeps, v); sr.Symbols++; return nil }, addChunk)
+		case "github-markdown":
+			_, err = repomd.Parse(ctx, f, res.Path, src, res.FetchedAt, addChunk)
+		case "gitbook-llms":
+			_, err = gitbook.Parse(ctx, f, res.Path, src, res.FetchedAt, addChunk)
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)

@@ -1,4 +1,4 @@
-**frc_search** · status: version_mismatch · confidence: 0.08 · season: 2026 (arg) · language: java · source: shard · index age: 2h30m
+**frc_search** · status: version_mismatch · confidence: 0.09 · season: 2026 (arg) · language: java · source: shard · index age: 2h30m
 
 Exact API symbols:
 - `com.revrobotics.CANSparkMax` (revlib 2024.2.4, java, 2024) — `public class CANSparkMax extends CANSparkBase` · ⚠ removed in 2025.0.0; use com.revrobotics.spark.SparkMax

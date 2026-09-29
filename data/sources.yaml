@@ -100,6 +100,171 @@ sources:
     shard: vendordeps-2027
     verified: true
 
+  # ---- Vendor documentation (M3) ----
+  # Seasons come from pinned refs, never from "latest": vendor repos' main
+  # branches already carry 2027-alpha code (org.wpilib / wpi::), so 2026 docs
+  # are read at the last 2026 release tag and 2027 docs at the alpha tag.
+  # Licenses: "LicenseRef-*" means the vendor publishes no license for its docs;
+  # `index publish` refuses those shards until permission is recorded (see
+  # docs/sources.md §4).
+
+  # CTRE Phoenix 6: Sphinx (Furo) on Read the Docs; CC BY-NC-ND 4.0 permits
+  # sharing excerpts with attribution for non-commercial use.
+  - id: phoenix6-docs-2026
+    adapter: sphinx-htmlzip
+    url: https://v6.docs.ctr-electronics.com/_/downloads/en/stable/htmlzip/
+    zip_root: phoenixpro-documentation/
+    base_url: https://v6.docs.ctr-electronics.com/en/stable/
+    library: phoenix6
+    season: "2026"
+    channel: stable
+    version: "2026"
+    license: CC-BY-NC-ND-4.0
+    trust: vendor
+    shard: phoenix6-docs-2026
+    verified: true # probed 2026-09-29 (127 MB htmlzip, 116 pages)
+
+  # PhotonVision: MyST Markdown in docs/source (docs/LICENSE: CC BY 4.0).
+  - id: photonvision-docs-2026
+    adapter: github-markdown
+    url: https://api.github.com/repos/PhotonVision/photonvision/git/trees/v2026.3.4?recursive=1
+    include: docs/source/
+    skip: [docs/contributing/, 404.md]
+    url_style: html
+    base_url: https://docs.photonvision.org/en/v2026.3.4/
+    library: photonvision
+    season: "2026"
+    channel: stable
+    version: v2026.3.4
+    license: CC-BY-4.0
+    trust: vendor
+    shard: photonvision-docs-2026
+    verified: true
+  - id: photonvision-docs-2027
+    adapter: github-markdown
+    url: https://api.github.com/repos/PhotonVision/photonvision/git/trees/v2027.0.0-alpha-2?recursive=1
+    include: docs/source/
+    skip: [docs/contributing/, 404.md]
+    url_style: html
+    base_url: https://docs.photonvision.org/en/latest/
+    library: photonvision
+    season: "2027"
+    channel: alpha
+    version: v2027.0.0-alpha-2
+    license: CC-BY-4.0
+    trust: vendor
+    shard: photonvision-docs-2027
+    verified: true
+
+  # AdvantageKit: Docusaurus in docs/docs (repo LICENSE: BSD-3-Clause).
+  - id: advantagekit-docs-2026
+    adapter: github-markdown
+    url: https://api.github.com/repos/Mechanical-Advantage/AdvantageKit/git/trees/v26.0.2?recursive=1
+    include: docs/docs/
+    skip: [legal/]
+    url_style: plain
+    base_url: https://docs.advantagekit.org/
+    library: advantagekit
+    season: "2026"
+    channel: stable
+    version: 26.0.2
+    license: BSD-3-Clause
+    trust: vendor
+    shard: advantagekit-docs-2026
+    verified: true
+  - id: advantagekit-docs-2027
+    adapter: github-markdown
+    url: https://api.github.com/repos/Mechanical-Advantage/AdvantageKit/git/trees/v27.0.0-alpha-6?recursive=1
+    include: docs/docs/
+    skip: [legal/]
+    url_style: plain
+    base_url: https://docs.advantagekit.org/
+    library: advantagekit
+    season: "2027"
+    channel: alpha
+    version: 27.0.0-alpha-6
+    license: BSD-3-Clause
+    trust: vendor
+    shard: advantagekit-docs-2027
+    verified: true
+
+  # Choreo / ChoreoLib: MkDocs Material in docs/ (BSD-3-Clause).
+  - id: choreolib-docs-2026
+    adapter: github-markdown
+    url: https://api.github.com/repos/SleipnirGroup/Choreo/git/trees/v2026.0.3?recursive=1
+    include: docs/
+    skip: [contributing/]
+    url_style: dir
+    base_url: https://choreo.autos/
+    library: choreolib
+    season: "2026"
+    channel: stable
+    version: 2026.0.3
+    license: BSD-3-Clause
+    trust: vendor
+    shard: choreolib-docs-2026
+    verified: true
+  - id: choreolib-docs-2027
+    adapter: github-markdown
+    url: https://api.github.com/repos/SleipnirGroup/Choreo/git/trees/v2027.0.0-alpha-3?recursive=1
+    include: docs/
+    skip: [contributing/]
+    url_style: dir
+    base_url: https://choreo.autos/
+    library: choreolib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-3
+    license: BSD-3-Clause
+    trust: vendor
+    shard: choreolib-docs-2027
+    verified: true
+
+  # PathPlanner / PathPlannerLib: Writerside topics (MIT). No 2027 release yet.
+  - id: pathplannerlib-docs-2026
+    adapter: github-markdown
+    url: https://api.github.com/repos/mjansen4857/pathplanner/git/trees/v2026.1.2?recursive=1
+    include: Writerside/topics/
+    url_style: html
+    lowercase: true
+    base_url: https://pathplanner.dev/
+    library: pathplannerlib
+    season: "2026"
+    channel: stable
+    version: 2026.1.2
+    license: MIT
+    trust: vendor
+    shard: pathplannerlib-docs-2026
+    verified: true
+
+  # GitBook sites: llms.txt lists every page's Markdown rendition.
+  - id: revlib-docs-2026
+    adapter: gitbook-llms
+    url: https://docs.revrobotics.com/llms.txt
+    include: /revlib/
+    base_url: https://docs.revrobotics.com/revlib/
+    library: revlib
+    season: "2026"
+    channel: stable
+    version: "2026"
+    license: LicenseRef-REV-Docs-NoLicense
+    trust: vendor
+    shard: revlib-docs-2026
+    verified: true
+  - id: yagsl-docs-2026
+    adapter: gitbook-llms
+    url: https://yagsl.yassrobotics.com/llms.txt
+    include: /
+    base_url: https://yagsl.yassrobotics.com/
+    library: yagsl
+    season: "2026"
+    channel: stable
+    version: "2026"
+    license: LicenseRef-YAGSL-Docs-NoLicense
+    trust: vendor
+    shard: yagsl-docs-2026
+    verified: true
+
 models:
   - id: potion-code-16M-v2 # MIT; query + document encoder for the lite profile
     license: MIT

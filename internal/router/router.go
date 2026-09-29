@@ -78,6 +78,13 @@ var libraryWords = map[string]string{
 	"navx": "studica", "lasercan": "grapple", "maplesim": "maple-sim",
 }
 
+// libraryPhrases are multi-word mentions (product names written with spaces).
+var libraryPhrases = map[string]string{
+	"spark max": "revlib", "spark flex": "revlib", "maxmotion": "revlib", "rev robotics": "revlib",
+	"motion magic": "phoenix6", "talon fx": "phoenix6", "path planner": "pathplannerlib",
+	"photon vision": "photonvision", "advantage kit": "advantagekit",
+}
+
 // Lexical signal sets, matched against lower-cased tokens. Token-set lookups
 // are ~20× faster than equivalent alternation regexps.
 var (
@@ -134,7 +141,10 @@ func Decide(q string) Decision {
 		if lib, ok := libraryWords[tok]; ok {
 			d.Libraries = appendUnique(d.Libraries, lib)
 		}
-		if d.Season == "" && isSeason(tok) {
+		// A season after "from" / "pre" or inside a migration question is the
+		// source season ("migrate from 2024", "REVLib 2024 or older"), not the
+		// target; it must not pin the query to a season we then report missing.
+		if d.Season == "" && isSeason(tok) && !sourceSeason(toks, i, lower) {
 			d.Season = tok
 		}
 		// "phoenix 5", "phoenix v6", "Phoenix6": an explicit major version wins.
@@ -142,6 +152,11 @@ func Decide(q string) Decision {
 			if v := strings.TrimPrefix(toks[i+1], "v"); v == "5" || v == "6" {
 				phoenix = v
 			}
+		}
+	}
+	for phrase, lib := range libraryPhrases {
+		if strings.Contains(lower, phrase) {
+			d.Libraries = appendUnique(d.Libraries, lib)
 		}
 	}
 	if phoenix != "" {
@@ -183,6 +198,25 @@ func Decide(q string) Decision {
 	d.NonEnglish = nonEnglish(q)
 	return d
 }
+
+// sourceSeason reports whether the season token at i names where code comes
+// from rather than where it is going.
+func sourceSeason(toks []string, i int, lower string) bool {
+	if i > 0 {
+		switch toks[i-1] {
+		case "to", "for", "into", "in":
+			return false // "migrate from 2026 to 2027": 2027 is the target
+		case "from", "pre", "before":
+			return true
+		}
+	}
+	if i+2 < len(toks) && toks[i+1] == "or" && (toks[i+2] == "older" || toks[i+2] == "earlier") {
+		return true
+	}
+	return containsAny(lower, migrationWords)
+}
+
+var migrationWords = []string{"migrat", "upgrad", "port to", "porting", "move to", "moving to"}
 
 // isSeason accepts 2020–2039.
 func isSeason(t string) bool {

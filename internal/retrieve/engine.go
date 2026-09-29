@@ -573,10 +573,17 @@ func boost(hits []Hit, d router.Decision, q Query) {
 		if h.SymbolMatch {
 			m *= 2.0
 		}
-		switch h.trust {
-		case index.TrustOfficial:
+		// Trust tiers rank sources when the query names no library. When it
+		// does, the named library's docs win: a vendor question ("Motion Magic
+		// on a TalonFX") must not be answered by a WPILib page that merely
+		// mentions the device.
+		switch {
+		case len(d.Libraries) > 0 && h.libMatch:
+			m *= 1.6
+		case len(d.Libraries) > 0:
+		case h.trust == index.TrustOfficial:
 			m *= 1.2
-		case index.TrustVendor:
+		case h.trust == index.TrustVendor:
 			m *= 1.1
 		}
 		if h.kind == index.KindCode && d.Intent == router.IntentHowTo {
@@ -590,9 +597,6 @@ func boost(hits []Hit, d router.Decision, q Query) {
 		}
 		if h.alpha && q.Channel != "alpha" && d.Season == "" && q.Season == "" {
 			m *= 0.5
-		}
-		if h.libMatch {
-			m *= 1.3
 		}
 		h.Score *= m
 	}

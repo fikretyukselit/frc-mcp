@@ -37,6 +37,12 @@ type Source struct {
 	Trust    string `yaml:"trust"`
 	Shard    string `yaml:"shard"`
 	Verified bool   `yaml:"verified"`
+
+	// Markdown adapters (github-markdown, gitbook-llms).
+	Include   string   `yaml:"include"`   // path prefix inside the archive / site to ingest
+	Skip      []string `yaml:"skip"`      // path prefixes (relative to include) to leave out
+	URLStyle  string   `yaml:"url_style"` // html (a/b.html) | dir (a/b/) | plain (a/b); github-markdown only
+	Lowercase bool     `yaml:"lowercase"` // lower-case page URLs (Writerside)
 }
 
 // Model is an embedding model distributed alongside shards.
@@ -47,7 +53,7 @@ type Model struct {
 }
 
 // Adapters known to this binary.
-var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog"}
+var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms"}
 
 // Load parses and validates a registry file.
 func Load(path string) (*Registry, error) {
@@ -84,6 +90,9 @@ func (r *Registry) Validate() error {
 			if err != nil || u.Scheme != "https" || u.Host == "" {
 				return fmt.Errorf("sources: %s: %s must be an https URL", s.ID, name)
 			}
+		}
+		if s.Adapter == "github-markdown" && !slices.Contains([]string{"html", "dir", "plain"}, s.URLStyle) {
+			return fmt.Errorf("sources: %s: url_style must be html, dir or plain", s.ID)
 		}
 		for name, v := range map[string]string{"library": s.Library, "season": s.Season, "channel": s.Channel,
 			"version": s.Version, "license": s.License, "trust": s.Trust, "shard": s.Shard} {

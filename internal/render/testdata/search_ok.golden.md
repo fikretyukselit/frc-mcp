@@ -1,4 +1,4 @@
-**frc_search** · status: ok · confidence: 0.89 · season: 2026 (default) · language: java · source: shard · index age: 2h30m
+**frc_search** · status: ok · confidence: 0.90 · season: 2026 (default) · language: java · source: shard · index age: 2h30m
 
 Exact API symbols:
 - `com.ctre.phoenix6.hardware.TalonFX` (phoenix6 26.1.0, java, 2026) — `public class TalonFX extends CoreTalonFX implements MotorController`
