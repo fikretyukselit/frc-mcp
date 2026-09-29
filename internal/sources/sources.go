@@ -204,6 +204,16 @@ func UserContent(license string) bool {
 	return strings.HasPrefix(license, "LicenseRef-") && strings.HasSuffix(license, "-UserContent")
 }
 
+// Prohibited reports whether a license id marks content that is never
+// redistributed or served to others, whatever the flags: user content
+// (forum posts), and content whose license expressly forbids distribution
+// (LicenseRef-*-EULA: CTRE's Phoenix 6 C++ header EULA). Other LicenseRef-*
+// content, which states no license at all, is published only with
+// --include-unlicensed (docs/sources.md §0.2).
+func Prohibited(license string) bool {
+	return UserContent(license) || strings.HasPrefix(license, "LicenseRef-") && strings.HasSuffix(license, "-EULA")
+}
+
 // Hosts returns the egress allowlist derived from the registry.
 func (r *Registry) Hosts() []string {
 	var hs []string

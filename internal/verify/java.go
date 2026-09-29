@@ -393,6 +393,17 @@ func checkType(ctx context.Context, r Resolver, fqn, season, lang string, emit f
 		emit(f)
 		return false
 	}
+	// Unknown everywhere, but a curated rule knows the name (REVLib's
+	// CANSparkMax, gone since 2025, older than every table): the pinned
+	// table proves it absent, so the rule's counterpart is an error.
+	found := false
+	curatedCheck(r, fqn, lang, season, func(f Finding) {
+		f.Severity, found = "error", true
+		emit(f)
+	})
+	if found {
+		return false
+	}
 	// Unknown everywhere: likely a nested/generated type or a typo.
 	if pkg := packageOf(fqn); pkg != "" && !r.PackageExists(ctx, pkg, season, lang) && r.PackageExists(ctx, pkg, "", lang) {
 		emit(Finding{Symbol: fqn, Severity: packageSeverity(pkg, season), Kind: "wrong_season",

@@ -11,8 +11,10 @@ works the same way.
   64 concurrent requests, 1 MiB request bodies, 60 s responses. Over the limit a client gets `429` with `Retry-After`.
 - The index syncs from the signed `index-stable` channel at startup and every 6 hours (ed25519, ADR-0006). A failed
   sync keeps serving the installed index.
-- Content without a redistribution license (`LicenseRef-*`: CTRE docs/APIs, REV Java API and docs, spec pages, forum
-  posts) is **not loaded** over HTTP. Only pass `--include-unlicensed` once the vendors have granted permission.
+- Content that states no redistribution license (`LicenseRef-*`: REV docs and Java API, Phoenix 6 Java/Python, spec
+  pages, CTRE/REV release notes) is loaded over HTTP only with `--include-unlicensed`, which the Foundation's server
+  passes (docs/sources.md §0.2). Prohibited content (forum posts; `LicenseRef-*-EULA`: CTRE's C++ header EULA) is
+  never loaded over HTTP, whatever the flags.
 - Filesystem arguments (`project_root`, `path`) are disabled: clients send code inline.
 - No query logging. The only telemetry is aggregate counters (requests by JSON-RPC method, tool and status class,
   plus a latency histogram) on an internal metrics port.

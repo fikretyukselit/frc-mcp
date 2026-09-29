@@ -538,7 +538,7 @@ func TestAPICuratedWithoutTables(t *testing.T) {
 		t.Errorf("shared simple name: %v", sc)
 	}
 	_, sc, _ = call(t, cs, "frc_api", map[string]any{"symbol": "SparkMax", "language": "java"})
-	if sc["status"] != "low_confidence" || !strings.Contains(sc["next"].([]any)[0].(string), "REV Robotics grants no redistribution license") {
+	if sc["status"] != "low_confidence" || !strings.Contains(sc["next"].([]any)[0].(string), "REV Robotics states no redistribution license") {
 		t.Errorf("restricted library: %v", sc)
 	}
 }

@@ -504,11 +504,10 @@ sources:
   # WPILib vendordep catalog for each season, like the Java tables.
   # CTRE's headers ship CTRE_LICENSE.txt, an EULA that forbids distributing
   # or making the Software (which includes documentation) available to third
-  # parties: LicenseRef-* keeps those tables local (docs/sources.md §0.2).
+  # parties: LicenseRef-*-EULA, in shards of their own, is never published or
+  # served, whatever the flags (docs/sources.md §0.2).
   # REVLib's headers carry a BSD-3-Clause notice (LICENSE.txt and every
-  # file), recorded as their license. By project policy the table still goes
-  # to the restricted shard next to REVLib Java (LicenseRef, no license
-  # found), so nothing REV-authored is published until REV confirms (§0.2).
+  # file), recorded as their license: published in vendor-api-*.
   # skip: headers CTRE leaves out of its own API reference (compound
   # differential controls, raw signal ids), checked against annotated.html.
   - id: phoenix6-cpp-2026
@@ -522,9 +521,9 @@ sources:
     channel: stable
     version: 26.3.0
     language: cpp
-    license: LicenseRef-CTRE-Phoenix-API
+    license: LicenseRef-CTRE-Phoenix-EULA
     trust: vendor
-    shard: vendor-restricted-api-2026
+    shard: vendor-eula-api-2026
     verified: true # probed 2026-09-29 (573 KB, 223 headers)
   - id: phoenix6-tools-cpp-2026
     adapter: cpp-headers-zip
@@ -537,9 +536,9 @@ sources:
     channel: stable
     version: 26.3.0
     language: cpp
-    license: LicenseRef-CTRE-Phoenix-API
+    license: LicenseRef-CTRE-Phoenix-EULA
     trust: vendor
-    shard: vendor-restricted-api-2026
+    shard: vendor-eula-api-2026
     verified: true # probed 2026-09-29 (93 KB; signals::*Value, ctre::phoenix::StatusCode)
   - id: phoenix6-cpp-2027
     adapter: cpp-headers-zip
@@ -552,9 +551,9 @@ sources:
     channel: alpha
     version: 26.70.0-alpha-2
     language: cpp
-    license: LicenseRef-CTRE-Phoenix-API
+    license: LicenseRef-CTRE-Phoenix-EULA
     trust: vendor
-    shard: vendor-restricted-api-2027
+    shard: vendor-eula-api-2027
     verified: true # probed 2026-09-29 (578 KB)
   - id: phoenix6-tools-cpp-2027
     adapter: cpp-headers-zip
@@ -567,9 +566,9 @@ sources:
     channel: alpha
     version: 26.70.0-alpha-2
     language: cpp
-    license: LicenseRef-CTRE-Phoenix-API
+    license: LicenseRef-CTRE-Phoenix-EULA
     trust: vendor
-    shard: vendor-restricted-api-2027
+    shard: vendor-eula-api-2027
     verified: true # probed 2026-09-29 (92 KB)
   - id: revlib-cpp-2026
     adapter: cpp-headers-zip

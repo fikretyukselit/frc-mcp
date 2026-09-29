@@ -77,11 +77,12 @@ func Publish(ctx context.Context, o PublishOptions) (*Manifest, error) {
 		if err != nil {
 			return nil, fmt.Errorf("publish: %s: %w", p, err)
 		}
-		// Forum posts are other people's words, often minors': they are
-		// never redistributed, whatever the flags (docs/sources.md §5).
-		if uc := slices.DeleteFunc(slices.Clone(lics), func(l string) bool { return !sources.UserContent(l) }); len(uc) > 0 {
+		// Forum posts are other people's words, often minors', and some
+		// vendor content is under a license that forbids distribution: never
+		// redistributed, whatever the flags (docs/sources.md §0.2, §5).
+		if no := slices.DeleteFunc(slices.Clone(lics), func(l string) bool { return !sources.Prohibited(l) }); len(no) > 0 {
 			if o.OnSkip != nil {
-				o.OnSkip(meta.Name, "user content ("+strings.Join(uc, ", ")+") is never redistributed; build it locally")
+				o.OnSkip(meta.Name, "content that is never redistributed ("+strings.Join(no, ", ")+"); build it locally")
 			}
 			continue
 		}
