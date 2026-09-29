@@ -57,3 +57,12 @@ func TestTypeName(t *testing.T) {
 		}
 	}
 }
+
+func TestDiffCpp(t *testing.T) {
+	old := []index.Symbol{{FQN: "frc::TimedRobot"}, {FQN: "frc::TimedRobot#AddPeriodic"}, {FQN: "frc::sim::XboxControllerSim"}}
+	nu := []index.Symbol{{FQN: "wpi::TimedRobot"}, {FQN: "wpi::TimedRobot#AddPeriodic"}, {FQN: "wpi::sim::XboxControllerSim"}}
+	r, _, m := Diff(old, nu, "2027.0.0-alpha-7")
+	if r != 3 || m != 3 || old[1].Replacement != "wpi::TimedRobot#AddPeriodic" || old[2].Replacement != "wpi::sim::XboxControllerSim" {
+		t.Fatalf("removed %d mapped %d %+v", r, m, old)
+	}
+}

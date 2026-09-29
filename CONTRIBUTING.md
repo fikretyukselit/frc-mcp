@@ -37,7 +37,8 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Vendor Java APIs (Javadoc jars from vendor Maven repos) | ✅ Phoenix 6, REVLib, PhotonLib, PathPlannerLib, ChoreoLib, AdvantageKit, YAGSL (2026 + 2027-alpha where released) |
 | Python APIs (`pypi-wheel` + `pystub`: RobotPy and vendor wheels) | ✅ wpilib, wpimath, wpiutil, ntcore, hal, commands2, apriltag; phoenix6, robotpy-rev, photonlibpy, pathplannerlib, choreolib (2026 + 2027-alpha) — about 35k symbols |
 | Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
-| `frc_migrate`, `frc_hardware`, C++ symbol tables, Python verification | ⏳ M3–M4 |
+| WPILib C++ API (`doxygen-zip`) | ✅ 2026 + 2027-alpha, ~20k symbols; 5,962 `frc::`→`wpi::` moves mapped automatically |
+| `frc_migrate`, `frc_hardware`, vendor C++ APIs, C++/Python verification | ⏳ M3–M4 |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -123,8 +124,8 @@ Most M3 work is "teach the indexer a new upstream". The steps:
 | Run `frc-mcp verify` on your team's code, report false errors | S | issues |
 | More vendor docs: ReduxLib, Studica, Limelight, maple-sim; CTRE 2027 docs | S–M each | §7, `data/sources.yaml` |
 | Ask CTRE, REV and YAGSL for permission to redistribute doc/API excerpts (`docs/sources.md` §0.2) | S, no code | email |
-| C++ symbols (WPILib/vendor Doxygen: HTML or tag files; no XML is published) | L | new adapter |
-| `frc_verify_code` for Python (imports/attributes against the Python tables) | M | `internal/verify` |
+| Vendor C++ APIs (Phoenix 6, REVLib, PhotonLib Doxygen bundles) with `doxygen-zip` | M each | `data/sources.yaml` |
+| `frc_verify_code` for Python and C++ (imports/includes against the new tables) | M | `internal/verify` |
 | Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |
 | `frc_hardware` (human-reviewed spec table, sources never merged) | L | `internal/facts`, `docs/mcp-surface.md` |
 | `frc_whats_new` `live` probe (allowlisted GitHub API call at query time) | M | `internal/mcpserver`, `internal/netguard` |

@@ -62,20 +62,29 @@ func Diff(old, new []index.Symbol, newVersion string) (removed, added, mapped in
 	return removed, added, mapped
 }
 
+// segments splits a Java ("a.b.C") or C++ ("a::b::C") qualified name.
+func segments(fqn string) (parts []string, sep string) {
+	if strings.Contains(fqn, "::") {
+		return strings.Split(fqn, "::"), "::"
+	}
+	return strings.Split(fqn, "."), "."
+}
+
 // typeName strips the package: lowercase-leading segments are package parts,
-// so "org.wpilib.hardware.led.AddressableLED.Buffer" → "AddressableLED.Buffer".
+// so "org.wpilib.hardware.led.AddressableLED.Buffer" → "AddressableLED.Buffer"
+// and "frc::sim::XboxControllerSim" → "XboxControllerSim".
 func typeName(fqn string) string {
-	parts := strings.Split(fqn, ".")
+	parts, sep := segments(fqn)
 	for i, p := range parts {
 		if p != "" && p[0] >= 'A' && p[0] <= 'Z' {
-			return strings.Join(parts[i:], ".")
+			return strings.Join(parts[i:], sep)
 		}
 	}
 	return fqn
 }
 
 func pkgOf(fqn string) []string {
-	parts := strings.Split(fqn, ".")
+	parts, _ := segments(fqn)
 	for i, p := range parts {
 		if p != "" && p[0] >= 'A' && p[0] <= 'Z' {
 			return parts[:i]

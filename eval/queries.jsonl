@@ -237,3 +237,8 @@
 {"id": "q235", "bucket": "howto", "query": "pathplannerlib AutoBuilder configure in python", "relevant": ["pathplannerlib-python/2026/pathplannerlib.auto.AutoBuilder"], "language": "python", "split": "holdout", "author": "llm"}
 {"id": "q236", "bucket": "symbol", "query": "phoenix6 TalonFX python class", "relevant": ["phoenix6-python/2026/phoenix6.hardware.TalonFX"], "language": "python", "split": "train", "author": "llm"}
 {"id": "q237", "bucket": "howto", "query": "choreo SwerveTrajectory sample_at python", "relevant": ["choreolib-python/2026/choreo.SwerveTrajectory"], "language": "python", "split": "train", "author": "llm"}
+{"id": "q238", "bucket": "symbol", "query": "frc::TimedRobot AddPeriodic C++", "relevant": ["wpilib-cpp/2026/frc::TimedRobot"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q239", "bucket": "symbol", "query": "frc2::CommandPtr AndThen c++", "relevant": ["wpilib-cpp/2026/frc2::CommandPtr"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q240", "bucket": "howto", "query": "C++ SwerveDriveKinematics ToSwerveModuleStates frc::", "relevant": ["wpilib-cpp/2026/frc::SwerveDriveKinematics"], "language": "cpp", "split": "train", "author": "llm"}
+{"id": "q241", "bucket": "symbol", "query": "frc::XboxController GetLeftBumperButton cpp", "relevant": ["wpilib-cpp/2026/frc::XboxController"], "language": "cpp", "split": "holdout", "author": "llm"}
+{"id": "q242", "bucket": "howto", "query": "frc::PIDController Calculate in C++", "relevant": ["wpilib-cpp/2026/frc::PIDController"], "language": "cpp", "split": "train", "author": "llm"}

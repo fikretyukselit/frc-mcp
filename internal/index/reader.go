@@ -398,6 +398,19 @@ func (r *Reader) Symbols(ctx context.Context, q SymbolQuery) ([]Symbol, error) {
 	// A qualified name that is not an FQN may still be Type#member written as
 	// "Type.member" or a C++ "ns::Type::member"; fall back to simple lookup.
 	if len(out) == 0 && isQualified && !strings.Contains(name, "#") && !q.Exact {
+		// "frc::TimedRobot::AddPeriodic" / "edu.wpi.first.wpilibj.Timer.get":
+		// try the member form of the FQN first, then the simple name.
+		sep := strings.LastIndex(name, "::")
+		width := 2
+		if dot := strings.LastIndexByte(name, '.'); dot > sep {
+			sep, width = dot, 1
+		}
+		if sep > 0 {
+			if m, err := r.Symbols(ctx, SymbolQuery{Name: name[:sep] + "#" + name[sep+width:], Season: q.Season,
+				Language: q.Language, Limit: q.Limit, Exact: true}); err == nil && len(m) > 0 {
+				return m, nil
+			}
+		}
 		return r.Symbols(ctx, SymbolQuery{Name: SimpleName(name), Season: q.Season, Language: q.Language, Limit: q.Limit})
 	}
 	return out, nil

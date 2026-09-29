@@ -22,6 +22,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/doxygen"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/ghreleases"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/gitbook"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/javadoc"
@@ -132,6 +133,9 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 				func(r index.Release) error { sd.releases = append(sd.releases, r); sr.Symbols++; return nil }, addChunk)
 		case "pypi-wheel":
 			_, err = pypi.Parse(ctx, f, res.Path, src, res.FetchedAt,
+				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
+		case "doxygen-zip":
+			_, err = doxygen.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,

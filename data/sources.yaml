@@ -74,6 +74,39 @@ sources:
     shard: wpilib-java-2027
     verified: true
 
+  # ---- WPILib C++ API (M3): Doxygen HTML zips from WPILib Maven ----
+  # No Doxygen XML or tag file is published; the adapter parses class pages.
+  # include lists WPILib's own namespaces: the bundle also documents vendored
+  # third-party code (fmt, Eigen, LLVM, Sleipnir, nlohmann).
+  - id: wpilib-cpp-2026
+    adapter: doxygen-zip
+    url: https://frcmaven.wpi.edu/artifactory/release/edu/wpi/first/wpilibc/documentation/2026.2.2/documentation-2026.2.2.zip
+    include: "frc::,frc2::,wpi::,units::,nt::,cs::,hal::"
+    base_url: https://github.wpilib.org/allwpilib/docs/release/cpp/
+    library: wpilib
+    season: "2026"
+    channel: stable
+    version: 2026.2.2
+    language: cpp
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-cpp-2026
+    verified: true # probed 2026-09-29 (30 MB zip, 812 types)
+  - id: wpilib-cpp-2027
+    adapter: doxygen-zip
+    url: https://frcmaven.wpi.edu/artifactory/release/org/wpilib/wpilibc/documentation/2027.0.0-alpha-7/documentation-2027.0.0-alpha-7.zip
+    include: "wpi::,frc::,frc2::,units::,nt::,cs::,hal::"
+    base_url: https://github.wpilib.org/allwpilib/docs/beta/cpp/
+    library: wpilib
+    season: "2027"
+    channel: alpha
+    version: 2027.0.0-alpha-7
+    language: cpp
+    license: BSD-3-Clause
+    trust: official
+    shard: wpilib-cpp-2027
+    verified: true
+
   # ---- Vendordep catalog (wpilibsuite/vendor-json-repo) ----
   # The list the WPILib Dependency Manager shows. Every vendordep JSON becomes
   # an exact fact row (frc_vendordep); the newest version per library also
