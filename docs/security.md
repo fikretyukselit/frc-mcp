@@ -153,3 +153,26 @@ attacker-controlled text that the agent then obeys**.
 - Surface-immutability golden test (§2.2).
 - The official MCP conformance suite runs in CI.
 - MCP Inspector is pinned to a version that is patched for CVE-2025-49596.
+
+## 4. Launch checklist (hosted server and public release)
+
+Each item names how it is checked. The hosted server is announced only when every item is ✅.
+
+| # | Item | Check | Status |
+|---|---|---|---|
+| 1 | The production signing key exists; its seed is only in the `index-publish` environment (main branch only); its public key is compiled in | `internal/dist/keys.go` non-empty; environment branch policy | ⏳ needs the maintainer (ADR-0006 rollout) |
+| 2 | The `index` workflow built, gated and published a signed index | `index-stable` release with `manifest.json` + `.sig` | ⏳ after 1 |
+| 3 | A fresh install syncs and verifies on macOS, Linux and Windows | cross-OS sync job in CI | ⏳ after 2 |
+| 4 | No unlicensed content is published or served | `index publish` skips `LicenseRef-*` shards; `serve --transport http` does not load them (`Reader.Licenses` covers chunks, symbols, releases, hardware) | ✅ |
+| 5 | Forum/user content is never published or served | `index publish` skips `LicenseRef-*-UserContent` even with `--include-unlicensed`; not loaded over HTTP | ✅ |
+| 6 | HTTP mode refuses filesystem arguments and caps inputs | `NoFilesystem`; body ≤ 1 MiB; tool-level size limits; tests | ✅ |
+| 7 | Anonymous access is rate-limited per real client and concurrency-capped; `X-Forwarded-For` trusted only from the configured proxy | `internal/hosted` tests (spoofing, refill, cap, eviction) | ✅ |
+| 8 | No query content is logged or exported | metrics labels limited to method/tool/status class; test asserts request text never appears | ✅ |
+| 9 | Metrics are not publicly reachable | `--metrics-addr` must be loopback, private or container-internal; compose does not publish it | ✅ |
+| 10 | TLS with automatic renewal and HSTS | Caddy config (`deploy/Caddyfile`) | ✅ config; ⏳ first deploy |
+| 11 | Container hardening: non-root, read-only root fs, no capabilities, images pinned by digest | `Dockerfile`, `deploy/docker-compose.yml` | ✅ |
+| 12 | Injection handling is documented and measured; suspect content is fenced | §2.1, §3 (holdout recall is low: fencing and trust tiers are the primary control) | ✅ documented; improving recall is open |
+| 13 | Verifier false positives stay at 0 on public team code | `docs/benchmarks.md` (193k lines, Java/C++/Python) | ✅ |
+| 14 | Binaries are signed (cosign), attested (SLSA), with an SBOM; Windows Authenticode and macOS notarization | release workflow | ⏳ M5 packaging |
+| 15 | A published notice states what the hosted server logs (nothing but aggregate counters) and the index licenses | `docs/deploy.md`, README | ✅ docs; ⏳ page on the domain |
+
