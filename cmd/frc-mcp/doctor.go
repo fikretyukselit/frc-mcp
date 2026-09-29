@@ -25,7 +25,7 @@ func doctor(ctx context.Context, args []string) error {
 	}
 	fmt.Printf("frc-mcp %s\nindex dir: %s\n", buildVersion(), *dir)
 	t0 := time.Now()
-	e, shards := openEngine(ctx, slog.New(slog.NewTextHandler(os.Stderr, nil)), *dir, "", !*noDense)
+	e, shards := openEngine(ctx, slog.New(slog.NewTextHandler(os.Stderr, nil)), *dir, !*noDense)
 	open := time.Since(t0)
 	if len(shards) == 0 {
 		fmt.Println("  no shards found — build one with `frc-mcp index build` (sync arrives in M2)")

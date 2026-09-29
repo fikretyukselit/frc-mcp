@@ -44,7 +44,7 @@ func evalCmd(ctx context.Context, args []string) error {
 	}
 	reports := map[string]*eval.Report{}
 	for _, a := range arms {
-		e, shards := openEngine(ctx, log, *dir, "", a.dense)
+		e, shards := openEngine(ctx, log, *dir, a.dense)
 		if e == nil {
 			return errors.New("no shards in " + *dir)
 		}

@@ -48,7 +48,7 @@ func verifyCmd(ctx context.Context, args []string) error {
 		}
 		*season = p.Season
 	}
-	e, shards := openEngine(ctx, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})), *dir, "", false)
+	e, shards := openEngine(ctx, slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})), *dir, false)
 	if e == nil {
 		return errors.New("no shards in " + *dir)
 	}

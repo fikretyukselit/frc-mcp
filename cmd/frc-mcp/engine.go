@@ -13,8 +13,8 @@ import (
 
 // openEngine loads every shard in dir and, when present, the lite embedding
 // model from dir/models/. Missing pieces degrade (logged), never fail.
-func openEngine(ctx context.Context, log *slog.Logger, dir, season string, dense bool) (*retrieve.Engine, []*index.Reader) {
-	return openEngineWith(ctx, log, dir, season, dense, true)
+func openEngine(ctx context.Context, log *slog.Logger, dir string, dense bool) (*retrieve.Engine, []*index.Reader) {
+	return openEngineWith(ctx, log, dir, "", dense, true)
 }
 
 // openEngineWith is openEngine that can leave out shards holding content
