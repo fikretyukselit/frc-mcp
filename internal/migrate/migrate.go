@@ -70,6 +70,8 @@ type Result struct {
 	NotFound  []string `json:"not_found,omitempty"`
 	AlreadyIn []string `json:"already_in_target,omitempty"`
 	Checked   int      `json:"checked"`
+	// Omitted counts code references left out by Query.MaxRefs.
+	Omitted int `json:"omitted,omitempty"`
 }
 
 // Query selects what to map.
@@ -97,6 +99,7 @@ func Map(ctx context.Context, r Resolver, q Query) Result {
 			q.MaxRefs = 200
 		}
 		if len(refs) > q.MaxRefs {
+			res.Omitted = len(refs) - q.MaxRefs
 			refs = refs[:q.MaxRefs]
 		}
 		seen := map[string]bool{}
@@ -127,6 +130,9 @@ type mapper struct {
 func (m *mapper) symbol(ctx context.Context, name string, res *Result, quiet bool) {
 	res.Checked++
 	syms := m.resolve(ctx, name, m.from)
+	if len(syms) == 0 {
+		syms = m.inherited(ctx, name, m.from)
+	}
 	if len(syms) == 0 {
 		if there := m.resolve(ctx, name, m.to); len(there) > 0 {
 			res.AlreadyIn = appendUnique(res.AlreadyIn, there[0].FQN)
@@ -217,6 +223,31 @@ func (m *mapper) resolve(ctx context.Context, name, season string) []index.Symbo
 		out = out[:6]
 	}
 	return out
+}
+
+// inherited resolves "Type#member" (or "Type.member") where Type only
+// inherits member: SparkMax#getOutputCurrent is declared on SparkBase, and
+// the rules name the declaring type.
+func (m *mapper) inherited(ctx context.Context, name, season string) []index.Symbol {
+	owner, member, ok := strings.Cut(name, "#")
+	if !ok {
+		mf := memberForm(name)
+		if mf == "" {
+			return nil
+		}
+		owner, member, _ = strings.Cut(mf, "#")
+	}
+	for _, t := range m.resolve(ctx, owner, season) {
+		if strings.Contains(t.FQN, "#") {
+			continue
+		}
+		if d := verify.DeclaringType(ctx, m.r, t.FQN, member, season, t.Language); d != "" && d != t.FQN {
+			if syms := m.resolve(ctx, d+"#"+member, season); len(syms) > 0 {
+				return syms
+			}
+		}
+	}
+	return nil
 }
 
 // memberForm turns "a.b.Type.member" / "ns::Type::Member" into the index's
@@ -413,40 +444,76 @@ func (m *mapper) viaOwner(ctx context.Context, cur index.Symbol, next string) ([
 	return []Mapping{mp}, t, true
 }
 
-// backward maps a newer symbol to what it replaced in an older season.
+// backward maps a newer symbol to its counterpart in an older season, hop
+// by hop through every indexed season in between: each hop needs its own
+// evidence (a curated rule into that season, the same FQN there, or a
+// symbol there whose replacement is the current one).
 func (m *mapper) backward(ctx context.Context, s index.Symbol, res *Result) {
-	found := false
-	for _, mr := range m.r.MigrationsTo(ctx, s.FQN, s.Language) {
-		if mr.FromSeason >= m.to && mr.ToSeason <= s.Season {
-			c := curated(mr, m.line)
-			c.From, c.To, c.FromSeason, c.ToSeason = mr.To, mr.From, mr.ToSeason, mr.FromSeason
-			res.Mappings = append(res.Mappings, c)
-			found = true
-		}
-	}
-	if !found {
-		if t := m.exact(ctx, s.FQN, m.to, s.Language); t != nil {
-			res.Mappings = append(res.Mappings, Mapping{From: s.FQN, To: t.FQN, FromSeason: s.Season, ToSeason: m.to,
-				Language: s.Language, Library: s.Library, Kind: SrcUnchanged, Source: SrcUnchanged, Confidence: "high", Line: m.line})
+	cur := s
+	var chain []Mapping
+	for _, prev := range m.hopsBack(s.Season, m.to) {
+		mp, nxt := m.hopBack(ctx, cur, prev)
+		if nxt == nil {
+			reason := fmt.Sprintf("no known %s counterpart of %s (new in %s?)", prev, cur.FQN, cur.Season)
+			noTable := m.r.LibraryVersion(ctx, cur.Library, prev, cur.Language) == ""
+			if noTable {
+				reason = fmt.Sprintf("no %s %s API table is indexed for %s", prev, cur.Language, libName(cur.Library))
+			}
+			res.Unresolved = append(res.Unresolved, Unresolved{Symbol: s.FQN, Language: s.Language, Library: s.Library,
+				Reason: reason, Line: m.line, NoTable: noTable})
 			return
 		}
-		for _, old := range m.r.SymbolsReplacedBy(ctx, s.FQN, m.to) {
-			if old.Language != s.Language {
-				continue
-			}
-			src := old.ReplacementSrc
-			if src == "" {
-				src = SrcUpstream
-			}
-			res.Mappings = append(res.Mappings, Mapping{From: s.FQN, To: old.FQN, FromSeason: s.Season, ToSeason: old.Season,
-				Language: s.Language, Library: s.Library, Kind: "move", Source: src, Confidence: "medium", Line: m.line})
-			found = true
+		chain = append(chain, mp)
+		cur = *nxt
+	}
+	res.Mappings = append(res.Mappings, collapse(chain, m.line)...)
+}
+
+// hopBack maps cur (season S) to the previous indexed season prev.
+func (m *mapper) hopBack(ctx context.Context, cur index.Symbol, prev string) (Mapping, *index.Symbol) {
+	for _, mr := range m.r.MigrationsTo(ctx, cur.FQN, cur.Language) {
+		if mr.ToSeason != cur.Season || mr.FromSeason != prev {
+			continue
+		}
+		if t := m.exact(ctx, mr.From, prev, cur.Language); t != nil {
+			c := curated(mr, m.line)
+			c.From, c.To, c.FromSeason, c.ToSeason = mr.To, mr.From, mr.ToSeason, mr.FromSeason
+			return c, t
 		}
 	}
-	if !found {
-		res.Unresolved = append(res.Unresolved, Unresolved{Symbol: s.FQN, Language: s.Language, Library: s.Library,
-			Reason: fmt.Sprintf("no known %s counterpart (new in %s?)", m.to, s.Season), Line: m.line})
+	if t := m.exact(ctx, cur.FQN, prev, cur.Language); t != nil {
+		return Mapping{From: cur.FQN, To: t.FQN, FromSeason: cur.Season, ToSeason: prev, Language: cur.Language,
+			Library: cur.Library, Kind: SrcUnchanged, Source: SrcUnchanged, Confidence: "high"}, t
 	}
+	for _, old := range m.r.SymbolsReplacedBy(ctx, cur.FQN, prev) {
+		if old.Language != cur.Language || old.Season != prev {
+			continue
+		}
+		src := old.ReplacementSrc
+		if src == "" {
+			src = SrcUpstream
+		}
+		o := old
+		return Mapping{From: cur.FQN, To: old.FQN, FromSeason: cur.Season, ToSeason: prev, Language: cur.Language,
+			Library: cur.Library, Kind: "move", Source: src, Confidence: "medium"}, &o
+	}
+	return Mapping{}, nil
+}
+
+// hopsBack lists the indexed API seasons in [to, from), newest first; to
+// itself is always the last hop.
+func (m *mapper) hopsBack(from, to string) []string {
+	var out []string
+	ss := m.r.SymbolSeasons()
+	for i := len(ss) - 1; i >= 0; i-- {
+		if ss[i] < from && ss[i] >= to {
+			out = append(out, ss[i])
+		}
+	}
+	if len(out) == 0 || out[len(out)-1] != to {
+		out = append(out, to)
+	}
+	return out
 }
 
 func (m *mapper) exact(ctx context.Context, fqn, season, lang string) *index.Symbol {

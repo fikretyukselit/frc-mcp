@@ -28,6 +28,10 @@ func openEnv(ctx context.Context, indexDir, cache string) (*env, error) {
 	if len(shards) == 0 {
 		return nil, fmt.Errorf("no shards in %s: %v", indexDir, errs)
 	}
+	// Jar paths go to javac, which runs in the task workspace.
+	if abs, err := filepath.Abs(cache); err == nil {
+		cache = abs
+	}
 	javac, err := exec.LookPath("javac")
 	if err != nil {
 		return nil, errors.New("javac not found on PATH (JDK 25+ compiles both 2026 and 2027 code)")

@@ -208,11 +208,14 @@ func (f *Fetcher) Jar(ctx context.Context, a Artifact) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return "", err
 	}
-	tmp := dst + ".tmp"
-	out, err := os.Create(tmp)
+	// A unique temp file per download: parallel runs fetch the same jars on
+	// a cold cache, and the first finished copy wins.
+	out, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".*.tmp")
 	if err != nil {
 		return "", err
 	}
+	tmp := out.Name()
+	defer func() { _ = os.Remove(tmp) }()
 	if _, err := io.Copy(out, io.LimitReader(resp.Body, 512<<20)); err != nil {
 		out.Close()
 		return "", err
@@ -220,7 +223,13 @@ func (f *Fetcher) Jar(ctx context.Context, a Artifact) (string, error) {
 	if err := out.Close(); err != nil {
 		return "", err
 	}
-	return dst, os.Rename(tmp, dst)
+	if err := os.Rename(tmp, dst); err != nil {
+		if st, serr := os.Stat(dst); serr == nil && st.Size() > 0 {
+			return dst, nil // another run published it first (Windows refuses to replace)
+		}
+		return "", err
+	}
+	return dst, nil
 }
 
 // get fetches one URL (allowlisted, redirects re-checked); a non-200

@@ -197,3 +197,72 @@ func keys(m map[string]Mapping) []string {
 	}
 	return out
 }
+
+func TestInheritedMemberAndBackwardHops(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "h.sqlite")
+	w, err := index.Create(ctx, path, "h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []index.Symbol{
+		sym("com.revrobotics.spark.SparkMax", "revlib", "2026", "java", func(s *index.Symbol) { s.Signature = "public class SparkMax extends SparkBase" }),
+		sym("com.revrobotics.spark.SparkBase", "revlib", "2026", "java"),
+		sym("com.revrobotics.spark.SparkBase#getOutputCurrent", "revlib", "2026", "java", func(s *index.Symbol) { s.Kind = "method" }),
+		sym("com.revrobotics.spark.SparkBase", "revlib", "2027", "java"),
+		sym("com.revrobotics.spark.SparkBase#getOutputCurrent", "revlib", "2027", "java", func(s *index.Symbol) { s.Kind = "method" }),
+		sym(cs, "wpilib", "2026", "java"),
+		sym(cv, "wpilib", "2027", "java"),
+		sym("edu.wpi.first.wpilibj.Old", "wpilib", "2025", "java"),
+	} {
+		if err := w.AddSymbol(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, m := range []index.Migration{
+		{RuleID: "current", Library: "revlib", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "signature",
+			From: "com.revrobotics.spark.SparkBase#getOutputCurrent", To: "com.revrobotics.spark.SparkBase#getOutputCurrent",
+			Notes: "returns a Signal now", Citation: "https://example.org/rev", Verified: true},
+		{RuleID: "speeds", Library: "wpilib", Language: "java", FromSeason: "2026", ToSeason: "2027", Kind: "rename", From: cs, To: cv,
+			Citation: "https://example.org/w", Verified: true},
+	} {
+		if err := w.AddMigration(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := index.Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	e := retrieve.New([]*index.Reader{r}, retrieve.Options{})
+
+	// A member called on a subclass resolves to its declaring type's rule.
+	res := Map(ctx, e, Query{Code: "import com.revrobotics.spark.SparkMax;\nclass A { SparkMax m; double f() { return m.getOutputCurrent(); } }\n",
+		Language: "java", From: "2026", To: "2027"})
+	found := false
+	for _, mp := range res.Mappings {
+		found = found || mp.RuleID == "current"
+	}
+	if !found {
+		t.Fatalf("inherited member rule not reported: %+v", res)
+	}
+	// 2027 → 2025 needs evidence for every hop: 2026 has it, 2025 does not.
+	res = Map(ctx, e, Query{Symbol: cv, Language: "java", From: "2027", To: "2025"})
+	if len(res.Mappings) != 0 || len(res.Unresolved) != 1 {
+		t.Fatalf("backward over a season without evidence: %+v", res)
+	}
+	res = Map(ctx, e, Query{Symbol: cv, Language: "java", From: "2027", To: "2026"})
+	if len(res.Mappings) != 1 || res.Mappings[0].To != cs {
+		t.Fatalf("one-hop backward: %+v", res)
+	}
+	// Truncation is reported.
+	res = Map(ctx, e, Query{Code: "import edu.wpi.first.math.kinematics.ChassisSpeeds;\nimport com.revrobotics.spark.SparkMax;\n",
+		Language: "java", From: "2026", To: "2027", MaxRefs: 1})
+	if res.Omitted != 1 {
+		t.Fatalf("omitted = %d", res.Omitted)
+	}
+}

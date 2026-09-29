@@ -745,11 +745,14 @@ func (s *Server) migrate(ctx context.Context, _ *mcp.CallToolRequest, in Migrate
 		return nil, render.MigrateOut{}, fmt.Errorf("from and to are both %s; for one season use frc_api or frc_verify_code", from)
 	}
 	res := migrate.Map(ctx, e, migrate.Query{Symbol: in.Symbol, Code: code, Language: in.Language, From: from, To: to,
-		Members: in.IncludeMembers})
+		Members: in.IncludeMembers, MaxRefs: migrateMaxRefs})
 	out := render.MigrateOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
 		Season: to, PinSource: pinSource, Language: in.Language}, FromSeason: from, ToSeason: to,
 		Mappings: []render.MigrateMapping{}, Unresolved: []render.MigrateUnresolved{}, NotFound: res.NotFound,
 		AlreadyIn: res.AlreadyIn, Checked: res.Checked}
+	if res.Omitted > 0 {
+		out.Truncated, out.Omitted = true, res.Omitted
+	}
 	for _, m := range res.Mappings {
 		out.Mappings = append(out.Mappings, render.MigrateMapping(m))
 	}
@@ -778,8 +781,14 @@ func (s *Server) migrate(ctx context.Context, _ *mcp.CallToolRequest, in Migrate
 	default:
 		out.Next = []string{"after editing, run frc_verify_code with frc_season " + to}
 	}
+	if res.Omitted > 0 {
+		out.Next = append([]string{fmt.Sprintf("%d more API references were not mapped (limit %d per call); split the file or pass the remaining symbols one by one", res.Omitted, migrateMaxRefs)}, out.Next...)
+	}
 	return text(render.MigrateMarkdown(out)), out, nil
 }
+
+// migrateMaxRefs caps code-mode references per call (latency bound).
+const migrateMaxRefs = 300
 
 // migratePointers finds target-season docs and release notes that mention
 // an unresolved symbol (by simple name).
