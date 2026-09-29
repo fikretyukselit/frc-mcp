@@ -58,6 +58,41 @@ so clients cannot spoof their address. If you put another proxy or a CDN in fron
 **Hardening in the compose file.** The container runs as a non-root user on a read-only root filesystem with all
 capabilities dropped and `no-new-privileges`; only `/data` (the index) is writable. The images are pinned by digest.
 
+## Behind an existing nginx and Cloudflare (the Foundation's server)
+
+The public instance, `https://mrkaynak.com/frc/mcp`, shares a host with other sites, so it uses the host's nginx
+instead of Caddy:
+
+- **Container** (`/opt/frc-mcp/docker-compose.yml`): the released image pinned by digest, ports published on
+  `127.0.0.1` only (`7424` MCP, `9465` metrics), on its own network with a fixed gateway, plus the same hardening as
+  above and `mem_limit`, `cpus`, `pids_limit` and log rotation.
+- **Trusted proxies**: `--trust-proxy=<network gateway>/32,<Cloudflare ranges>`. nginx reaches the container through
+  the gateway, and Cloudflare is the hop in front of nginx, so the right-most untrusted `X-Forwarded-For` entry is the
+  real client. The Cloudflare list comes from `https://www.cloudflare.com/ips-v4` and `/ips-v6`; refresh it when
+  Cloudflare changes it.
+- **nginx** (inside the site's `server` block):
+
+  ```nginx
+  location = /frc/mcp {
+      proxy_pass http://127.0.0.1:7424/mcp;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Connection "";
+      proxy_buffering off;
+      proxy_read_timeout 90s;
+      client_max_body_size 1m;
+      access_log off;
+  }
+  location = /frc/healthz { proxy_pass http://127.0.0.1:7424/readyz; access_log off; }
+  ```
+
+Checked on 2026-09-29 against the live endpoint: `initialize`, `tools/list` and tool calls through Cloudflare; a
+per-client burst of 30 then `429`; another client unaffected meanwhile; spoofed `X-Forwarded-For` does not reset the
+bucket; `path` arguments refused; bodies over 1 MiB → `413`; cross-site browser requests → `403`; the MCP and
+metrics ports closed on the public address.
+
 ## Before announcing the URL
 
 Walk the launch checklist in `docs/security.md` §4.
