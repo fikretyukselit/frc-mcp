@@ -159,3 +159,20 @@ ctre::phoenix6::hardware::TalonFX m{1};
 		t.Errorf("2026 cpp: %+v", r.Findings)
 	}
 }
+
+func TestPythonSubmoduleImportIsNotAWarning(t *testing.T) {
+	e := engineOf(t, []row{
+		{"phoenix6.hardware.TalonFX", "phoenix6", "2026", "python", "class", "class TalonFX", ""},
+		{"wpimath.geometry.Pose2d", "wpilib", "2026", "python", "class", "class Pose2d", ""},
+		{"wpimath.Pose2d", "wpilib", "2027", "python", "class", "class Pose2d", ""},
+	})
+	ctx := context.Background()
+	r := verify.Check(ctx, e, "from phoenix6.hardware.talon_fx import TalonFX\n", "python", "2026", verify.Options{})
+	if r.Errors+r.Warnings != 0 || len(r.Findings) != 1 || r.Findings[0].Severity != "info" {
+		t.Fatalf("defining submodule import: %+v", r.Findings)
+	}
+	r = verify.Check(ctx, e, "from wpimath.geometry import Pose2d\n", "python", "2027", verify.Options{})
+	if r.Warnings != 1 || r.Findings[0].Fix != "from wpimath import Pose2d" {
+		t.Fatalf("2026 path in a 2027 project: %+v", r.Findings)
+	}
+}
