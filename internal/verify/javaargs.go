@@ -69,10 +69,21 @@ func (k argKind) String() string {
 // src (comments and literal contents already blanked by stripJava). It
 // returns nil, false when the parentheses do not balance.
 func callArgs(src string, off int) ([]string, bool) {
-	depth, start := 0, off
+	depth, generic, start := 0, 0, off
 	var out []string
 	for i := off; i < len(src); i++ {
 		switch src[i] {
+		case '<':
+			// A type argument list ("HashMap<K, V>()", "c.<K, V>of()") opens
+			// right after an identifier or a dot with a type (or ?/>) next;
+			// "a < b" has spaces.
+			if i > 0 && (isIdentByte(src[i-1]) || src[i-1] == '.') && i+1 < len(src) && (src[i+1] >= 'A' && src[i+1] <= 'Z' || src[i+1] == '?' || src[i+1] == '>') {
+				generic++
+			}
+		case '>':
+			if generic > 0 {
+				generic--
+			}
 		case '(', '[', '{':
 			depth++
 		case ')', ']', '}':
@@ -87,7 +98,7 @@ func callArgs(src string, off int) ([]string, bool) {
 			}
 			depth--
 		case ',':
-			if depth == 0 {
+			if depth == 0 && generic == 0 {
 				out = append(out, src[start:i])
 				start = i + 1
 			}
@@ -141,7 +152,7 @@ func params(sig string) ([]param, bool) {
 
 // accepts reports whether a literal kind can be passed as type t.
 func accepts(t string, k argKind) bool {
-	t = strings.TrimSuffix(t, "[]")
+	t = strings.TrimPrefix(strings.TrimSuffix(t, "[]"), "java.lang.")
 	if k == argOther || t == "Object" || isTypeVar(t) {
 		return true
 	}
@@ -173,6 +184,10 @@ func accepts(t string, k argKind) bool {
 		return true
 	}
 	return false
+}
+
+func isIdentByte(c byte) bool {
+	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
 func isTypeVar(t string) bool {

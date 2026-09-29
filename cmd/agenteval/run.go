@@ -152,6 +152,12 @@ func runOne(ctx context.Context, e *env, agent agenteval.Agent, t agenteval.Task
 	if err != nil {
 		return r, err
 	}
+	// An interrupted run (Ctrl-C, or another run failed) is not a result:
+	// recording it as a failed compile would bias against the slower arm,
+	// and resuming would then skip it.
+	if ctx.Err() != nil {
+		return r, ctx.Err()
+	}
 	if r.Condition == agenteval.WithMCP && !hasServer(r.Agent.MCPServers, "frc:connected") {
 		log.Warn("frc-mcp did not connect", "task", t.ID, "servers", r.Agent.MCPServers)
 	}

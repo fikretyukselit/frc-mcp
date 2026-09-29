@@ -72,7 +72,7 @@ func (e *env) classpath(ctx context.Context, s agenteval.Season, deps []agenteva
 		for _, a := range va {
 			for _, r := range append([]string{a.Repo}, a.Fallbacks...) {
 				if host := hostOf(r); host != "" {
-					e.fetch.Hosts = appendUnique(e.fetch.Hosts, host)
+					e.fetch.AllowHost(host)
 				}
 			}
 		}
@@ -89,15 +89,6 @@ func hostOf(u string) string {
 	u = strings.TrimPrefix(u, "https://")
 	h, _, _ := strings.Cut(u, "/")
 	return h
-}
-
-func appendUnique(xs []string, x string) []string {
-	for _, v := range xs {
-		if v == x {
-			return xs
-		}
-	}
-	return append(xs, x)
 }
 
 func defaultCache() string {

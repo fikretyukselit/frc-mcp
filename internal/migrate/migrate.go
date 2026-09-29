@@ -103,10 +103,14 @@ func Map(ctx context.Context, r Resolver, q Query) Result {
 			refs = refs[:q.MaxRefs]
 		}
 		seen := map[string]bool{}
+		used := map[string]bool{} // references the file makes itself: reported at their own line
+		for _, ref := range refs {
+			used[ref.Symbol] = true
+		}
 		for _, ref := range refs {
 			// Member rules of used types surface constructor and signature
 			// changes (new TalonFX(id, "canivore")) that no ref names.
-			m := mapper{r: r, lang: lang, from: q.From, to: q.To, line: ref.Line, members: !ref.Member, seen: seen}
+			m := mapper{r: r, lang: lang, from: q.From, to: q.To, line: ref.Line, members: !ref.Member, seen: seen, used: used}
 			m.symbol(ctx, ref.Symbol, &res, true)
 		}
 		return res
@@ -122,6 +126,7 @@ type mapper struct {
 	line           int
 	members        bool
 	seen           map[string]bool // "lang fqn" already reported
+	used           map[string]bool // code mode: symbols the file references directly
 }
 
 // symbol resolves a name in the from season and maps each match. In code
@@ -300,6 +305,9 @@ func (m *mapper) forward(ctx context.Context, s index.Symbol, res *Result) {
 	if m.members && !strings.Contains(s.FQN, "#") {
 		for _, mr := range m.r.MigrationsFrom(ctx, s.FQN, s.Language, true) {
 			key := "rule " + mr.Language + " " + mr.RuleID + " " + mr.From
+			if m.used[mr.From] {
+				continue // the file calls this member: mapped at the call's own line
+			}
 			if mr.From != s.FQN && mr.FromSeason >= s.Season && mr.ToSeason <= m.to && !m.seen[key] {
 				m.seen[key] = true
 				m.seen[mr.Language+" "+mr.From] = true

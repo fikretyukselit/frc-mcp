@@ -62,7 +62,8 @@ func TestArtifactsAndVendordep(t *testing.T) {
 	if err != nil || len(arts) != 1 || arts[0].URL() != "https://maven.revrobotics.com/com/revrobotics/frc/REVLib-java/2027.0.0-alpha-7/REVLib-java-2027.0.0-alpha-7.jar" {
 		t.Fatalf("%v %v", arts, err)
 	}
-	f := &Fetcher{Hosts: []string{"maven.revrobotics.com"}}
+	f := &Fetcher{}
+	f.AllowHost("maven.revrobotics.com")
 	for u, want := range map[string]bool{"https://maven.revrobotics.com/x.jar": true, "https://evil.example/x.jar": false, "http://frcmaven.wpi.edu/x": false} {
 		if f.allowed(u) != want {
 			t.Errorf("allowed(%s) != %v", u, want)
