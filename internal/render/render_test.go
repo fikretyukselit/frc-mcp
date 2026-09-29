@@ -155,3 +155,26 @@ func TestFetchAndAPIGolden(t *testing.T) {
 	}
 	golden(t, "api_version_mismatch", render.APIMarkdown(o))
 }
+
+// TestHardwareGolden: one column per (source, season), motor fields first,
+// any other unit-suffixed key after, and every source's citation and note.
+func TestHardwareGolden(t *testing.T) {
+	cite := func(url, lib, rev, lic, trust string) render.Citation {
+		return render.Citation{SourceURL: url, Library: lib, Version: rev, UpstreamRev: rev, RetrievedAt: "2026-09-29T00:00:00Z",
+			License: lic, Trust: trust}
+	}
+	out := render.HardwareOut{Envelope: render.Envelope{Status: "ok", Confidence: 1, Freshness: "shard", Season: "2026", PinSource: "default"},
+		Parts: []render.HWPartOut{
+			{Part: "neo", Name: "NEO", Category: "motor", Sim: map[string]string{"java": "DCMotor.getNEO(numMotors)"}, Sources: []render.HWSourceRow{
+				{Source: "recalc", Season: "all", Fields: map[string]float64{"stall_torque_nm": 4.201, "free_speed_rpm": 5906, "motor_weight_lb": 0.938},
+					Note: "ReCalc data source: CTRE; brushless; sold by REV", Citation: cite("https://github.com/tervay/recalc/blob/8702a80/app/lib/models/Motor.ts", "recalc", "8702a80", "MIT", "community")},
+				{Source: "wpilib-dcmotor", Season: "2026", Fields: map[string]float64{"stall_torque_nm": 2.6, "free_speed_rpm": 5676},
+					Factory: "getNEO", Citation: cite("https://github.com/wpilibsuite/allwpilib/blob/v2026.2.2/DCMotor.java", "wpilib", "v2026.2.2", "BSD-3-Clause", "official")},
+			}},
+			{Part: "sdsmk4i", Name: "SDS MK4i", Category: "swerve_module", Sources: []render.HWSourceRow{
+				{Source: "sds", Season: "all", Fields: map[string]float64{"steer_ratio": 21.428571428571427, "weight_with_neo_lb": 6},
+					Note: "Steering ratio 150/7:1.", Citation: cite("https://www.swervedrivespecialties.com/products/mk4i-swerve-module", "sds", "checked 2026-09-29", "MIT", "vendor")},
+			}},
+		}}
+	golden(t, "hardware_sources", render.HardwareMarkdown(out))
+}

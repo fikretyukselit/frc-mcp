@@ -1,0 +1,136 @@
+# Curated swerve module specs (frc_hardware category swerve_module).
+# Every number is copied from the page in `citation`, read on `checked`.
+# Drive gear ratios are not listed: SDS, WCP and REV publish them only as a
+# table image (SDS, REV) or an SVG (WCP), so they cannot be copied reliably.
+# Keys carry their unit (docs/mcp-surface.md frc_hardware); ratios are
+# dimensionless (input turns per output turn).
+license: MIT # this file: our compilation of the cited facts, notes in our words
+trust: vendor
+shard: hardware
+parts:
+  - part: sdsmk4
+    name: SDS MK4
+    category: swerve_module
+    source: sds
+    citation: https://www.swervedrivespecialties.com/products/mk4-swerve-module
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 12.8
+      weight_with_neo_lb: 4.9
+      weight_with_falcon500_lb: 5.2
+    note: >-
+      Steering ratio 12.8:1. Four drive ratios (L1 to L4) are offered; the page shows them only as an image.
+      Weights are SDS's approximate figures for a module with the named motors.
+  - part: sdsmk4i
+    name: SDS MK4i
+    category: swerve_module
+    source: sds
+    citation: https://www.swervedrivespecialties.com/products/mk4i-swerve-module
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 21.428571428571427
+      weight_with_neo_lb: 6.0
+      weight_with_falcon500_lb: 6.3
+    note: >-
+      Steering ratio 150/7:1 (the value above is 150/7). Same L1, L2 and L3 drive ratios as the MK4; the page shows
+      them only as an image. Approximate weights include encoder, lower mounting plate, hardware and wires.
+  - part: sdsmk4n
+    name: SDS MK4n
+    category: swerve_module
+    source: sds
+    citation: https://www.swervedrivespecialties.com/products/mk4n-swerve-module
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 18.75
+      weight_with_krakenx60_lb: 6.5
+      weight_with_neo_lb: 6.0
+    note: >-
+      Steering ratio 18.75:1. Drive ratios L1+, L2+ and L3+ (same as the MK4i with the 16T drive pinion kit) are
+      shown only as an image. Mirrored A and B layouts. Accepts 0.25 in magnet encoders or a 0.5 in hex encoder.
+  - part: sdsmk5i
+    name: SDS MK5i
+    category: swerve_module
+    source: sds
+    citation: https://www.swervedrivespecialties.com/products/mk5i-swerve-module
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 26
+      weight_without_motors_encoder_lb: 4.1
+      weight_ready_to_run_lb: 6.1
+    note: >-
+      Steering ratio 26:1, fully gear-driven steering; three drive ratios are included (shown only as an image).
+      Ready-to-run weight includes steering encoder, a Kraken X44 steering motor and a Kraken X60 (or NEO with
+      SPARK MAX) drive motor.
+  - part: sdsmk5n
+    name: SDS MK5n
+    category: swerve_module
+    source: sds
+    citation: https://www.swervedrivespecialties.com/products/mk5n-swerve-module
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 26.09090909090909
+      weight_without_motors_encoder_lb: 3.9
+      weight_ready_to_run_lb: 5.9
+    note: >-
+      Steering ratio 287:11 (the value above is 287/11, about 26.09:1); steering motor is a Kraken X44. Three drive
+      ratios are included (shown only as an image). Mirrored A and B layouts.
+  - part: revmaxswerve
+    name: REV MAXSwerve (3 in)
+    category: swerve_module
+    source: rev
+    citation: https://www.revrobotics.com/rev-21-3005/
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 46.423645320197046
+      wheel_diameter_in: 3
+      weight_with_neo_lb: 3.80
+      weight_with_falcon500_lb: 3.97
+    note: >-
+      Azimuth ratio exactly 9424:203 (about 46.42:1), driven by a NEO 550 through an UltraPlanetary. Low, mid and
+      high speed drive pinions (12T, 13T, 14T) are included; the resulting drive ratios are not given as text. The
+      included Through Bore Encoder gives 10-bit angle resolution on the turning axis.
+  - part: wcpswervex
+    name: WCP Swerve X
+    category: swerve_module
+    source: wcp
+    citation: https://docs.wcproducts.com/welcome/gearboxes/wcp-swerve-x/general-info/ratio-options
+    checked: 2026-09-29
+    fields:
+      steer_ratio_standard: 11.314285714285715
+      steer_ratio_flipped: 13.371428571428572
+    note: >-
+      Rotation ratio 396/35:1 (standard) or 468/35:1 (flipped, gears below) with the 10t steering pinions. Drive
+      ratio sets X1 to X3 are shown only as an image.
+  - part: wcpswervex2
+    name: WCP Swerve X2
+    category: swerve_module
+    source: wcp
+    citation: https://docs.wcproducts.com/welcome/gearboxes/wcp-swerve-x2/general-info/ratio-options
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 12.1
+    note: >-
+      Rotation ratio 12.1:1 with the 10t steering pinions, for every motor configuration. Drive ratio sets X1 to X4
+      are shown only as an image.
+  - part: wcpswervex2s
+    name: WCP Swerve X2S
+    category: swerve_module
+    source: wcp
+    citation: https://docs.wcproducts.com/welcome/gearboxes/wcp-swerve-x2s/general-info/ratio-options
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 25.9
+    note: >-
+      Steering ratio 25.9:1 with the 8t steering pinion (Kraken X44, NEO 550, 775 Pro and 775 RedLine pinions
+      included). Drive ratio sets X1 to X3.
+  - part: wcpswervexs
+    name: WCP Swerve XS
+    category: swerve_module
+    source: wcp
+    citation: https://docs.wcproducts.com/welcome/gearboxes/wcp-swerve-xs/general-info/ratio-options
+    checked: 2026-09-29
+    fields:
+      steer_ratio: 41.25
+    note: >-
+      Rotation ratio 165/4:1 (41.25:1) with the 8t pinions for 550/775-size steering motors. Drive ratio sets X1 and
+      X2.

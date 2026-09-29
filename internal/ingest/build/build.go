@@ -20,6 +20,7 @@ import (
 
 	"github.com/fikretyukselit/frc-mcp/internal/apisym"
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
+	"github.com/fikretyukselit/frc-mcp/internal/hwdata"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/dcmotor"
@@ -29,7 +30,9 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/gitbook"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/javadoc"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/pypi"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/recalc"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/repomd"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/specpage"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/sphinx"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/vendordeps"
 	"github.com/fikretyukselit/frc-mcp/internal/migrate"
@@ -46,8 +49,10 @@ type Options struct {
 	SourceIDs []string
 	// MigrationsDir holds the curated rules (data/migrations); "" skips them.
 	MigrationsDir string
-	Embed         bool // compute vector layers with the registry's first model
-	Log           *slog.Logger
+	// HardwareDir holds the curated hardware specs (data/hardware); "" skips them.
+	HardwareDir string
+	Embed       bool // compute vector layers with the registry's first model
+	Log         *slog.Logger
 }
 
 // Report summarizes a run.
@@ -57,10 +62,14 @@ type Report struct {
 	Diffs   []DiffReport   `json:"diffs"`
 	// Migrations counts curated rules written; rules whose from-season table
 	// is not part of this run are skipped (that shard is not rebuilt).
-	Migrations        int    `json:"migrations"`
-	MigrationsSkipped int    `json:"migrations_skipped,omitempty"`
-	Model             string `json:"model,omitempty"`
-	Elapsed           string `json:"elapsed"`
+	Migrations        int `json:"migrations"`
+	MigrationsSkipped int `json:"migrations_skipped,omitempty"`
+	// HardwareCurated counts data/hardware rows written; rows whose shard is
+	// not part of this run are skipped (that shard is not rebuilt).
+	HardwareCurated        int    `json:"hardware_curated,omitempty"`
+	HardwareCuratedSkipped int    `json:"hardware_curated_skipped,omitempty"`
+	Model                  string `json:"model,omitempty"`
+	Elapsed                string `json:"elapsed"`
 }
 
 type SourceReport struct {
@@ -134,6 +143,7 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 		}
 		sr := SourceReport{ID: src.ID, NotModified: res.NotModified, Bytes: res.Size, Rev: rev}
 		addChunk := func(c index.Chunk) error { sd.chunks = append(sd.chunks, c); sr.Chunks++; return nil }
+		addHW := func(h index.HWSpec) error { sd.hwspecs = append(sd.hwspecs, h); sr.Symbols++; return nil }
 		switch src.Adapter {
 		case "sphinx-htmlzip":
 			_, err = sphinx.Parse(res.Path, src, rev, res.FetchedAt, addChunk)
@@ -154,8 +164,11 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 			_, err = doxygen.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
 		case "wpilib-dcmotor":
-			_, err = dcmotor.Parse(res.Path, src, rev, res.FetchedAt,
-				func(h index.HWSpec) error { sd.hwspecs = append(sd.hwspecs, h); sr.Symbols++; return nil })
+			_, err = dcmotor.Parse(res.Path, src, rev, res.FetchedAt, addHW)
+		case "recalc-motors":
+			_, err = recalc.Parse(res.Path, src, res.FetchedAt, addHW)
+		case "gitbook-spec-table":
+			_, err = specpage.Parse(res.Path, src, rev, res.FetchedAt, addHW)
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
@@ -183,6 +196,16 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 			return nil, err
 		}
 		if rep.Migrations, rep.MigrationsSkipped, err = applyMigrations(shards, rules); err != nil {
+			return nil, err
+		}
+	}
+
+	if opt.HardwareDir != "" {
+		rows, err := hwdata.Load(opt.HardwareDir)
+		if err != nil {
+			return nil, err
+		}
+		if rep.HardwareCurated, rep.HardwareCuratedSkipped, err = applyHardware(shards, rows); err != nil {
 			return nil, err
 		}
 	}
@@ -326,6 +349,38 @@ func applyMigrations(shards map[string]*shardData, rules []index.Migration) (wri
 	}
 	if len(bad) > 0 {
 		return 0, 0, fmt.Errorf("migrate: %d curated rule(s) do not match the symbol tables:\n  %s", len(bad), strings.Join(bad, "\n  "))
+	}
+	return written, skipped, nil
+}
+
+// applyHardware adds the curated hardware rows to their shard when that shard
+// is built in this run (a partial run must not overwrite the full shard with
+// only the curated rows), and fails on a (part, source, season) that two
+// sources both produce: hw_spec rows are never silently replaced.
+func applyHardware(shards map[string]*shardData, rows []hwdata.Row) (written, skipped int, err error) {
+	for _, r := range rows {
+		sd := shards[r.Shard]
+		if sd == nil {
+			skipped++
+			continue
+		}
+		sd.hwspecs = append(sd.hwspecs, r.Spec)
+		written++
+	}
+	names := make([]string, 0, len(shards))
+	for n := range shards {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		seen := map[string]bool{}
+		for _, h := range shards[n].hwspecs {
+			k := h.Part + "/" + h.Source + "/" + h.Season
+			if seen[k] {
+				return 0, 0, fmt.Errorf("hardware: shard %s has two rows for part %s from source %s (%s)", n, h.Part, h.Source, h.Season)
+			}
+			seen[k] = true
+		}
 	}
 	return written, skipped, nil
 }

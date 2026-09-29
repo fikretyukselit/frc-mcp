@@ -176,6 +176,12 @@ func New(shards []*index.Reader, opt Options) *Engine {
 		}
 		e.hwspecs = append(e.hwspecs, hs...)
 	}
+	// Rows of one part can come from several shards (hardware and
+	// hardware-restricted): order them as one table would.
+	slices.SortStableFunc(e.hwspecs, func(a, b index.HWSpec) int {
+		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Part, b.Part), cmp.Compare(a.Source, b.Source),
+			cmp.Compare(a.Season, b.Season))
+	})
 	e.migFrom, e.migTo = map[string][]int{}, map[string][]int{}
 	symSeasons := map[string]bool{}
 	for i, s := range shards {
@@ -262,8 +268,12 @@ func (e *Engine) WhatsNew(q WhatsNewQuery) []index.Release {
 var partAliases = map[string]string{
 	"kraken": "krakenx60", "x60": "krakenx60", "krakenx60": "krakenx60", "x44": "krakenx44", "krakenx44": "krakenx44",
 	"falcon": "falcon500", "falcon500": "falcon500", "vortex": "neovortex", "neovortex": "neovortex", "sparkflexvortex": "neovortex",
-	"neo": "neo", "neov11": "neo", "neo550": "neo550", "550": "neo550", "775": "vex775pro", "775pro": "vex775pro",
-	"vex775pro": "vex775pro", "cim": "cim", "minicim": "minicim", "bag": "bag", "minion": "minion", "romi": "romibuiltin",
+	"neo": "neo", "neov11": "neo", "neov1.1": "neo", "neo2.0": "neo2", "neov2": "neo2", "neo550": "neo550", "550": "neo550",
+	"775": "vex775pro", "775pro": "vex775pro", "vex775pro": "vex775pro", "redline": "775redline", "775redline": "775redline",
+	"cim": "cim", "minicim": "minicim", "bag": "bag", "minion": "minion", "pulsar": "thriftypulsar", "romi": "romibuiltin",
+	"pigeon": "ctrepigeon2", "pigeon2": "ctrepigeon2", "pigeon2.0": "ctrepigeon2", "canandgyro": "reduxcanandgyro",
+	"borongyro": "reduxcanandgyro", "boron": "reduxcanandgyro", "throughbore": "revthroughborev2",
+	"throughboreencoder": "revthroughborev2", "tbe": "revthroughborev2", "maxswerve": "revmaxswerve",
 }
 
 // PartID normalizes a part name: "Kraken X60 FOC" → "krakenx60-foc".
@@ -283,6 +293,10 @@ func PartID(name string) string {
 	return n
 }
 
+// SeasonAll is the season of hardware rows that do not depend on the FRC
+// season (ReCalc, vendor spec pages, curated data): they answer every season.
+const SeasonAll = "all"
+
 // HWPart groups every source's rows for one part.
 type HWPart struct {
 	Part, Name, Category string
@@ -290,7 +304,8 @@ type HWPart struct {
 }
 
 // Hardware returns the rows for the given parts (or a category), one group
-// per part, with every source and season kept separate.
+// per part, with every source and season kept separate. A season filter
+// keeps that season's rows plus the season-independent ones (SeasonAll).
 func (e *Engine) Hardware(parts []string, category, season string) (found []HWPart, unknown []string) {
 	known := e.HardwareParts()
 	want := map[string]bool{}
@@ -298,15 +313,23 @@ func (e *Engine) Hardware(parts []string, category, season string) (found []HWPa
 	for _, p := range parts {
 		id := PartID(p)
 		if !slices.Contains(known, id) {
-			// A unique prefix is accepted: "andymark rs775" → andymarkrs775_125.
-			var cands []string
-			for _, k := range known {
-				if strings.HasPrefix(k, id) && !strings.HasSuffix(k, "-foc") {
-					cands = append(cands, k)
+			// A unique prefix is accepted ("andymark rs775" → andymarkrs775_125),
+			// then a unique suffix, for names without the vendor ("mk4i" →
+			// sdsmk4i, "cancoder" → ctrecancoder).
+			for _, match := range []func(k string) bool{
+				func(k string) bool { return strings.HasPrefix(k, id) },
+				func(k string) bool { return strings.HasSuffix(k, id) },
+			} {
+				var cands []string
+				for _, k := range known {
+					if match(k) && !strings.HasSuffix(k, "-foc") {
+						cands = append(cands, k)
+					}
 				}
-			}
-			if len(cands) == 1 {
-				id = cands[0]
+				if len(cands) == 1 {
+					id = cands[0]
+					break
+				}
 			}
 		}
 		want[id], resolved[p] = true, id
@@ -318,7 +341,7 @@ func (e *Engine) Hardware(parts []string, category, season string) (found []HWPa
 			continue
 		case len(want) == 0 && category != "" && h.Category != category:
 			continue
-		case season != "" && h.Season != season:
+		case season != "" && h.Season != season && h.Season != SeasonAll:
 			continue
 		}
 		i, ok := idx[h.Part]

@@ -32,7 +32,7 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Egress guard, sanitizer (`internal/netguard`, `internal/ingest/sanitize`) | ✅ implemented |
 | Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context`, `frc_vendordep`, `frc_verify_code`, `frc_whats_new`, `frc_hardware`, `frc_migrate` | ✅ implemented (9 tools) |
 | Release facts (`github-releases` adapter, `release` table) | ✅ WPILib + 7 vendors, seasons ≥ 2025 |
-| Hardware facts (`wpilib-dcmotor` adapter, `hw_spec` table, `frc_hardware`) | ✅ 20 motors from WPILib DCMotor (2026 + 2027), sim factories per language |
+| Hardware facts (`wpilib-dcmotor`, `recalc-motors`, `gitbook-spec-table` adapters, curated `data/hardware/`, `hw_spec` table, `frc_hardware`) | ✅ motors from WPILib DCMotor (19, 2026 + 2027), ReCalc (21) and REV/WCP spec pages (8 rows, unpublished `hardware-restricted` shard); curated swerve modules (10), encoders (4), IMUs (2); every source its own column; sim factories per language |
 | Vendordep catalog facts (`internal/facts`, `source/vendordeps`) | ✅ WPILib vendor-json-repo, 2026 + 2027-alpha |
 | Verifier (`internal/verify`, `frc-mcp verify`) | ✅ Java (incl. call shapes), C++ and Python; WPILib + 7 vendor libraries (checked only when that season's table is indexed; version skew caps findings at warning): 0 false errors on 139k lines of public 2026 team code |
 | Migration (`internal/migrate`, `data/migrations/`, `frc_migrate`, `frc-mcp migrate`) | ✅ 238 curated 2026 → 2027 rules (366 per language) with citations, plus upstream and generated mappings: 97.8% of API references in 12 team repositories map to 2027 |
@@ -42,7 +42,7 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
 | WPILib C++ API (`doxygen-zip`) | ✅ 2026 + 2027-alpha, ~20k symbols; 5,962 `frc::`→`wpi::` moves mapped automatically |
 | Opt-in forum (`discourse-rss`: Chief Delphi `latest.rss` + `posts.rss`, shard `forum`) | ✅ trust `community`, searched only with `kinds: ["forum"]` or troubleshooting intent, fenced as untrusted data; built locally, never published (user content, `docs/sources.md` §0.1.1) |
-| Vendor C++ APIs, more hardware sources | ⏳ M3 leftovers |
+| Vendor C++ APIs | ⏳ M3 leftover |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -148,6 +148,26 @@ it cannot map; those are the rules worth writing. A rule lives in `data/migratio
 - Run `go test ./internal/migrate` and `make index` (the build validates every rule), then re-run `frc-mcp migrate`
   on the code that needed the rule.
 
+## 8a. Adding hardware data
+
+Machine-readable upstreams get an adapter (§7). Everything else goes in `data/hardware/<category>.yaml`:
+
+```yaml
+  - part: sdsmk4i              # lower-case letters and digits; reuse an existing id for the same part
+    name: SDS MK4i
+    category: swerve_module    # motor | encoder | imu | swerve_module
+    source: sds                # the vendor whose page you read; one row per (part, source)
+    citation: https://www.swervedrivespecialties.com/products/mk4i-swerve-module
+    checked: 2026-09-29        # the day you read it
+    fields:                    # numbers only, unit in the key suffix (_nm, _rpm, _a, _lb, _in, _bits, _deg_per_hour, ...)
+      steer_ratio: 21.428571428571427   # ratios are dimensionless
+    note: >-
+      What the numbers mean and anything that is not a number (interface, conditions).
+```
+
+- **Every number comes from the cited page** (or a `see_also` page). No estimates, no numbers from memory.
+- `go test ./internal/hwdata` validates the committed files; `make index` loads them.
+
 ## 9. Open work (pick one, open an issue first so two people don't take the same item)
 
 | Item | Size | Where |
@@ -161,7 +181,7 @@ it cannot map; those are the rules worth writing. A rule lives in `data/migratio
 | More agent-eval tasks (C++ and Python tasks need a compile step per language) | M | `eval/tasks/`, `internal/agenteval` |
 | Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |
 | More community sources (r/FRC RSS, YouTube titles), each probed for robots.txt and ToS first like Chief Delphi (`docs/sources.md` §0.1.1) | S–M each | `internal/ingest/source`, `data/sources.yaml` |
-| More `frc_hardware` sources: CTRE/REV dyno pages, ReCalc (MIT) motor data, encoders/IMUs/swerve modules — each its own labeled source | M each | `internal/ingest/source`, `hw_spec` |
+| More `frc_hardware` data: swerve drive ratios (vendors publish them only as images; transcribe with a citation), motor controllers, more encoders/IMUs (navX2 specs are PDF-only); ask REV and WCP to allow redistributing their spec pages (`hardware-restricted`) | S each | `data/hardware/`, `docs/sources.md` §6 |
 | `frc_whats_new` `live` probe (allowlisted GitHub API call at query time) | M | `internal/mcpserver`, `internal/netguard` |
 | MCP conformance suite and goreleaser snapshot in CI; sync check on all 3 OSes | M | `.github/workflows/` |
 | Packaging: Homebrew, Scoop, Winget | M | `.goreleaser.yaml` |

@@ -222,9 +222,9 @@ type WhatsNewOut struct {
 
 // HWSourceRow is one source's values for a part (never merged across sources).
 type HWSourceRow struct {
-	Source  string             `json:"source" jsonschema:"where the numbers come from, e.g. wpilib-dcmotor (WPILib simulation constants)"`
-	Season  string             `json:"frc_season"`
-	Fields  map[string]float64 `json:"fields" jsonschema:"values with unit-suffixed keys: stall_torque_nm, stall_current_a, free_current_a, free_speed_rpm, nominal_voltage_v"`
+	Source  string             `json:"source" jsonschema:"where the numbers come from: wpilib-dcmotor (WPILib simulation constants), recalc (ReCalc, mostly vendor dynos), <vendor>-docs (a vendor spec page) or a vendor (sds, rev, ctre, redux, wcp: curated from the cited page)"`
+	Season  string             `json:"frc_season" jsonschema:"season of the source; all = does not depend on the season"`
+	Fields  map[string]float64 `json:"fields" jsonschema:"values with unit-suffixed keys, e.g. stall_torque_nm, free_speed_rpm, stall_current_a, free_current_a, nominal_voltage_v, kv_rpm_per_v, motor_weight_lb, steer_ratio, wheel_diameter_in, quadrature_cpr, absolute_resolution_bits, yaw_drift_no_motion_deg_per_hour; ratios are dimensionless"`
 	Factory string             `json:"factory,omitempty"`
 	Note    string             `json:"note,omitempty" jsonschema:"the source's own provenance note (e.g. the dyno it copied)"`
 	Citation
@@ -232,11 +232,14 @@ type HWSourceRow struct {
 
 // HWPartOut is one part in frc_hardware.
 type HWPartOut struct {
-	Part     string            `json:"part"`
-	Name     string            `json:"name"`
-	Category string            `json:"category"`
-	Sources  []HWSourceRow     `json:"sources"`
-	Sim      map[string]string `json:"sim,omitempty" jsonschema:"WPILib simulation factory per language (from the indexed API tables)"`
+	Part     string        `json:"part"`
+	Name     string        `json:"name"`
+	Category string        `json:"category" jsonschema:"motor | encoder | imu | swerve_module"`
+	Sources  []HWSourceRow `json:"sources" jsonschema:"one entry per (source, season); empty in a category listing"`
+	// Available lists the source labels of a part in a category listing,
+	// which leaves the rows out to stay within the token budget.
+	Available []string          `json:"available_sources,omitempty" jsonschema:"category listing only: sources with data for the part; ask for the part by id to get the values"`
+	Sim       map[string]string `json:"sim,omitempty" jsonschema:"WPILib simulation factory per language (from the indexed API tables)"`
 }
 
 // HardwareOut is frc_hardware's result.
