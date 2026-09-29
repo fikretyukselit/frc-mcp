@@ -23,6 +23,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/hwdata"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/cppheader"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/dcmotor"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/discourse"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/doxygen"
@@ -162,6 +163,9 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
 		case "doxygen-zip":
 			_, err = doxygen.Parse(res.Path, src, rev, res.FetchedAt,
+				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
+		case "cpp-headers-zip":
+			_, err = cppheader.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
 		case "wpilib-dcmotor":
 			_, err = dcmotor.Parse(res.Path, src, rev, res.FetchedAt, addHW)

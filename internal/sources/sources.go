@@ -42,7 +42,7 @@ type Source struct {
 
 	// Markdown adapters (github-markdown, gitbook-llms).
 	Include   string   `yaml:"include"`   // path prefix inside the archive / site to ingest
-	Skip      []string `yaml:"skip"`      // path prefixes (relative to include) to leave out
+	Skip      []string `yaml:"skip"`      // path prefixes (relative to include) to leave out; cpp-headers-zip: header paths in the zip
 	URLStyle  string   `yaml:"url_style"` // html (a/b.html) | dir (a/b/) | plain (a/b); github-markdown only
 	Lowercase bool     `yaml:"lowercase"` // lower-case page URLs (Writerside)
 
@@ -83,7 +83,7 @@ type Model struct {
 }
 
 // Adapters known to this binary.
-var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip", "wpilib-dcmotor", "recalc-motors", "gitbook-spec-table", "discourse-rss"}
+var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip", "cpp-headers-zip", "wpilib-dcmotor", "recalc-motors", "gitbook-spec-table", "discourse-rss"}
 
 // partRe matches a hw_spec part id or source label ("krakenx60-foc",
 // "andymarkrs775_125", "rev-docs").
