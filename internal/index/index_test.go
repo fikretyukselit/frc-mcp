@@ -231,3 +231,32 @@ func TestNoStat4Samples(t *testing.T) {
 		t.Fatalf("stat1 rows %d err %v", n, err)
 	}
 }
+
+func TestLicensesCoverSymbolsAndFacts(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "l.sqlite")
+	w, err := Create(ctx, path, "l")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.AddSymbol(ctx, Symbol{FQN: "a.B", Library: "x", Version: "1", Season: "2026", Language: "java", Kind: "class",
+		Signature: "class B", SourceURL: "https://x", UpstreamRev: "r", RetrievedAt: time.Unix(1, 0), License: "LicenseRef-X", Trust: "vendor"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.AddHWSpec(ctx, HWSpec{Part: "p", Name: "P", Category: "motor", Source: "s", Season: "2026", Fields: map[string]float64{"a_v": 1},
+		SourceURL: "https://x", License: "MIT", Trust: "vendor"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	got, err := r.Licenses(ctx)
+	if err != nil || len(got) != 2 || got[0] != "LicenseRef-X" || got[1] != "MIT" {
+		t.Fatalf("licenses = %v, %v", got, err)
+	}
+}

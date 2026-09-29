@@ -123,10 +123,9 @@ func refCheck(ctx context.Context, r Resolver, code, lang, season string) Result
 const partialRefs = "partial (qualified names, imports, members on receivers of known type)"
 
 // movedModule handles Python names imported from a module path the pinned
-// season does not use while the same top-level package still exports the
-// class elsewhere (wpimath.geometry.Pose2d vs wpimath.Pose2d). Python
-// packages re-export freely, so this is a warning with the indexed path,
-// never an error.
+// season does not list while the same top-level package exports the class
+// elsewhere. Python packages re-export freely, so this is never an error: a
+// warning when the path is another season's canonical one, info otherwise.
 func movedModule(ctx context.Context, r Resolver, fqn, season string, emit func(Finding)) bool {
 	if len(exact(ctx, r, fqn, season, "python")) > 0 {
 		return false
@@ -144,8 +143,20 @@ func movedModule(ctx context.Context, r Resolver, fqn, season string, emit func(
 		return false
 	}
 	mod := paths[0][:strings.LastIndexByte(paths[0], '.')]
-	emit(Finding{Symbol: fqn, Severity: "warning", Kind: "wrong_season",
-		Message: fmt.Sprintf("%s is not at this module path in the %s API; it is %s", fqn, season, paths[0]),
-		Fix:     fmt.Sprintf("from %s import %s", mod, name)})
+	f := Finding{Symbol: fqn, Severity: "info", Kind: "unknown",
+		Message: fmt.Sprintf("%s is imported from a submodule; the %s API lists it as %s", fqn, season, paths[0])}
+	// Only a path that is the canonical one in another season is a season
+	// move (wpimath.geometry.Pose2d in a 2027 project). Otherwise the import
+	// names the defining submodule of a re-exported class
+	// (phoenix6.hardware.talon_fx.TalonFX), which is valid Python.
+	for _, o := range exact(ctx, r, fqn, "", "python") {
+		if o.Season != season {
+			f.Severity, f.Kind = "warning", "wrong_season"
+			f.Message = fmt.Sprintf("%s is the %s path; the %s API has it at %s", fqn, o.Season, season, paths[0])
+			f.Fix = fmt.Sprintf("from %s import %s", mod, name)
+			break
+		}
+	}
+	emit(f)
 	return true
 }

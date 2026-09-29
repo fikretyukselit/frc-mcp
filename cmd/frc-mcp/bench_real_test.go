@@ -16,7 +16,7 @@ func BenchmarkSearchRealIndex(b *testing.B) {
 	if _, err := os.Stat("../../.shards"); err != nil {
 		b.Skip("no ../../.shards; run `make index`")
 	}
-	e, shards := openEngine(context.Background(), slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})), "../../.shards", "", true)
+	e, shards := openEngine(context.Background(), slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})), "../../.shards", true)
 	if e == nil {
 		b.Skip("no shards")
 	}
