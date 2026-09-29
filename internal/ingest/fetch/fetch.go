@@ -24,6 +24,16 @@ import (
 type Fetcher struct {
 	Client *http.Client
 	Dir    string // cache directory
+	// Now is the clock (nil: time.Now); tests set it, since a
+	// minimum-interval check must not depend on the OS clock's resolution.
+	Now func() time.Time
+}
+
+func (f *Fetcher) now() time.Time {
+	if f.Now != nil {
+		return f.Now()
+	}
+	return time.Now()
 }
 
 // Result describes a fetched resource.
@@ -69,7 +79,7 @@ func (f *Fetcher) GetFresh(ctx context.Context, url string, minInterval time.Dur
 			}
 		}
 	}
-	if cached != nil && minInterval > 0 && time.Since(cached.FetchedAt) < minInterval {
+	if cached != nil && minInterval > 0 && f.now().Sub(cached.FetchedAt) < minInterval {
 		cached.NotModified = true
 		return cached, nil
 	}
@@ -116,7 +126,7 @@ func (f *Fetcher) GetFresh(ctx context.Context, url string, minInterval time.Dur
 	}
 	r := &Result{URL: url, Path: base + ".body", ETag: resp.Header.Get("ETag"),
 		LastModified: resp.Header.Get("Last-Modified"), SHA256: hex.EncodeToString(h.Sum(nil)), Size: n,
-		FetchedAt: time.Now().UTC()}
+		FetchedAt: f.now().UTC()}
 	if err := os.Rename(tmp, r.Path); err != nil {
 		return nil, err
 	}
