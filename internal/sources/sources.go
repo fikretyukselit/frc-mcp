@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -43,6 +44,23 @@ type Source struct {
 	Skip      []string `yaml:"skip"`      // path prefixes (relative to include) to leave out
 	URLStyle  string   `yaml:"url_style"` // html (a/b.html) | dir (a/b/) | plain (a/b); github-markdown only
 	Lowercase bool     `yaml:"lowercase"` // lower-case page URLs (Writerside)
+
+	// Forum feeds (discourse-rss). URL is the topics feed (latest.rss);
+	// PostsURL, when set, is the latest-posts feed (posts.rss), whose replies
+	// are kept only for topics that URL's feed lists in an allowed category.
+	PostsURL   string   `yaml:"posts_url"`
+	Categories []string `yaml:"categories"` // category names to keep (case-insensitive); empty = all
+
+	// MinInterval is the politeness floor between two fetches of this
+	// source (Go duration, e.g. "30m"). Within it the cached copy is served
+	// without a request; it matters for hosts that send no validators.
+	MinInterval string `yaml:"min_interval"`
+}
+
+// Interval parses MinInterval (0 when unset; Validate rejects bad values).
+func (s Source) Interval() time.Duration {
+	d, _ := time.ParseDuration(s.MinInterval)
+	return d
 }
 
 // Model is an embedding model distributed alongside shards.
@@ -53,7 +71,7 @@ type Model struct {
 }
 
 // Adapters known to this binary.
-var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip", "wpilib-dcmotor"}
+var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip", "wpilib-dcmotor", "discourse-rss"}
 
 // Load parses and validates a registry file.
 func Load(path string) (*Registry, error) {
@@ -94,6 +112,18 @@ func (r *Registry) Validate() error {
 		if s.Adapter == "github-markdown" && !slices.Contains([]string{"html", "dir", "plain"}, s.URLStyle) {
 			return fmt.Errorf("sources: %s: url_style must be html, dir or plain", s.ID)
 		}
+		if s.MinInterval != "" {
+			if d, err := time.ParseDuration(s.MinInterval); err != nil || d <= 0 {
+				return fmt.Errorf("sources: %s: min_interval must be a positive Go duration (e.g. 30m)", s.ID)
+			}
+		}
+		if s.Adapter == "discourse-rss" {
+			if err := validateForum(s); err != nil {
+				return fmt.Errorf("sources: %s: %w", s.ID, err)
+			}
+		} else if s.PostsURL != "" || len(s.Categories) > 0 {
+			return fmt.Errorf("sources: %s: posts_url and categories are discourse-rss options", s.ID)
+		}
 		for name, v := range map[string]string{"library": s.Library, "season": s.Season, "channel": s.Channel,
 			"version": s.Version, "license": s.License, "trust": s.Trust, "shard": s.Shard} {
 			if strings.TrimSpace(v) == "" {
@@ -111,6 +141,49 @@ func (r *Registry) Validate() error {
 	return nil
 }
 
+// validateForum enforces the forum policy in configuration, so a registry
+// edit cannot quietly change it (docs/security.md §2.1, docs/sources.md §5):
+//
+//   - forum posts are user content: trust must be community and the license a
+//     LicenseRef-*-UserContent id, which `index publish` never ships;
+//   - site-level feeds only: Discourse's default robots.txt disallows the
+//     per-category and per-topic feeds (/c/*.rss, /t/*/*.rss).
+func validateForum(s Source) error {
+	if s.Trust != "community" {
+		return fmt.Errorf("discourse-rss content must be trust: community (got %q)", s.Trust)
+	}
+	if !UserContent(s.License) {
+		return fmt.Errorf("discourse-rss license must be a LicenseRef-*-UserContent id (never redistributed), got %q", s.License)
+	}
+	feeds := []string{s.URL}
+	if s.PostsURL != "" {
+		feeds = append(feeds, s.PostsURL)
+	}
+	var host string
+	for i, raw := range feeds {
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme != "https" || u.Host == "" {
+			return fmt.Errorf("feed %q must be an https URL", raw)
+		}
+		if !strings.HasSuffix(u.Path, ".rss") || strings.HasPrefix(u.Path, "/c/") || strings.HasPrefix(u.Path, "/t/") ||
+			u.RawQuery != "" {
+			return fmt.Errorf("feed %q: only site-level .rss feeds are allowed (robots.txt disallows /c/*.rss and /t/*/*.rss)", raw)
+		}
+		if i == 0 {
+			host = u.Host
+		} else if u.Host != host {
+			return fmt.Errorf("posts_url must be on the same host as url")
+		}
+	}
+	return nil
+}
+
+// UserContent reports whether a license id marks user-contributed content
+// (forum posts) that is never redistributed, even with --include-unlicensed.
+func UserContent(license string) bool {
+	return strings.HasPrefix(license, "LicenseRef-") && strings.HasSuffix(license, "-UserContent")
+}
+
 // Hosts returns the egress allowlist derived from the registry.
 func (r *Registry) Hosts() []string {
 	var hs []string
@@ -121,6 +194,9 @@ func (r *Registry) Hosts() []string {
 	}
 	for _, s := range r.Sources {
 		add(s.URL)
+		if s.PostsURL != "" {
+			add(s.PostsURL)
+		}
 	}
 	for _, m := range r.Models {
 		for _, f := range m.Files {

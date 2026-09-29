@@ -46,6 +46,15 @@ func New(dir, userAgent string, hosts []string, maxBody int64) *Fetcher {
 
 // Get returns the resource, revalidating a cached copy with conditional GET.
 func (f *Fetcher) Get(ctx context.Context, url string) (*Result, error) {
+	return f.GetFresh(ctx, url, 0)
+}
+
+// GetFresh is Get with a politeness floor: a cached copy fetched less than
+// minInterval ago is returned without contacting the host (NotModified set).
+// Sources without validators (Chief Delphi RSS behind Cloudflare sends
+// neither ETag nor Last-Modified) would otherwise cost a full download on
+// every index run.
+func (f *Fetcher) GetFresh(ctx context.Context, url string, minInterval time.Duration) (*Result, error) {
 	if err := os.MkdirAll(f.Dir, 0o755); err != nil {
 		return nil, err
 	}
@@ -59,6 +68,10 @@ func (f *Fetcher) Get(ctx context.Context, url string) (*Result, error) {
 				cached = &r
 			}
 		}
+	}
+	if cached != nil && minInterval > 0 && time.Since(cached.FetchedAt) < minInterval {
+		cached.NotModified = true
+		return cached, nil
 	}
 	hdr := http.Header{}
 	// Authenticated GitHub API calls get 5,000 req/h and free 304s; the token
@@ -116,3 +129,20 @@ func (f *Fetcher) Get(ctx context.Context, url string) (*Result, error) {
 
 // ErrNoCache is returned by Offline when nothing is cached for a URL.
 var ErrNoCache = errors.New("fetch: not cached")
+
+// Within adapts a Fetcher to the adapters' Get interface with a politeness
+// floor, for adapters that fetch further URLs of the same source.
+func (f *Fetcher) Within(minInterval time.Duration) *Floor {
+	return &Floor{f: f, d: minInterval}
+}
+
+// Floor is a Fetcher bound to a minimum re-fetch interval.
+type Floor struct {
+	f *Fetcher
+	d time.Duration
+}
+
+// Get fetches url, serving a cached copy younger than the floor.
+func (g *Floor) Get(ctx context.Context, url string) (*Result, error) {
+	return g.f.GetFresh(ctx, url, g.d)
+}

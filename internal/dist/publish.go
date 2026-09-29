@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/fikretyukselit/frc-mcp/internal/index"
+	"github.com/fikretyukselit/frc-mcp/internal/sources"
 )
 
 // PublishOptions configures Publish.
@@ -30,7 +31,8 @@ type PublishOptions struct {
 	Now     time.Time
 
 	// IncludeUnlicensed publishes shards with content whose license is a
-	// LicenseRef-* (the vendor publishes no license; docs/sources.md §4).
+	// LicenseRef-* (the vendor publishes no license; docs/sources.md §0.2).
+	// It never covers LicenseRef-*-UserContent (forum posts).
 	// Off by default: such shards are built and usable locally, but only
 	// redistributed once permission is recorded.
 	IncludeUnlicensed bool
@@ -74,6 +76,14 @@ func Publish(ctx context.Context, o PublishOptions) (*Manifest, error) {
 		r.Close()
 		if err != nil {
 			return nil, fmt.Errorf("publish: %s: %w", p, err)
+		}
+		// Forum posts are other people's words, often minors': they are
+		// never redistributed, whatever the flags (docs/sources.md §5).
+		if uc := slices.DeleteFunc(slices.Clone(lics), func(l string) bool { return !sources.UserContent(l) }); len(uc) > 0 {
+			if o.OnSkip != nil {
+				o.OnSkip(meta.Name, "user content ("+strings.Join(uc, ", ")+") is never redistributed; build it locally")
+			}
+			continue
 		}
 		if bad := slices.DeleteFunc(lics, func(l string) bool { return !Unlicensed(l) }); len(bad) > 0 && !o.IncludeUnlicensed {
 			if o.OnSkip != nil {

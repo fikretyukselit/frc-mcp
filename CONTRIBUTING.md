@@ -41,7 +41,8 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Python APIs (`pypi-wheel` + `pystub`: RobotPy and vendor wheels) | ✅ wpilib, wpimath, wpiutil, ntcore, hal, commands2, apriltag; phoenix6, robotpy-rev, photonlibpy, pathplannerlib, choreolib (2026 + 2027-alpha) — about 35k symbols |
 | Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
 | WPILib C++ API (`doxygen-zip`) | ✅ 2026 + 2027-alpha, ~20k symbols; 5,962 `frc::`→`wpi::` moves mapped automatically |
-| Vendor C++ APIs, more hardware sources, opt-in forum | ⏳ M3 leftovers |
+| Opt-in forum (`discourse-rss`: Chief Delphi `latest.rss` + `posts.rss`, shard `forum`) | ✅ trust `community`, searched only with `kinds: ["forum"]` or troubleshooting intent, fenced as untrusted data; built locally, never published (user content, `docs/sources.md` §0.1.1) |
+| Vendor C++ APIs, more hardware sources | ⏳ M3 leftovers |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -107,6 +108,8 @@ Most M3 work is "teach the indexer a new upstream". The steps:
    - `github-markdown` handles Markdown docs in a GitHub repository (MyST, Docusaurus, MkDocs Material, Writerside).
      Pin a release tag, never `main`.
    - `gitbook-llms` handles GitBook sites that publish `llms.txt`.
+   - `discourse-rss` handles a Discourse forum's site-level `latest.rss` / `posts.rss`. Forum sources must be
+     `trust: community` with a `LicenseRef-<Site>-UserContent` license (validated), and they are never published.
    - Record the **docs** license. If the vendor publishes none, use `LicenseRef-<Vendor>-Docs-NoLicense`, and the
      shard will not be redistributed (`docs/sources.md` §0.2).
 4. **New adapter:** add a package under `internal/ingest/source/<name>/` with a
@@ -157,6 +160,7 @@ it cannot map; those are the rules worth writing. A rule lives in `data/migratio
 | Migration rules for the few references still unresolved, and for PathPlannerLib / YAGSL / PhotonLib once their 2027 tables exist | S each | §8, `data/migrations/` |
 | More agent-eval tasks (C++ and Python tasks need a compile step per language) | M | `eval/tasks/`, `internal/agenteval` |
 | Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |
+| More community sources (r/FRC RSS, YouTube titles), each probed for robots.txt and ToS first like Chief Delphi (`docs/sources.md` §0.1.1) | S–M each | `internal/ingest/source`, `data/sources.yaml` |
 | More `frc_hardware` sources: CTRE/REV dyno pages, ReCalc (MIT) motor data, encoders/IMUs/swerve modules — each its own labeled source | M each | `internal/ingest/source`, `hw_spec` |
 | `frc_whats_new` `live` probe (allowlisted GitHub API call at query time) | M | `internal/mcpserver`, `internal/netguard` |
 | MCP conformance suite and goreleaser snapshot in CI; sync check on all 3 OSes | M | `.github/workflows/` |

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/fikretyukselit/frc-mcp/internal/retrieve"
+	"github.com/fikretyukselit/frc-mcp/internal/router"
 	"github.com/fikretyukselit/frc-mcp/internal/testfixture"
 )
 
@@ -100,6 +101,51 @@ func TestCommunityPolicy(t *testing.T) {
 	}
 	if bad != 0 && bad < clean {
 		t.Fatalf("suspect post ranked above clean one: %v", ids(r.Hits))
+	}
+}
+
+// Forum posts are opt-in (docs/security.md §2.1): no default search returns
+// one, whatever the retriever (BM25, dense, exact symbol) that found it;
+// kinds=[forum] returns only forum posts, all trust community.
+func TestForumOptIn(t *testing.T) {
+	e := testfixture.Engine(t)
+	ctx := context.Background()
+	for _, q := range []string{
+		"reduce CAN utilization status signals",          // general; the forum post is the best lexical match
+		"High CAN utilization with 8 Krakens",            // the forum post's exact title
+		"BaseStatusSignal.setUpdateFrequencyForAll",      // symbol intent; the post names the method
+		"How do I lower CAN bus utilization on Krakens?", // how-to
+	} {
+		r, err := e.Search(ctx, retrieve.Query{Text: q, Limit: 50})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Decision.Intent == router.IntentTroubleshoot {
+			t.Fatalf("%q routes to troubleshoot, which opts in by design; use a default-intent query", q)
+		}
+		for _, h := range append(r.Hits, r.OtherSeason...) {
+			if h.Chunk == nil {
+				t.Fatalf("%q: hit not hydrated", q)
+			}
+			if h.Chunk.Kind == "forum" || h.Chunk.Trust == "community" {
+				t.Fatalf("%q: forum chunk %s without opt-in", q, h.Chunk.ID())
+			}
+		}
+	}
+	r, err := e.Search(ctx, retrieve.Query{Text: "reduce CAN utilization status signals", Kinds: []string{"forum"}, Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Hits) == 0 {
+		t.Fatal("kinds=[forum] returned nothing")
+	}
+	for _, h := range r.Hits {
+		if h.Chunk == nil || h.Chunk.Kind != "forum" || h.Chunk.Trust != "community" {
+			t.Fatalf("kinds=[forum] returned %v", ids(r.Hits))
+		}
+	}
+	if r.Hits[0].Chunk.ID() != "forum/chiefdelphi/can-utilization#0" || r.Hits[0].Chunk.Suspect {
+		t.Fatalf("clean post must lead the suspect one: %v", ids(r.Hits))
 	}
 }
 
