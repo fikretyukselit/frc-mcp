@@ -43,7 +43,7 @@ func TestStdioEndToEnd(t *testing.T) {
 	client := mcp.NewClient(&mcp.Implementation{Name: "e2e", Version: "0"}, nil)
 	launch := func() (*mcp.ClientSession, *mcp.ListToolsResult, time.Duration) {
 		start := time.Now()
-		cs, err := client.Connect(ctx, &mcp.CommandTransport{Command: exec.Command(bin, "serve", "--index", shards)}, nil)
+		cs, err := client.Connect(ctx, &mcp.CommandTransport{Command: exec.Command(bin, "serve", "--offline", "--index", shards)}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

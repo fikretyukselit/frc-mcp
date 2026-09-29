@@ -43,3 +43,8 @@ Students must also be able to sync from school mirrors and verify offline.
 2. They store the seed as the `FRC_MCP_INDEX_KEY` secret in the protected `index-publish` environment.
 3. The public key is committed to `internal/dist/keys.go`.
 4. The `index` workflow runs; it needs GitHub Actions billing, or a public repository.
+
+**Status of the rollout (2026-09-29):** steps 1–3 are done. The production key has id `4d6c685f407388a5`; its seed was
+piped straight from `index keygen` into the `FRC_MCP_INDEX_KEY` secret of the `index-publish` environment (protected
+branches only) and never written to disk or shown. The repository is public, so step 4 runs on the free Actions tier.
+

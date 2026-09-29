@@ -225,3 +225,17 @@ func TestPublishSkipsUnlicensed(t *testing.T) {
 		t.Fatalf("include: %v %+v", err, m)
 	}
 }
+
+func TestProductionKeyCompiledIn(t *testing.T) {
+	kr, err := TrustedKeyring("")
+	if err != nil || len(kr) == 0 {
+		t.Fatalf("no compiled-in key: %v", err)
+	}
+	found := false
+	for _, k := range kr {
+		found = found || KeyID(k) == "4d6c685f407388a5"
+	}
+	if !found {
+		t.Fatalf("production key 4d6c685f407388a5 missing")
+	}
+}
