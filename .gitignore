@@ -1,6 +1,7 @@
 /bin/
 /dist/
 /.shards/
+/shards/
 /.cache/
 *.sqlite
 *.sqlite-*
