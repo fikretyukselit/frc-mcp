@@ -944,7 +944,7 @@ sources:
   # ---- Hardware specs (M3, frc_hardware) ----
   # WPILib's simulation constants for each motor (DCMotor factories), read
   # from DCMotor.java at the release tag. Labeled "wpilib-dcmotor"; other
-  # sources (vendor dyno data, ReCalc) will be separate rows, never merged.
+  # sources (ReCalc, vendor spec pages, data/hardware) are separate rows, never merged.
   - id: wpilib-dcmotor-2026
     adapter: wpilib-dcmotor
     url: https://raw.githubusercontent.com/wpilibsuite/allwpilib/v2026.2.2/wpimath/src/main/java/edu/wpi/first/math/system/plant/DCMotor.java
@@ -956,7 +956,7 @@ sources:
     license: BSD-3-Clause
     trust: official
     shard: hardware
-    verified: true # probed 2026-09-29 (20 factories)
+    verified: true # probed 2026-09-29 (19 factories)
   - id: wpilib-dcmotor-2027
     adapter: wpilib-dcmotor
     url: https://raw.githubusercontent.com/wpilibsuite/allwpilib/v2027.0.0-alpha-7/wpimath/src/main/java/org/wpilib/math/system/DCMotor.java
@@ -968,6 +968,107 @@ sources:
     license: BSD-3-Clause
     trust: official
     shard: hardware
+    verified: true
+
+  # ReCalc's motor table (tervay/recalc, MIT, LICENSE.txt), pinned to a
+  # commit: most values are vendor dyno data (its dataSource field), so they
+  # differ from DCMotor. Labeled "recalc"; season-independent ("all").
+  - id: recalc-motors
+    adapter: recalc-motors
+    url: https://raw.githubusercontent.com/tervay/recalc/8702a80eb61300b3cbfd7b800ea8d4b0e7614ab9/app/lib/models/Motor.ts
+    base_url: https://github.com/tervay/recalc/blob/8702a80eb61300b3cbfd7b800ea8d4b0e7614ab9/app/lib/models/Motor.ts
+    library: recalc
+    season: all
+    channel: stable
+    version: 8702a80eb61300b3cbfd7b800ea8d4b0e7614ab9
+    license: MIT
+    trust: community # a community tool; its numbers are copied, never merged with another source
+    shard: hardware
+    verified: true # probed 2026-09-29 (28 motors, 21 FRC)
+
+  # Vendor motor spec pages (GitBook .md renditions; robots.txt allows all).
+  # REV and WCP publish no license for their docs, so these rows live in
+  # hardware-restricted, which `index publish` leaves out (docs/sources.md §0.2).
+  # Unversioned pages: the ETag is the upstream revision.
+  - id: rev-neo-spec
+    adapter: gitbook-spec-table
+    url: https://docs.revrobotics.com/brushless/neo/v1.1.md
+    base_url: https://docs.revrobotics.com/brushless/neo/v1.1
+    hardware: {source: rev-docs, part: neo, name: NEO V1.1}
+    library: rev
+    season: all
+    channel: stable
+    version: live
+    license: LicenseRef-REV-Docs-NoLicense
+    trust: vendor
+    shard: hardware-restricted
+    verified: true # probed 2026-09-29
+  - id: rev-neo2-spec
+    adapter: gitbook-spec-table
+    url: https://docs.revrobotics.com/brushless/neo/2.0.md
+    base_url: https://docs.revrobotics.com/brushless/neo/2.0
+    hardware: {source: rev-docs, part: neo2, name: NEO 2.0}
+    library: rev
+    season: all
+    channel: stable
+    version: live
+    license: LicenseRef-REV-Docs-NoLicense
+    trust: vendor
+    shard: hardware-restricted
+    verified: true
+  - id: rev-neovortex-spec
+    adapter: gitbook-spec-table
+    url: https://docs.revrobotics.com/brushless/neo/vortex.md
+    base_url: https://docs.revrobotics.com/brushless/neo/vortex
+    hardware: {source: rev-docs, part: neovortex, name: NEO Vortex}
+    library: rev
+    season: all
+    channel: stable
+    version: live
+    license: LicenseRef-REV-Docs-NoLicense
+    trust: vendor
+    shard: hardware-restricted
+    verified: true
+  - id: rev-neo550-spec
+    adapter: gitbook-spec-table
+    url: https://docs.revrobotics.com/brushless/neo/550.md
+    base_url: https://docs.revrobotics.com/brushless/neo/550
+    hardware: {source: rev-docs, part: neo550, name: NEO 550}
+    library: rev
+    season: all
+    channel: stable
+    version: live
+    license: LicenseRef-REV-Docs-NoLicense
+    trust: vendor
+    shard: hardware-restricted
+    verified: true
+  # WCP (Kraken X60/X44 distributor) motor performance pages: one tab for
+  # trapezoidal commutation, one for FOC (→ the "-foc" part).
+  - id: wcp-krakenx60-spec
+    adapter: gitbook-spec-table
+    url: https://docs.wcproducts.com/welcome/electronics/kraken-x60/kraken-x60-motor/overview-and-features/motor-performance.md
+    base_url: https://docs.wcproducts.com/welcome/electronics/kraken-x60/kraken-x60-motor/overview-and-features/motor-performance
+    hardware: {source: wcp-docs, part: krakenx60, name: Kraken X60}
+    library: wcp
+    season: all
+    channel: stable
+    version: live
+    license: LicenseRef-WCP-Docs-NoLicense
+    trust: vendor
+    shard: hardware-restricted
+    verified: true # probed 2026-09-29
+  - id: wcp-krakenx44-spec
+    adapter: gitbook-spec-table
+    url: https://docs.wcproducts.com/welcome/electronics/kraken-x44/kraken-x44-motor/overview-and-features/motor-performance.md
+    base_url: https://docs.wcproducts.com/welcome/electronics/kraken-x44/kraken-x44-motor/overview-and-features/motor-performance
+    hardware: {source: wcp-docs, part: krakenx44, name: Kraken X44}
+    library: wcp
+    season: all
+    channel: stable
+    version: live
+    license: LicenseRef-WCP-Docs-NoLicense
+    trust: vendor
+    shard: hardware-restricted
     verified: true
 
 models:

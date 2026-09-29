@@ -24,6 +24,15 @@ func TestRegistryLoads(t *testing.T) {
 	}
 }
 
+func TestValidateSpecPage(t *testing.T) {
+	s := Source{ID: "x", Adapter: "gitbook-spec-table", URL: "https://a/b.md", BaseURL: "https://a/b", Library: "rev",
+		Season: "all", Channel: "stable", Version: "live", License: "LicenseRef-X", Trust: "vendor", Shard: "s",
+		Hardware: &Hardware{Source: "rev-docs", Part: "neovortex", Name: "NEO Vortex"}}
+	if err := (&Registry{Version: 1, Sources: []Source{s}}).Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateRejects(t *testing.T) {
 	base := Source{ID: "x", Adapter: "javadoc-zip", URL: "https://a/b", BaseURL: "https://a/", Library: "l",
 		Season: "2026", Channel: "stable", Version: "1", License: "MIT", Trust: "official", Shard: "s"}
@@ -34,6 +43,13 @@ func TestValidateRejects(t *testing.T) {
 		"bad min_interval":              func(s *Source) { s.MinInterval = "soon" },
 		"negative interval":             func(s *Source) { s.MinInterval = "-5m" },
 		"forum options on docs adapter": func(s *Source) { s.Categories = []string{"Programming"} },
+		"spec page without hardware":    func(s *Source) { s.Adapter = "gitbook-spec-table" },
+		"spec page with bad part id": func(s *Source) {
+			s.Adapter, s.Hardware = "gitbook-spec-table", &Hardware{Source: "rev-docs", Part: "NEO Vortex", Name: "NEO Vortex"}
+		},
+		"spec page without source label": func(s *Source) {
+			s.Adapter, s.Hardware = "gitbook-spec-table", &Hardware{Part: "neovortex", Name: "NEO Vortex"}
+		},
 	} {
 		s := base
 		mut(&s)

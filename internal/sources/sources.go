@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -55,6 +56,17 @@ type Source struct {
 	// source (Go duration, e.g. "30m"). Within it the cached copy is served
 	// without a request; it matters for hosts that send no validators.
 	MinInterval string `yaml:"min_interval"`
+
+	// Hardware labels the hw_spec rows of a vendor spec-page adapter
+	// (gitbook-spec-table): one page describes one part.
+	Hardware *Hardware `yaml:"hardware"`
+}
+
+// Hardware names what a spec page describes and how its rows are labeled.
+type Hardware struct {
+	Source string `yaml:"source"` // hw_spec source label, e.g. "rev-docs"; never shared with another upstream
+	Part   string `yaml:"part"`   // part id, the same one other sources use (e.g. "neovortex")
+	Name   string `yaml:"name"`   // display name, e.g. "NEO Vortex"
 }
 
 // Interval parses MinInterval (0 when unset; Validate rejects bad values).
@@ -71,7 +83,11 @@ type Model struct {
 }
 
 // Adapters known to this binary.
-var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip", "wpilib-dcmotor", "discourse-rss"}
+var Adapters = []string{"sphinx-htmlzip", "javadoc-zip", "vendordep-catalog", "github-markdown", "gitbook-llms", "github-releases", "pypi-wheel", "doxygen-zip", "wpilib-dcmotor", "recalc-motors", "gitbook-spec-table", "discourse-rss"}
+
+// partRe matches a hw_spec part id or source label ("krakenx60-foc",
+// "andymarkrs775_125", "rev-docs").
+var partRe = regexp.MustCompile(`^[a-z0-9]+(?:[-_][a-z0-9]+)*$`)
 
 // Load parses and validates a registry file.
 func Load(path string) (*Registry, error) {
@@ -123,6 +139,10 @@ func (r *Registry) Validate() error {
 			}
 		} else if s.PostsURL != "" || len(s.Categories) > 0 {
 			return fmt.Errorf("sources: %s: posts_url and categories are discourse-rss options", s.ID)
+		}
+		if s.Adapter == "gitbook-spec-table" && (s.Hardware == nil || !partRe.MatchString(s.Hardware.Part) ||
+			!partRe.MatchString(s.Hardware.Source) || strings.TrimSpace(s.Hardware.Name) == "") {
+			return fmt.Errorf("sources: %s: gitbook-spec-table needs hardware.source, hardware.part (lower-case id) and hardware.name", s.ID)
 		}
 		for name, v := range map[string]string{"library": s.Library, "season": s.Season, "channel": s.Channel,
 			"version": s.Version, "license": s.License, "trust": s.Trust, "shard": s.Shard} {
