@@ -1,0 +1,21 @@
+# Curated motor specs that no machine-readable table gives (frc_hardware
+# category motor). Every number is copied from the page in `citation`, read
+# on `checked`. Full DCMotor constants come from wpilib-dcmotor, recalc and
+# the vendor spec-page sources; these rows add only what the vendor states.
+license: MIT # this file: our compilation of the cited facts, notes in our words
+trust: vendor
+shard: hardware
+parts:
+  - part: minion
+    name: CTRE Minion
+    category: motor
+    source: ctre
+    citation: https://store.ctr-electronics.com/products/minion-brushless-motor
+    checked: 2026-09-29
+    fields:
+      stall_torque_nm: 3.1
+      peak_power_w: 610
+      motor_weight_lb: 0.65
+    note: >-
+      From the store page's tech specs (1.5 in diameter, 2.85 in long, SplineXS shaft). CTRE pairs it with the Talon FXS; the
+      page gives no free speed or currents.

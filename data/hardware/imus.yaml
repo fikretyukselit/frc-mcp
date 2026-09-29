@@ -1,0 +1,45 @@
+# Curated IMU specs (frc_hardware category imu). Every number is copied from
+# the page in `citation`, read on `checked`. Drift figures are the vendor's
+# own typical values under the conditions named in the key and note.
+license: MIT # this file: our compilation of the cited facts, notes in our words
+trust: vendor
+shard: hardware
+parts:
+  - part: ctrepigeon2
+    name: CTRE Pigeon 2.0
+    category: imu
+    source: ctre
+    citation: https://store.ctr-electronics.com/products/pigeon-2
+    checked: 2026-09-29
+    fields:
+      input_voltage_min_v: 6
+      input_voltage_max_v: 28
+      yaw_drift_no_motion_deg_per_hour: 0.12
+      yaw_drift_in_motion_deg_per_min: 0.4
+      yaw_drift_in_motion_at_boot_deg_per_min: 1.0
+      weight_g: 30.39
+    note: >-
+      9-axis IMU (3-axis gyro, accelerometer and magnetometer) on CAN and CAN FD (Phoenix 6). No boot or
+      temperature calibration needed; the gyro re-biases after 4 s without motion. In-motion drift is about 0.4
+      degree per minute after 4 s of no motion at boot, about 1.0 degree per minute when driven instantly after boot.
+  - part: reduxcanandgyro
+    name: Redux Boron Canandgyro
+    category: imu
+    source: redux
+    citation: https://docs.reduxrobotics.com/canandgyro/electrical-specs
+    see_also:
+      - https://docs.reduxrobotics.com/canandgyro
+    checked: 2026-09-29
+    fields:
+      input_voltage_min_v: 4.3
+      input_voltage_max_v: 16
+      current_ma: 40
+      yaw_drift_no_motion_deg_per_hour: 0.2
+      yaw_drift_in_motion_deg_per_min: 0.25
+      max_rate_deg_per_s: 2000
+      yaw_update_rate_default_hz: 100
+      weight_g: 17
+    note: >-
+      IMU fusing gyro and accelerometer (6 axes) on CAN 2.0B at 1 Mbps (no CAN FD). Drift is typical after calibration (no motion over
+      3 h; in motion over 2.5 min). The yaw frame defaults to 10 ms (100 Hz, about 1% bus); overriding it to 5 ms
+      (200 Hz) doubles that bus load.

@@ -1,0 +1,76 @@
+# Curated encoder specs (frc_hardware category encoder). Every number is
+# copied from the page in `citation` (or `see_also`), read on `checked`.
+# Interfaces are named in the note; only numbers go in fields.
+license: MIT # this file: our compilation of the cited facts, notes in our words
+trust: vendor
+shard: hardware
+parts:
+  - part: ctrecancoder
+    name: CTRE CANcoder
+    category: encoder
+    source: ctre
+    citation: https://store.ctr-electronics.com/products/cancoder
+    checked: 2026-09-29
+    fields:
+      supply_voltage_min_v: 6
+      supply_voltage_max_v: 16
+      current_max_ma: 60
+    note: >-
+      Rotary magnetic encoder (position and velocity) on CAN 2.0 and CAN FD (Phoenix 6). Current draw is under 50 mA nominal, 60 mA max.
+      The store page gives no resolution figure; see the CANcoder hardware reference and user's guide.
+  - part: revthroughborev2
+    name: REV Through Bore Encoder V2
+    category: encoder
+    source: rev
+    citation: https://docs.revrobotics.com/rev-crossover-products/sensors/tbe/specs
+    see_also:
+      - https://docs.revrobotics.com/rev-crossover-products/sensors/tbe
+    checked: 2026-09-29
+    fields:
+      quadrature_cpr: 8192
+      absolute_resolution_bits: 12
+      absolute_period_us: 1000
+      max_speed_rpm: 10000
+      input_voltage_min_v: 3.3
+      input_voltage_max_v: 5.0
+      accuracy_deg: 0.5
+      weight_g: 23.0
+    note: >-
+      Magnetic (MPS MA600) incremental and absolute encoder: ABI quadrature (2048 cycles, 8192 counts per
+      revolution) plus a 1 kHz absolute duty-cycle output. Factory calibrated to +/- 0.5 degree. JST-PH 6-pin
+      connector; 1/2 in hex bore by default.
+  - part: revthroughborev1
+    name: REV Through Bore Encoder V1
+    category: encoder
+    source: rev
+    citation: https://docs.revrobotics.com/rev-crossover-products/sensors/tbe/v1/specs
+    checked: 2026-09-29
+    fields:
+      quadrature_cpr: 8192
+      absolute_resolution_bits: 10
+      absolute_period_us: 1025
+      max_speed_rpm: 10000
+      input_voltage_min_v: 3.3
+      input_voltage_max_v: 5.0
+    note: >-
+      Magnetic (AEAT-8800) incremental and absolute encoder: ABI quadrature (2048 cycles, 8192 counts per
+      revolution) plus an absolute duty-cycle output (975.6 Hz); an SSI mode is selectable by switch. JST-PH 6-pin.
+  - part: reduxcanandmag
+    name: Redux Canandmag
+    category: encoder
+    source: redux
+    citation: https://docs.reduxrobotics.com/canandmag/electrical-specs
+    see_also:
+      - https://docs.reduxrobotics.com/canandmag
+    checked: 2026-09-29
+    fields:
+      absolute_resolution_bits: 14
+      input_voltage_min_v: 4.2
+      input_voltage_max_v: 16
+      current_at_5v_ma: 30
+      max_speed_rpm: 14600
+      pwm_period_us: 2049
+      pwm_frequency_hz: 488
+    note: >-
+      Magnetic absolute encoder over CAN (ReduxLib) and 14-bit PWM on a breakaway 10-pin IDC port that plugs into
+      a SPARK MAX or Talon SRX. Magnet sense range 1 to 3 mm.
