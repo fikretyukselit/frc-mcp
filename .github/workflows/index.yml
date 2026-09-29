@@ -71,3 +71,28 @@ jobs:
           # Objects first (content-addressed, idempotent), manifest last: clients only switch after everything is uploaded.
           gh release upload index-stable dist/index/*.gz --clobber
           gh release upload index-stable dist/index/manifest.json.sig dist/index/manifest.json --clobber
+  sync-check:
+    # A fresh install on every OS syncs the index just published and
+    # re-verifies it (signature, digests), with the compiled-in key.
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Fresh sync and verify
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          go build -o frc-mcp-bin ./cmd/frc-mcp
+          dir="$RUNNER_TEMP/frc-index"
+          ./frc-mcp-bin sync --index "$dir"
+          ./frc-mcp-bin sync --index "$dir" --verify
+          ./frc-mcp-bin doctor --index "$dir"
+
