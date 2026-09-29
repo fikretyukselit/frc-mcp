@@ -46,3 +46,15 @@ func FuzzCompareVersions(f *testing.F) {
 		}
 	})
 }
+
+func TestSeasonFor(t *testing.T) {
+	for _, tc := range []struct{ lib, v, want string }{
+		{"phoenix6", "26.3.0", "2026"}, {"phoenix6", "26.70.0-alpha-2", "2027"}, {"revlib", "2026.0.5", "2026"},
+		{"advantagekit", "27.0.0-alpha-6", "2027"}, {"wpilib", "2027.0.0-alpha-7", "2027"}, {"yagsl", "2026.9.27", "2026"},
+		{"photonvision", "Dev", ""},
+	} {
+		if got := SeasonFor(tc.lib, tc.v); got != tc.want {
+			t.Errorf("SeasonFor(%s, %s) = %q, want %q", tc.lib, tc.v, got, tc.want)
+		}
+	}
+}

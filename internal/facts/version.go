@@ -117,3 +117,18 @@ func Season(v string) string {
 	}
 	return ""
 }
+
+// SeasonFor is Season with vendor numbering quirks: CTRE numbers the next
+// season's alphas as YY.70+ of the current year (Phoenix 6 26.70.0-alpha-2
+// is the 2027 alpha), so a minor ≥ 50 on a two-digit year means next season.
+func SeasonFor(library, v string) string {
+	s := Season(v)
+	if s == "" || (library != "phoenix6" && library != "phoenix5") {
+		return s
+	}
+	core, _ := split(v)
+	if len(core) >= 2 && core[0] >= 20 && core[0] <= 39 && core[1] >= 50 {
+		return strconv.Itoa(2001 + core[0])
+	}
+	return s
+}

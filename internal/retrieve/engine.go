@@ -78,6 +78,8 @@ type Engine struct {
 	// shards without symbol tables (28 shards → typically 8–10 queried).
 	seasons    []map[string]bool
 	hasSymbols []bool
+
+	releases []index.Release // every shard's release facts, newest first
 }
 
 // Options configures an Engine.
@@ -111,9 +113,25 @@ func New(shards []*index.Reader, opt Options) *Engine {
 		if m.BuiltAt.After(e.builtAt) {
 			e.builtAt = m.BuiltAt
 		}
+		// The default season is the newest *stable API* season: shards with
+		// symbol tables define what a season is. Release-note shards span
+		// seasons and a vendor's "stable" 2027 tag must not flip every
+		// unpinned query to 2027.
+		if m.Symbols == 0 {
+			continue
+		}
 		for _, sc := range m.Seasons {
 			if sc.Channel == "stable" && sc.Season > best {
 				best = sc.Season
+			}
+		}
+	}
+	if best == "" { // no API shards (fixture-only / docs-only indexes)
+		for _, s := range shards {
+			for _, sc := range s.Meta().Seasons {
+				if sc.Channel == "stable" && sc.Season > best {
+					best = sc.Season
+				}
 			}
 		}
 	}
@@ -134,7 +152,87 @@ func New(shards []*index.Reader, opt Options) *Engine {
 		vds = append(vds, rows...)
 	}
 	e.catalog = facts.NewCatalog(vds)
+	for _, s := range shards {
+		rs, err := s.Releases(context.Background())
+		if err != nil {
+			e.warnings = append(e.warnings, "releases:"+s.Meta().Name+": "+err.Error())
+			continue
+		}
+		e.releases = append(e.releases, rs...)
+	}
+	slices.SortStableFunc(e.releases, func(a, b index.Release) int {
+		if c := b.PublishedAt.Compare(a.PublishedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Library, b.Library)
+	})
 	return e
+}
+
+// WhatsNewQuery selects release facts. Zero values mean "any".
+type WhatsNewQuery struct {
+	Library string    // library id or alias; "" or "all" = every library
+	Season  string    // FRC season; "" = any
+	Since   string    // a version of Library (exclusive), or empty
+	After   time.Time // releases published after this time, or zero
+	Stable  bool      // stable channel only
+	Limit   int
+}
+
+// ReleaseLibraries lists the libraries with release facts, sorted.
+func (e *Engine) ReleaseLibraries() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, r := range e.releases {
+		if !seen[r.Library] {
+			seen[r.Library] = true
+			out = append(out, r.Library)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// WhatsNew returns matching releases, newest first. It is an exact fact
+// lookup (no similarity): the order is publication time.
+func (e *Engine) WhatsNew(q WhatsNewQuery) []index.Release {
+	lib := LibraryID(q.Library)
+	var out []index.Release
+	for _, r := range e.releases {
+		switch {
+		case lib != "" && r.Library != lib:
+		case q.Season != "" && r.Season != q.Season:
+		case q.Stable && r.Channel != "stable":
+		case !q.After.IsZero() && !r.PublishedAt.After(q.After):
+		case q.Since != "" && facts.CompareVersions(r.Version, q.Since) <= 0:
+		default:
+			out = append(out, r)
+			if q.Limit > 0 && len(out) == q.Limit {
+				return out
+			}
+		}
+	}
+	return out
+}
+
+// libraryAliases maps common names to library ids (frc_whats_new input).
+var libraryAliases = map[string]string{
+	"all": "", "wpilib": "wpilib", "allwpilib": "wpilib", "gradlerio": "wpilib",
+	"phoenix": "phoenix6", "phoenix6": "phoenix6", "ctre": "phoenix6",
+	"rev": "revlib", "revlib": "revlib", "photon": "photonvision", "photonlib": "photonvision", "photonvision": "photonvision",
+	"pathplanner": "pathplannerlib", "pathplannerlib": "pathplannerlib", "choreo": "choreolib", "choreolib": "choreolib",
+	"akit": "advantagekit", "advantagekit": "advantagekit", "yagsl": "yagsl",
+}
+
+// LibraryID normalizes a library name or alias; unknown names pass through
+// lower-cased (so the caller can report "no releases for X").
+func LibraryID(name string) string {
+	n := strings.ToLower(strings.TrimSpace(name))
+	n = strings.NewReplacer(" ", "", "-", "", "_", "").Replace(n)
+	if id, ok := libraryAliases[n]; ok {
+		return id
+	}
+	return n
 }
 
 // Stale reports whether the installed index is past its manifest expiry

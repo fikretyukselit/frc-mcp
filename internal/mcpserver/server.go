@@ -114,6 +114,8 @@ func (s *Server) register() {
 		Annotations: readOnly("Resolve FRC vendordeps"), InputSchema: vendordepSchema()}, s.vendordep)
 	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_verify_code", Title: "Verify robot code against the season API", Description: surface.VerifyCode(),
 		Annotations: readOnly("Verify robot code against the season API"), InputSchema: verifySchema()}, s.verifyCode)
+	mcp.AddTool(s.mcp, &mcp.Tool{Name: "frc_whats_new", Title: "FRC library release notes", Description: surface.WhatsNew(),
+		Annotations: readOnly("FRC library release notes"), InputSchema: whatsNewSchema()}, s.whatsNew)
 	s.mcp.AddResource(&mcp.Resource{URI: "frc://index/manifest", Name: "index-manifest", Title: "Loaded index shards",
 		Description: "Shards currently loaded: names, build ids, build times, seasons, chunk and symbol counts.",
 		MIMEType:    "application/json"}, s.manifest)
@@ -523,6 +525,69 @@ func (s *Server) verifyCode(ctx context.Context, _ *mcp.CallToolRequest, in Veri
 	return text(render.VerifyMarkdown(out)), out, nil
 }
 
+// ---- frc_whats_new ----
+
+// WhatsNewIn is frc_whats_new's input.
+type WhatsNewIn struct {
+	Library    string `json:"library,omitempty" jsonschema:"library id or alias (wpilib, phoenix6, revlib, photonvision, pathplannerlib, choreolib, advantagekit, yagsl) or all (default)"`
+	Since      string `json:"since,omitempty" jsonschema:"only releases after this: a version of the library (e.g. 2026.0.2) or a date (YYYY-MM-DD)"`
+	Season     string `json:"frc_season,omitempty" jsonschema:"FRC season, e.g. 2026 (default: pin, else every season)"`
+	StableOnly bool   `json:"stable_only,omitempty" jsonschema:"leave out alpha and beta releases"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"maximum entries (default 10)"`
+	Pin        string `json:"pin,omitempty" jsonschema:"pin handle from frc_context"`
+}
+
+func (s *Server) whatsNew(_ context.Context, _ *mcp.CallToolRequest, in WhatsNewIn) (*mcp.CallToolResult, render.WhatsNewOut, error) {
+	var lang, channel string
+	fromPin, err := applyPin(in.Pin, &in.Season, &lang, &channel)
+	if err != nil {
+		return nil, render.WhatsNewOut{}, err
+	}
+	if err := validateCommon(in.Season, "", ""); err != nil {
+		return nil, render.WhatsNewOut{}, err
+	}
+	if in.Limit <= 0 {
+		in.Limit = 10
+	}
+	e := s.engine.Load()
+	if !e.Ready() {
+		out := render.WhatsNewOut{Envelope: syncing(), Entries: []render.ReleaseEntry{}}
+		return text(render.WhatsNewMarkdown(out)), out, nil
+	}
+	q := retrieve.WhatsNewQuery{Library: in.Library, Season: in.Season, Stable: in.StableOnly, Limit: in.Limit}
+	since := strings.TrimSpace(in.Since)
+	if t, err := time.Parse("2006-01-02", since); err == nil {
+		q.After = t
+	} else if since != "" {
+		if retrieve.LibraryID(in.Library) == "" {
+			return nil, render.WhatsNewOut{}, errors.New(`a version in "since" needs a library, e.g. {"library": "revlib", "since": "2026.0.2"}; use a date (YYYY-MM-DD) for all libraries`)
+		}
+		q.Since = since
+	}
+	pinSource := "arg"
+	switch {
+	case fromPin:
+		pinSource = "handle"
+	case in.Season == "":
+		pinSource = "all seasons"
+	}
+	out := render.WhatsNewOut{Envelope: render.Envelope{Status: retrieve.StatusOK, Confidence: 1, Freshness: "shard",
+		Season: in.Season, PinSource: pinSource}, Entries: []render.ReleaseEntry{}}
+	for _, r := range e.WhatsNew(q) {
+		out.Entries = append(out.Entries, render.ReleaseEntry{Library: r.Library, Version: r.Version, Season: r.Season,
+			Channel: r.Channel, Published: r.PublishedAt.Format("2006-01-02"), Breaking: r.Breaking, Title: r.Title,
+			Summary: r.Summary, ChunkID: r.ChunkID,
+			Citation: render.Citation{SourceURL: r.SourceURL, Library: r.Library, Version: r.Version, UpstreamRev: r.UpstreamRev,
+				RetrievedAt: r.RetrievedAt.Format(time.RFC3339), License: r.License, Trust: r.Trust}})
+	}
+	if len(out.Entries) == 0 {
+		out.Status, out.Confidence = retrieve.StatusNoMatch, 0
+		out.Libraries = e.ReleaseLibraries()
+		out.Next = []string{"no releases match; widen since/frc_season, or pick a library listed above"}
+	}
+	return text(render.WhatsNewMarkdown(out)), out, nil
+}
+
 // ---- frc_vendordep ----
 
 // VendordepIn is frc_vendordep's input.
@@ -719,6 +784,15 @@ func vendordepSchema() *jsonschema.Schema {
 	s := infer[VendordepIn]()
 	s.Properties["frc_season"].Pattern = seasonRe.String()
 	s.Properties["vendordeps"].MaxItems = ptr(64)
+	return s
+}
+
+func whatsNewSchema() *jsonschema.Schema {
+	s := infer[WhatsNewIn]()
+	s.Properties["frc_season"].Pattern = seasonRe.String()
+	s.Properties["since"].MaxLength = ptr(40)
+	s.Properties["library"].MaxLength = ptr(40)
+	s.Properties["limit"].Minimum, s.Properties["limit"].Maximum = ptr(1.0), ptr(50.0)
 	return s
 }
 

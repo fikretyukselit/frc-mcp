@@ -102,6 +102,26 @@ CREATE TABLE vendordep (
   PRIMARY KEY (uuid, version, season)
 ) WITHOUT ROWID;
 CREATE INDEX vendordep_name ON vendordep (name, season);
+
+-- Release facts (frc_whats_new): one row per upstream release. Added in M3;
+-- readers treat a missing table as "no releases" (older shards).
+CREATE TABLE release (
+  library      TEXT NOT NULL,
+  version      TEXT NOT NULL,
+  season       TEXT NOT NULL,
+  channel      TEXT NOT NULL,
+  published_at INTEGER NOT NULL,
+  breaking     INTEGER NOT NULL DEFAULT 0,
+  title        TEXT NOT NULL DEFAULT '',
+  summary      TEXT NOT NULL DEFAULT '',
+  chunk_id     TEXT NOT NULL DEFAULT '',
+  source_url   TEXT NOT NULL,
+  upstream_rev TEXT NOT NULL,
+  retrieved_at INTEGER NOT NULL,
+  license      TEXT NOT NULL,
+  trust        TEXT NOT NULL,
+  PRIMARY KEY (library, version)
+) WITHOUT ROWID;
 `
 
 // Enum codes returned by the light FTS query (no per-row string allocation).

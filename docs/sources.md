@@ -87,6 +87,7 @@ code license):
 | ChoreoLib Java API | BSD-3-Clause | yes |
 | AdvantageKit Java API | BSD-3-Clause | yes |
 | YAGSL Java API | LGPL-2.1 | yes |
+| Release notes (GitHub releases) | the repository's license (BSD-3/MIT/GPL-3.0/LGPL-2.1); CTRE `Phoenix-Releases` and REV `REV-Software-Binaries` have none | yes, except CTRE/REV (`LicenseRef-*-Release-Notes`, shard `releases-restricted`) |
 
 `LicenseRef-*` marks documentation without a redistribution grant. Those shards are built and can be used from a
 local index, but `frc-mcp index publish` leaves them out of the signed manifest unless `--include-unlicensed` is

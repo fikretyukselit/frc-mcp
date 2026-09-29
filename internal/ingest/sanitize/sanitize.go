@@ -96,7 +96,9 @@ var suspectPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(^|[.!?]\s+|\n)\s*(dear |hey |hi |hello |attention,? )?(claude|chatgpt|gpt-?\d?|copilot|gemini|cursor|codex|llm|ai|assistant)\s*[,:]`),
 	regexp.MustCompile(`(?i)\b(note|message|instructions?|attention|reminder)\s+(to|for)\s+(the\s+|any\s+|all\s+)?(ai|llm|assistant|agent|model|claude|gpt|copilot)s?\b`),
 	regexp.MustCompile(`(?i)\b(if you are|if you're)\s+an?\s+(ai|llm|assistant|agent|language model|bot)\b`),
-	regexp.MustCompile(`(?i)\b(for\s+)?(automated|machine|ai|llm)\s+(readers?|agents?|assistants?|eyes)(\s+only)?\s*[:,]|\bfor\s+(automated|machine|ai|llm)\s+(readers?|agents?|assistants?|eyes)\b|\b(hidden|secret)\s+(instruction|prompt|message)s?\b`),
+	// Vocative position only ("AI agents: …" at a line/sentence start):
+	// "your new live AI assistant, built into PhotonVision" is product prose.
+	regexp.MustCompile(`(?i)(^|[.!?]\s+|\n)\s*(for\s+)?(automated|machine|ai|llm)\s+(readers?|agents?|assistants?|eyes)(\s+only)?\s*[:,]|\bfor\s+(automated|machine|ai|llm)\s+(readers?|agents?|assistants?|eyes)\b|\b(hidden|secret)\s+(instruction|prompt|message)s?\b`),
 	regexp.MustCompile(`(?i)\bto\s+the\s+(ai|llm|model|assistant|agent|bot)\s+(reading|processing|parsing|summari[sz]ing)\b`),
 	regexp.MustCompile(`(?i)\b(?:(?:ai|llm|coding|automated)\s+(?:assistants?|agents?|models?|tools?)|llms?)\b[^.\n]{0,20}\b(must|should|need to|needs to|have to|has to|are required to)\b[^.\n]{0,60}\b(run|execute|delete|remove|send|upload|post|curl|install|commit|push|approve|import|add|disable)\b`),
 	// Subject is literally an AI/LLM: "the assistant coach should run the

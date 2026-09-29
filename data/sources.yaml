@@ -461,6 +461,110 @@ sources:
     shard: vendor-java-2026
     verified: true # probed 2026-09-29
 
+  # ---- Release notes (M3, frc_whats_new): GitHub releases of each project ----
+  # One REST listing per repository (ETag, GITHUB_TOKEN when set). Seasons
+  # come from each release's own version (facts.SeasonFor), so one shard holds
+  # every season. Release notes are often generated from pull-request titles:
+  # they are sanitized and flagged like any other text. Repositories without
+  # a license for their notes are LicenseRef-* (kept local by publish).
+  - id: wpilib-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/wpilibsuite/allwpilib/releases?per_page=100
+    base_url: https://github.com/wpilibsuite/allwpilib/releases/
+    library: wpilib
+    season: "all"
+    channel: stable
+    version: releases
+    license: BSD-3-Clause
+    trust: official
+    shard: releases
+    verified: true # probed 2026-09-29
+  - id: phoenix6-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/CrossTheRoadElec/Phoenix-Releases/releases?per_page=100
+    base_url: https://github.com/CrossTheRoadElec/Phoenix-Releases/releases/
+    library: phoenix6
+    season: "all"
+    channel: stable
+    version: releases
+    license: LicenseRef-CTRE-Release-Notes
+    trust: vendor
+    shard: releases-restricted
+    verified: true # probed 2026-09-29
+  - id: revlib-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/REVrobotics/REV-Software-Binaries/releases?per_page=100
+    include: revlib-
+    base_url: https://github.com/REVrobotics/REV-Software-Binaries/releases/
+    library: revlib
+    season: "all"
+    channel: stable
+    version: releases
+    license: LicenseRef-REV-Release-Notes
+    trust: vendor
+    shard: releases-restricted
+    verified: true # probed 2026-09-29
+  - id: photonvision-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/PhotonVision/photonvision/releases?per_page=100
+    base_url: https://github.com/PhotonVision/photonvision/releases/
+    library: photonvision
+    season: "all"
+    channel: stable
+    version: releases
+    license: GPL-3.0
+    trust: vendor
+    shard: releases
+    verified: true # probed 2026-09-29
+  - id: pathplannerlib-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/mjansen4857/pathplanner/releases?per_page=100
+    base_url: https://github.com/mjansen4857/pathplanner/releases/
+    library: pathplannerlib
+    season: "all"
+    channel: stable
+    version: releases
+    license: MIT
+    trust: vendor
+    shard: releases
+    verified: true # probed 2026-09-29
+  - id: choreolib-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/SleipnirGroup/Choreo/releases?per_page=100
+    base_url: https://github.com/SleipnirGroup/Choreo/releases/
+    library: choreolib
+    season: "all"
+    channel: stable
+    version: releases
+    license: BSD-3-Clause
+    trust: vendor
+    shard: releases
+    verified: true # probed 2026-09-29
+  - id: advantagekit-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/Mechanical-Advantage/AdvantageKit/releases?per_page=100
+    base_url: https://github.com/Mechanical-Advantage/AdvantageKit/releases/
+    library: advantagekit
+    season: "all"
+    channel: stable
+    version: releases
+    license: BSD-3-Clause
+    trust: vendor
+    shard: releases
+    verified: true # probed 2026-09-29
+  - id: yagsl-releases
+    adapter: github-releases
+    url: https://api.github.com/repos/Yet-Another-Software-Suite/YAGSL/releases?per_page=100
+    base_url: https://github.com/Yet-Another-Software-Suite/YAGSL/releases/
+    library: yagsl
+    season: "all"
+    channel: stable
+    version: releases
+    license: LGPL-2.1
+    trust: vendor
+    shard: releases
+    verified: true # probed 2026-09-29
+
 models:
   - id: potion-code-16M-v2 # MIT; query + document encoder for the lite profile
     license: MIT

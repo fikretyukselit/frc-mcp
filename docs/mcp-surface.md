@@ -173,10 +173,32 @@ Detects or declares the project's pin set.
   - Data comes from the relational `vendordep` and `compat` tables, never from embeddings.
   - `jsonUrl` values come from the signed catalog only.
 
-### `frc_whats_new`
-- **In:** `library` (or `all`), `since` (a version or a date), the `Pin` fields, `live?`.
-- **Out:** release, changelog and known-issue entries in order, with breaking-change flags and citations. Release-note
-  bodies from non-vendor repositories are `trust: community` and fenced.
+### `frc_whats_new` (implemented M3)
+- **In:**
+  - `library`: an id or alias, or `all`;
+  - `since`: a version of that library, or a date `YYYY-MM-DD`;
+  - `frc_season` or `pin`;
+  - `stable_only`;
+  - `limit` (default 10, at most 50).
+  - `live?` is not implemented yet. Freshness comes from the index cron.
+- **Out:** release entries newest first. Each has:
+  - library, version, season, channel, date and title;
+  - a `breaking` hint when the notes mention removed or renamed APIs;
+  - the first lines of the notes;
+  - the `chunk_id` of the full notes (for `frc_fetch`);
+  - a citation.
+
+  This is an exact fact lookup over the `release` table, in date order with no similarity ranking. With no match it
+  returns `no_match` plus the libraries that have release data.
+- **Data:** GitHub releases of each project's own repository (`github-releases` adapter; seasons ≥ 2025):
+  - allwpilib;
+  - Phoenix-Releases;
+  - REV-Software-Binaries (`revlib-` tags);
+  - photonvision, pathplanner, Choreo, AdvantageKit and YAGSL.
+
+  Seasons come from each version, including CTRE's `26.70.x`, which is the 2027 alpha. Release notes are often
+  generated from pull-request titles, so they are sanitized at ingest and rendered as a quote block. Notes from
+  non-vendor repositories, if ever added, are `trust: community` and fenced.
 
 ### `frc_hardware` (spec'd v0.2, implemented M3)
 - **In:** `parts[]`, or `category` (`motor|controller|encoder|imu|swerve_module|sensor`); `fields?`; `source?`.

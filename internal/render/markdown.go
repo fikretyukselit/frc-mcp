@@ -322,3 +322,34 @@ func VerifyMarkdown(o VerifyOut) string {
 	footer(&b, o.Envelope)
 	return b.String()
 }
+
+// WhatsNewMarkdown renders frc_whats_new. Release-note text is quoted: it is
+// upstream data (often generated from pull-request titles), not guidance.
+func WhatsNewMarkdown(o WhatsNewOut) string {
+	var b strings.Builder
+	envelope(&b, "frc_whats_new", o.Envelope)
+	for i, r := range o.Entries {
+		flag := ""
+		if r.Breaking {
+			flag = " · ⚠ possibly breaking"
+		}
+		fmt.Fprintf(&b, "\n%d. **%s %s** — %s · %s · season %s%s\n", i+1, r.Library, r.Version, r.Published, r.Channel, r.Season, flag)
+		if r.Title != "" && r.Title != r.Version && r.Title != "v"+r.Version {
+			fmt.Fprintf(&b, "   %s\n", r.Title)
+		}
+		if r.Summary != "" {
+			clean := strings.NewReplacer("⟦", "[", "⟧", "]").Replace(r.Summary)
+			b.WriteString("\n   > " + strings.ReplaceAll(clean, "\n", "\n   > ") + "\n")
+		}
+		if r.ChunkID != "" {
+			fmt.Fprintf(&b, "\n   full notes: frc_fetch id `%s`\n", r.ChunkID)
+		}
+		b.WriteString("\n")
+		source(&b, r.Citation, "   ")
+	}
+	if len(o.Libraries) > 0 {
+		fmt.Fprintf(&b, "\nLibraries with release data: %s\n", strings.Join(o.Libraries, ", "))
+	}
+	footer(&b, o.Envelope)
+	return b.String()
+}

@@ -102,6 +102,7 @@ func TestSuspectRealDocsRegressions(t *testing.T) {
 		"The previous instructions for Phoenix 5 no longer apply.",
 		"The assistant coach should run the practice match.",
 		"Resource Management: They act as locks that commands must acquire to run.",
+		"Introducing Quarky, your brand-new live AI assistant, built right into PhotonVision.",
 	} {
 		if Suspect(Clean(s)) {
 			t.Errorf("false positive: %q", s)

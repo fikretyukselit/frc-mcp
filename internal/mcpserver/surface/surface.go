@@ -25,6 +25,8 @@ var (
 	vendordep string
 	//go:embed frc_verify_code.md
 	verifyCode string
+	//go:embed frc_whats_new.md
+	whatsNew string
 )
 
 // Instructions is the server-level instructions text.
@@ -37,3 +39,4 @@ func API() string        { return strings.TrimSpace(api) }
 func Context() string    { return strings.TrimSpace(context) }
 func Vendordep() string  { return strings.TrimSpace(vendordep) }
 func VerifyCode() string { return strings.TrimSpace(verifyCode) }
+func WhatsNew() string   { return strings.TrimSpace(whatsNew) }

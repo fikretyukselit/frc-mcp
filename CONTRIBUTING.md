@@ -30,12 +30,13 @@ The docs describe the **target** design. The code implements milestones **M0, M1
 | Project detection + pin handles (`internal/project`) | ✅ implemented |
 | Eval harness + judged queries + CI gate (`internal/eval`, `eval/`) | ✅ 184 queries; a human-written holdout is still needed |
 | Egress guard, sanitizer (`internal/netguard`, `internal/ingest/sanitize`) | ✅ implemented |
-| Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context`, `frc_vendordep`, `frc_verify_code` (Java) | ✅ implemented |
+| Tools `frc_search`, `frc_fetch`, `frc_api`, `frc_context`, `frc_vendordep`, `frc_verify_code` (Java), `frc_whats_new` | ✅ implemented |
+| Release facts (`github-releases` adapter, `release` table) | ✅ WPILib + 7 vendors, seasons ≥ 2025 |
 | Vendordep catalog facts (`internal/facts`, `source/vendordeps`) | ✅ WPILib vendor-json-repo, 2026 + 2027-alpha |
 | Verifier (`internal/verify`, `frc-mcp verify`) | ✅ Java, WPILib + 7 vendor libraries (checked only when that season's table is indexed; version skew caps findings at warning): 0 false errors on 128k LOC of public 2026 team code |
 | Vendor Java APIs (Javadoc jars from vendor Maven repos) | ✅ Phoenix 6, REVLib, PhotonLib, PathPlannerLib, ChoreoLib, AdvantageKit, YAGSL (2026 + 2027-alpha where released) |
 | Signed distribution (`internal/dist`, `frc-mcp sync / index publish / index keygen`, `.github/workflows/index.yml`) | ✅ code + tests; the first publish is waiting on the production key (ADR-0006) |
-| `frc_migrate`, `frc_whats_new`, `frc_hardware`, C++/Python symbol tables | ⏳ M3–M4 |
+| `frc_migrate`, `frc_hardware`, C++/Python symbol tables | ⏳ M3–M4 |
 
 The corpus in `testdata/fixture/` is **synthetic and illustrative**. Never treat it as FRC truth.
 
@@ -123,7 +124,8 @@ Most M3 work is "teach the indexer a new upstream". The steps:
 | Ask CTRE, REV and YAGSL for permission to redistribute doc/API excerpts (`docs/sources.md` §0.2) | S, no code | email |
 | C++ symbols (Doxygen XML) and Python symbols (`.pyi` from robotpy) | L | new adapters |
 | Injection corpus + suspect detection (recall ≥ 0.95) | M | `eval/security/injection/`, `internal/ingest/sanitize` |
-| `frc_whats_new` (release notes, fenced as untrusted) and `frc_hardware` | L | `internal/mcpserver`, `docs/mcp-surface.md` |
+| `frc_hardware` (human-reviewed spec table, sources never merged) | L | `internal/facts`, `docs/mcp-surface.md` |
+| `frc_whats_new` `live` probe (allowlisted GitHub API call at query time) | M | `internal/mcpserver`, `internal/netguard` |
 | MCP conformance suite and goreleaser snapshot in CI; sync check on all 3 OSes | M | `.github/workflows/` |
 | Packaging: Homebrew, Scoop, Winget | M | `.goreleaser.yaml` |
 | M4: `frc_migrate`, Java member-level verification, agent compile-pass eval | L | `CLAUDE.md` §9 |

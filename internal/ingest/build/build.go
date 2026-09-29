@@ -22,6 +22,7 @@ import (
 	"github.com/fikretyukselit/frc-mcp/internal/embed/m2v"
 	"github.com/fikretyukselit/frc-mcp/internal/index"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/fetch"
+	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/ghreleases"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/gitbook"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/javadoc"
 	"github.com/fikretyukselit/frc-mcp/internal/ingest/source/repomd"
@@ -67,6 +68,7 @@ type ShardReport struct {
 	Rejected   int    `json:"rejected"`
 	Vectors    int    `json:"vectors"`
 	Vendordeps int    `json:"vendordeps,omitempty"`
+	Releases   int    `json:"releases,omitempty"`
 	BuildID    string `json:"build_id"`
 }
 
@@ -80,6 +82,7 @@ type shardData struct {
 	chunks     []index.Chunk
 	symbols    []index.Symbol
 	vendordeps []index.Vendordep
+	releases   []index.Release
 }
 
 // Run executes a build.
@@ -123,6 +126,9 @@ func Run(ctx context.Context, opt Options) (*Report, error) {
 			_, err = repomd.Parse(ctx, f, res.Path, src, res.FetchedAt, addChunk)
 		case "gitbook-llms":
 			_, err = gitbook.Parse(ctx, f, res.Path, src, res.FetchedAt, addChunk)
+		case "github-releases":
+			_, err = ghreleases.Parse(ctx, f, res.Path, src, res.FetchedAt,
+				func(r index.Release) error { sd.releases = append(sd.releases, r); sr.Symbols++; return nil }, addChunk)
 		case "javadoc-zip":
 			_, err = javadoc.Parse(res.Path, src, rev, res.FetchedAt,
 				func(s index.Symbol) error { sd.symbols = append(sd.symbols, s); sr.Symbols++; return nil }, addChunk)
@@ -279,6 +285,16 @@ func writeShard(ctx context.Context, dir string, sd *shardData, model *m2v.Model
 			return nil, err
 		}
 		rep.Vendordeps++
+	}
+	for _, r := range sd.releases {
+		if err := w.AddRelease(ctx, r); err != nil {
+			if errors.Is(err, index.ErrInvalidChunk) {
+				rep.Rejected++
+				continue
+			}
+			return nil, err
+		}
+		rep.Releases++
 	}
 	if err := w.Close(ctx); err != nil {
 		return nil, err
