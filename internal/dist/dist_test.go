@@ -160,9 +160,10 @@ func TestParseKeyring(t *testing.T) {
 	}
 }
 
-func TestPublishSkipsUnlicensed(t *testing.T) {
-	e := setup(t)
-	// A second shard whose content has no redistribution license.
+// oneChunkShard writes shard <name> holding the fixture's first chunk under
+// another license.
+func oneChunkShard(t *testing.T, dir, name, license string) {
+	t.Helper()
 	b, err := os.ReadFile(filepath.Join(testfixture.Root(), "chunks.jsonl"))
 	if err != nil {
 		t.Fatal(err)
@@ -178,15 +179,38 @@ func TestPublishSkipsUnlicensed(t *testing.T) {
 	if err := json.Unmarshal([]byte(line), &c); err != nil {
 		t.Fatal(err)
 	}
-	c["license"] = "LicenseRef-Vendor-NoLicense"
+	c["license"] = license
 	lb, _ := json.Marshal(c)
 	jl := filepath.Join(t.TempDir(), "u.jsonl")
 	if err := os.WriteFile(jl, append(lb, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := index.BuildFromJSONL(context.Background(), filepath.Join(e.in, "vendor-x.sqlite"), "vendor-x", jl, ""); err != nil {
+	if _, err := index.BuildFromJSONL(context.Background(), filepath.Join(dir, name+".sqlite"), name, jl, ""); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Forum posts never ship, not even with --include-unlicensed.
+func TestPublishNeverShipsUserContent(t *testing.T) {
+	e := setup(t)
+	oneChunkShard(t, e.in, "forum", "LicenseRef-ChiefDelphi-UserContent")
+	for _, include := range []bool{false, true} {
+		var skipped []string
+		m, err := Publish(context.Background(), PublishOptions{InDir: e.in, OutDir: e.out, Channel: "stable", Key: e.priv,
+			IncludeUnlicensed: include, OnSkip: func(s, _ string) { skipped = append(skipped, s) }})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(m.Shards) != 1 || m.Shards[0].Name != "fixture" || len(skipped) != 1 || skipped[0] != "forum" {
+			t.Fatalf("include=%v: shards %+v skipped %v", include, m.Shards, skipped)
+		}
+	}
+}
+
+func TestPublishSkipsUnlicensed(t *testing.T) {
+	e := setup(t)
+	// A second shard whose content has no redistribution license.
+	oneChunkShard(t, e.in, "vendor-x", "LicenseRef-Vendor-NoLicense")
 	var skipped []string
 	m, err := Publish(context.Background(), PublishOptions{InDir: e.in, OutDir: e.out, Channel: "stable", Key: e.priv,
 		OnSkip: func(s, _ string) { skipped = append(skipped, s) }})
