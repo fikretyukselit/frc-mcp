@@ -1,0 +1,8 @@
+.git
+.cache
+.shards
+.claude
+bin
+dist
+eval/results
+**/*.test

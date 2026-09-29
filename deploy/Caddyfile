@@ -1,0 +1,22 @@
+# TLS certificates are obtained and renewed automatically for {$DOMAIN}.
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+	}
+	# The MCP endpoint (Streamable HTTP) and health checks.
+	handle /mcp {
+		reverse_proxy frc-mcp:7424
+	}
+	handle /healthz {
+		reverse_proxy frc-mcp:7424
+	}
+	handle /readyz {
+		reverse_proxy frc-mcp:7424
+	}
+	handle {
+		respond "frc-mcp — FRC software knowledge for coding agents. Add https://{$DOMAIN}/mcp to your MCP client (see github.com/fikretyukselit/frc-mcp)." 200
+	}
+}

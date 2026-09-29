@@ -93,6 +93,9 @@ func New(engine *retrieve.Engine, opt Options) *Server {
 // MCP returns the underlying SDK server (for transports).
 func (s *Server) MCP() *mcp.Server { return s.mcp }
 
+// Ready reports whether an index is loaded.
+func (s *Server) Ready() bool { return s.engine.Load().Ready() }
+
 // SetEngine atomically replaces the engine (after an index sync).
 func (s *Server) SetEngine(e *retrieve.Engine) { s.engine.Store(e) }
 

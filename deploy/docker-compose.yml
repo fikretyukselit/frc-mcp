@@ -1,0 +1,60 @@
+# Hosted frc-mcp behind Caddy (automatic HTTPS). See docs/deploy.md.
+#
+#   cd deploy && DOMAIN=mcp.example.org docker compose up -d --build
+#
+# Only Caddy publishes ports. frc-mcp trusts X-Forwarded-For from Caddy's
+# fixed address on the private network, so rate limits apply per real client.
+name: frc-mcp
+services:
+  frc-mcp:
+    build:
+      context: ..
+      args:
+        VERSION: ${VERSION:-dev}
+    restart: unless-stopped
+    command:
+      - serve
+      - --transport=http
+      - --public
+      - --addr=0.0.0.0:7424
+      - --index=/data/shards
+      - --trust-proxy=172.28.0.10/32
+      - --metrics-addr=0.0.0.0:9464 # container network only; not published
+      - --rate=${FRC_MCP_RATE:-1}
+      - --burst=${FRC_MCP_BURST:-30}
+      - --max-inflight=${FRC_MCP_MAX_INFLIGHT:-64}
+    volumes:
+      - index:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 2g
+    networks:
+      edge:
+        ipv4_address: 172.28.0.20
+  caddy:
+    image: caddy:2.10@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
+    restart: unless-stopped
+    depends_on: [frc-mcp]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN, e.g. mcp.example.org}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      edge:
+        ipv4_address: 172.28.0.10
+volumes:
+  index:
+  caddy-data:
+  caddy-config:
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
