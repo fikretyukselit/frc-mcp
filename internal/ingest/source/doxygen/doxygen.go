@@ -88,7 +88,7 @@ func Parse(zipPath string, src sources.Source, rev string, retrieved time.Time,
 		if err != nil {
 			return st, fmt.Errorf("doxygen: %s: %w", name, err)
 		}
-		c := parseClass(doc, name)
+		c := parseClass(doc)
 		if c == nil || !wanted(c.fqn, roots) || seen[c.fqn] {
 			continue
 		}
@@ -170,7 +170,7 @@ func (c *class) signature() string {
 	return s
 }
 
-func parseClass(doc *html.Node, page string) *class {
+func parseClass(doc *html.Node) *class {
 	title := find(doc, func(n *html.Node) bool { return hasClass(attr(n, "class"), "title") })
 	if title == nil {
 		return nil
