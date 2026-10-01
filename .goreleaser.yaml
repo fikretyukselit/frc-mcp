@@ -56,6 +56,14 @@ homebrew_casks:
     description: Version-correct FRC robotics software knowledge for coding agents (MCP server)
     license: MIT
     binaries: [frc-mcp]
+    # The binary is not notarized yet: without this, Gatekeeper blocks the
+    # first run. The release itself is verifiable (cosign bundle, SLSA).
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/frc-mcp"]
+          end
 scoops:
   - name: frc-mcp
     repository:
