@@ -47,7 +47,6 @@ A local server works offline, reads your project to detect its season and vendor
 |---|---|
 | macOS / Linux (Homebrew) | `brew install fikretyukselit/tap/frc-mcp` |
 | Windows (Scoop) | `scoop bucket add fikretyukselit https://github.com/fikretyukselit/scoop-bucket` then `scoop install frc-mcp` |
-| Windows (winget) | `winget install FikretYukselFoundation.frc-mcp` |
 | Any, with Go 1.27+ | `go install github.com/fikretyukselit/frc-mcp/cmd/frc-mcp@latest` |
 | Manual | download the archive for your OS from the [latest release](https://github.com/fikretyukselit/frc-mcp/releases/latest) and put `frc-mcp` on your `PATH` |
 

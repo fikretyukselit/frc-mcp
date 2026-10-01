@@ -1,9 +1,8 @@
 # goreleaser v2: release binaries for the three OSes with checksums, a Syft
 # SBOM per archive and a cosign keyless signature on the checksums (identity:
 # this repository's release workflow). SLSA provenance and the container image
-# are produced by .github/workflows/release.yml. Package-manager publishing is
-# skipped unless PACKAGING_TOKEN (a token that can push to the tap/bucket and
-# open the winget-pkgs PR) is set.
+# are produced by .github/workflows/release.yml. Homebrew and Scoop packages
+# are written by their own repositories (see the note at the end).
 version: 2
 project_name: frc-mcp
 before:
@@ -45,51 +44,6 @@ release:
   prerelease: auto
   footer: |
     Verify: `cosign verify-blob --bundle checksums.txt.sigstore.json --certificate-identity-regexp '^https://github.com/fikretyukselit/frc-mcp/.github/workflows/release.yml@refs/tags/v' --certificate-oidc-issuer https://token.actions.githubusercontent.com checksums.txt`, then `sha256sum --check --ignore-missing checksums.txt`.
-homebrew_casks:
-  - name: frc-mcp
-    repository:
-      owner: fikretyukselit
-      name: homebrew-tap
-      token: "{{ .Env.PACKAGING_TOKEN }}"
-    skip_upload: '{{ if isEnvSet "PACKAGING_TOKEN" }}false{{ else }}true{{ end }}'
-    homepage: https://github.com/fikretyukselit/frc-mcp
-    description: Version-correct FRC robotics software knowledge for coding agents (MCP server)
-    license: MIT
-    binaries: [frc-mcp]
-    # The binary is not notarized yet: without this, Gatekeeper blocks the
-    # first run. The release itself is verifiable (cosign bundle, SLSA).
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/frc-mcp"]
-          end
-scoops:
-  - name: frc-mcp
-    repository:
-      owner: fikretyukselit
-      name: scoop-bucket
-      token: "{{ .Env.PACKAGING_TOKEN }}"
-    skip_upload: '{{ if isEnvSet "PACKAGING_TOKEN" }}false{{ else }}true{{ end }}'
-    homepage: https://github.com/fikretyukselit/frc-mcp
-    description: Version-correct FRC robotics software knowledge for coding agents (MCP server)
-    license: MIT
-winget:
-  - name: frc-mcp
-    publisher: Fikret Yuksel Foundation
-    short_description: Version-correct FRC robotics software knowledge for coding agents (MCP server)
-    license: MIT
-    homepage: https://github.com/fikretyukselit/frc-mcp
-    package_identifier: FikretYukselFoundation.frc-mcp
-    repository:
-      owner: fikretyukselit
-      name: winget-pkgs
-      branch: "frc-mcp-{{ .Version }}"
-      token: "{{ .Env.PACKAGING_TOKEN }}"
-      pull_request:
-        enabled: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
-    skip_upload: '{{ if isEnvSet "PACKAGING_TOKEN" }}false{{ else }}true{{ end }}'
+# Homebrew and Scoop: fikretyukselit/homebrew-tap and fikretyukselit/scoop-bucket
+# update themselves from each release (hourly), after verifying checksums.txt
+# against this workflow's signature; no cross-repository token is needed.
