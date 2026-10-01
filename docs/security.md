@@ -175,6 +175,6 @@ Each item names how it is checked. The hosted server is announced only when ever
 | 13 | Verifier false positives stay at 0 on public team code | `docs/benchmarks.md` (193k lines, Java/C++/Python) | ✅ |
 | 14 | Binaries are signed (cosign keyless on the checksums), attested (SLSA provenance), with a Syft SBOM per archive; the container image is signed and attested | `.github/workflows/release.yml`, `.goreleaser.yaml` | ✅ v0.1.1: `cosign verify-blob` of the checksums bundle, `sha256sum --check` and `gh attestation verify` (archive and image) all pass |
 | 14b | Windows Authenticode and macOS notarization | needs a code-signing certificate and an Apple Developer account | ⏳ Foundation decision |
-| 14c | Homebrew tap, Scoop bucket, winget | `PACKAGING_TOKEN` secret + `homebrew-tap`, `scoop-bucket` repos and a `winget-pkgs` fork | ⏳ maintainer setup |
+| 14c | Homebrew tap and Scoop bucket | `fikretyukselit/homebrew-tap` and `scoop-bucket` update themselves hourly with their own `GITHUB_TOKEN`, only after `checksums.txt` verifies against this release workflow's signature; no cross-repository token exists. Scoop installs are tested on a clean Windows runner. winget is not offered (it would need a token that can open PRs upstream) | ✅ 2026-10-01: `brew install fikretyukselit/tap/frc-mcp` (macOS) and `scoop install frc-mcp` (Windows runner) install v0.1.3 |
 | 15 | A published notice states what the hosted server logs (nothing but aggregate counters) and the index licenses | `docs/deploy.md`, README | ✅ docs; ⏳ page on the domain |
 

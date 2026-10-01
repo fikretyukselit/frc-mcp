@@ -18,41 +18,74 @@ with cited sources, and checks code against the real API before the agent says i
 classpath. With frc-mcp, **98.7%** of Sonnet's solutions compile, against **38.5%** without it; for 2027 tasks alone,
 98% against 20%. Haiku improves by 42 points.
 
-## Use the hosted server
+## Quick start: the hosted server
 
-No install needed: add `https://mrkaynak.com/frc/mcp` as a Streamable HTTP MCP server. For Claude Code:
+No install, nothing to keep updated. Add `https://mrkaynak.com/frc/mcp` to your agent as a remote (Streamable HTTP)
+MCP server:
+
+| Client | How |
+|---|---|
+| Claude Code | `claude mcp add --transport http frc https://mrkaynak.com/frc/mcp` |
+| Codex CLI | `codex mcp add frc --url https://mrkaynak.com/frc/mcp` |
+| Cursor | `~/.cursor/mcp.json`: `{ "mcpServers": { "frc": { "url": "https://mrkaynak.com/frc/mcp" } } }` |
+| VS Code (Copilot) | `.vscode/mcp.json`: `{ "servers": { "frc": { "type": "http", "url": "https://mrkaynak.com/frc/mcp" } } }` |
+| Claude Desktop / claude.ai | Settings → Connectors → Add custom connector → `https://mrkaynak.com/frc/mcp` |
+
+Then ask your agent something season-specific, for example:
+
+> "This is a 2027 project. Write a swerve subsystem with Phoenix 6 TalonFX drive motors and check that it compiles."
+
+The agent calls `frc_context` to pin the season, looks APIs up with `frc_api`, and runs `frc_verify_code` before
+it says it is done. The hosted server keeps no request content (aggregate counters only) and is rate-limited per
+client. It cannot read your files, so code goes in inline; to check a whole project, install locally.
+
+## Install locally
+
+A local server works offline, reads your project to detect its season and vendordeps, and checks every file.
+
+| Platform | Command |
+|---|---|
+| macOS / Linux (Homebrew) | `brew install fikretyukselit/tap/frc-mcp` |
+| Windows (Scoop) | `scoop bucket add fikretyukselit https://github.com/fikretyukselit/scoop-bucket` then `scoop install frc-mcp` |
+| Any, with Go 1.27+ | `go install github.com/fikretyukselit/frc-mcp/cmd/frc-mcp@latest` |
+| Manual | download the archive for your OS from the [latest release](https://github.com/fikretyukselit/frc-mcp/releases/latest) and put `frc-mcp` on your `PATH` |
+
+Then add it to your agent:
+
+| Client | How |
+|---|---|
+| Claude Code | `claude mcp add frc -- frc-mcp serve` |
+| Codex CLI | `codex mcp add frc -- frc-mcp serve` |
+| Cursor, Claude Desktop | `{ "mcpServers": { "frc": { "command": "frc-mcp", "args": ["serve"] } } }` |
+| VS Code (Copilot) | `.vscode/mcp.json`: `{ "servers": { "frc": { "type": "stdio", "command": "frc-mcp", "args": ["serve"] } } }` |
+
+If your client cannot find `frc-mcp`, use the full path (`which frc-mcp`, or `where frc-mcp` on Windows).
+
+**First run.** The server starts right away and downloads the signed index (about 55 MB, 184 MB on disk) in the
+background; tools answer `syncing` until it is in. It re-checks every 6 hours. Every download is verified with the
+Foundation's ed25519 key before use, so a mirror or a network in the middle cannot change what your agent reads.
+
+| Command | What it does |
+|---|---|
+| `frc-mcp doctor` | shows the installed index: every shard, its seasons and build date |
+| `frc-mcp sync` | downloads or updates the index now (`--verify` re-checks the installed one) |
+| `frc-mcp serve --offline` | never touches the network; serves what is installed |
+
+The index lives in `~/Library/Caches/frc-mcp/shards` (macOS), `$XDG_CACHE_HOME/frc-mcp/shards` (Linux) or
+`%LocalAppData%\frc-mcp\shards` (Windows); `--index DIR` picks another one.
+
+**Verify a download** (optional): every release ships `checksums.txt` with a Sigstore bundle and SLSA provenance.
 
 ```sh
-claude mcp add --transport http frc https://mrkaynak.com/frc/mcp
+cosign verify-blob --bundle checksums.txt.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/fikretyukselit/frc-mcp/.github/workflows/release.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com checksums.txt
+sha256sum --check --ignore-missing checksums.txt
+gh attestation verify frc-mcp_*_darwin_arm64.tar.gz -R fikretyukselit/frc-mcp   # or your archive
 ```
 
-The hosted server keeps no request content (aggregate counters only) and is rate-limited per client. It cannot read
-your files, so tools that take a `path` want the code inline; for whole-project checks install locally.
-
-## Install
-
-Download the archive for your OS from the [latest release](https://github.com/fikretyukselit/frc-mcp/releases/latest)
-and put `frc-mcp` on your `PATH`, or build it with Go 1.27+:
-
-```sh
-go install github.com/fikretyukselit/frc-mcp/cmd/frc-mcp@latest
-```
-
-Add it to your MCP client. For Claude Code:
-
-```sh
-claude mcp add frc -- frc-mcp serve
-```
-
-For clients configured with JSON (Cursor, VS Code, Claude Desktop), use a pinned path:
-
-```json
-{ "mcpServers": { "frc": { "command": "/usr/local/bin/frc-mcp", "args": ["serve"] } } }
-```
-
-On first start the server downloads the signed index (about 50 MB) in the background and keeps it updated. Every
-download is verified with the Foundation's ed25519 key before use. `frc-mcp sync` does the same by hand, and
-`frc-mcp doctor` shows what is installed.
+The binaries are not code-signed for macOS or Windows yet. Homebrew clears the macOS quarantine flag on install; for
+a manual download on macOS, run `xattr -d com.apple.quarantine frc-mcp` once.
 
 ## Tools
 
