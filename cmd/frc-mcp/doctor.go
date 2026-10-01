@@ -28,7 +28,7 @@ func doctor(ctx context.Context, args []string) error {
 	e, shards := openEngine(ctx, slog.New(slog.NewTextHandler(os.Stderr, nil)), *dir, !*noDense)
 	open := time.Since(t0)
 	if len(shards) == 0 {
-		fmt.Println("  no shards found — build one with `frc-mcp index build` (sync arrives in M2)")
+		fmt.Println("  no shards found — run `frc-mcp sync` to download the signed index (or `frc-mcp index run` to build one)")
 		return nil
 	}
 	defer func() {
